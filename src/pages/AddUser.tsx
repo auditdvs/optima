@@ -8,58 +8,50 @@ function AddUser() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setMessage(null);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage(null);
 
-  try {
-    // Gunakan service role untuk membuat pengguna
-    const { data: userData, error: signUpError } = await supabaseService.auth.admin.createUser({
-      email,
-      password: 'auditoptima',
-    });
-
-    
-    if (signUpError) throw signUpError;
-
-    if (userData.user) {
-      // Tambahkan role user ke tabel user_roles
-      const { error: roleError } = await supabaseService
-        .from('user_roles')
-        .insert([
-          {
-            user_id: userData.user.id,
-            role: 'user',
-          },
-        ]);
-
-      if (roleError) throw roleError;
-
-      setMessage({
-        text: 'User created successfully with default password: auditoptima',
-        type: 'success',
+    try {
+      // Gunakan service role untuk membuat pengguna, tapi dalam konteks yang terpisah
+      const adminAuth = supabaseService.auth.admin;
+      const { data: userData, error: signUpError } = await adminAuth.createUser({
+        email,
+        password: 'auditoptima',
       });
-      setEmail('');
+
+      if (signUpError) throw signUpError;
+
+      if (userData.user) {
+        // Tambahkan role user ke tabel user_roles menggunakan service client
+        const { error: roleError } = await supabaseService
+          .from('user_roles')
+          .insert([
+            {
+              user_id: userData.user.id,
+              role: 'user',
+            },
+          ]);
+
+        if (roleError) throw roleError;
+
+        setMessage({
+          text: 'User created successfully with default password: auditoptima',
+          type: 'success',
+        });
+        setEmail('');
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      setMessage({
+        text: 'Failed to create user. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error creating user:', error);
-    setMessage({
-      text: 'Failed to create user. Please try again.',
-      type: 'error',
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-  useEffect(() => {
-  const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-    console.log('Auth state changed:', event, session);
-  });
-
-  return () => subscription?.unsubscribe();
-}, []);
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-6">
