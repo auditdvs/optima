@@ -7,49 +7,52 @@ function AddUser() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage(null);
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setMessage(null);
 
-    try {
-      // Create user with default password
-      const { data: userData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password: 'auditoptima',
-      });
+  try {
+    // Create user with default password
+    const { data: userData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password: 'auditoptima',
+    });
 
-      if (signUpError) throw signUpError;
+    if (signUpError) throw signUpError;
 
-      if (userData.user) {
-        // Add user role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert([
-            {
-              user_id: userData.user.id,
-              role: 'user'
-            }
-          ]);
+    if (userData.user) {
+      // Add user role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert([
+          {
+            user_id: userData.user.id,
+            role: 'user',
+          },
+        ]);
 
-        if (roleError) throw roleError;
+      if (roleError) throw roleError;
 
-        setMessage({
-          text: 'User created successfully with default password: auditoptima',
-          type: 'success'
-        });
-        setEmail('');
-      }
-    } catch (error) {
-      console.error('Error creating user:', error);
+      // Log out the newly created user
+      await supabase.auth.signOut();
+
       setMessage({
-        text: 'Failed to create user. Please try again.',
-        type: 'error'
+        text: 'User created successfully with default password: auditoptima',
+        type: 'success',
       });
-    } finally {
-      setLoading(false);
+      setEmail('');
     }
-  };
+  } catch (error) {
+    console.error('Error creating user:', error);
+    setMessage({
+      text: 'Failed to create user. Please try again.',
+      type: 'error',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="max-w-2xl mx-auto p-6">
