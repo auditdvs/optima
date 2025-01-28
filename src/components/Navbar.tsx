@@ -11,7 +11,7 @@ function Navbar() {
       <div className="flex items-center space-x-6">
         {/* Audit Rating */}
         <Link
-          to="#"
+          to="https://risk-issue.streamlit.app/"
           className="flex items-center text-sm text-gray-600 hover:text-gray-900"
         >
           <FileCheck className="w-5 h-5 mr-2" />
@@ -20,7 +20,7 @@ function Navbar() {
 
         {/* RCM */}
         <Link
-          to="#"
+          to="https://risk-control-matriks.streamlit.app/"
           className="flex items-center text-sm text-gray-600 hover:text-gray-900"
         >
           <GitBranch className="w-5 h-5 mr-2" />
