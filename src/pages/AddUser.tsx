@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserPlus } from 'lucide-react';
+import { supabaseService } from '../lib/supabaseService';
 
 function AddUser() {
   const [email, setEmail] = useState('');
@@ -13,8 +14,8 @@ function AddUser() {
   setMessage(null);
 
   try {
-    // Create user with default password
-    const { data: userData, error: signUpError } = await supabase.auth.signUp({
+    // Gunakan service role untuk membuat pengguna
+    const { data: userData, error: signUpError } = await supabaseService.auth.admin.createUser({
       email,
       password: 'auditoptima',
     });
@@ -22,8 +23,8 @@ function AddUser() {
     if (signUpError) throw signUpError;
 
     if (userData.user) {
-      // Add user role
-      const { error: roleError } = await supabase
+      // Tambahkan role user ke tabel user_roles
+      const { error: roleError } = await supabaseService
         .from('user_roles')
         .insert([
           {
@@ -33,9 +34,6 @@ function AddUser() {
         ]);
 
       if (roleError) throw roleError;
-
-      // Log out the newly created user
-      await supabase.auth.signOut();
 
       setMessage({
         text: 'User created successfully with default password: auditoptima',
