@@ -1,37 +1,31 @@
+// lib/supabaseService.ts
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseServiceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY // Perhatikan prefix VITE_
 
-if (!supabaseUrl) {
-  throw new Error('Missing VITE_SUPABASE_URL environment variable')
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  console.error('Environment variables not found:', {
+    hasUrl: !!supabaseUrl,
+    hasServiceKey: !!supabaseServiceRoleKey
+  });
+  throw new Error('Required environment variables are missing')
 }
 
-if (!supabaseServiceRoleKey) {
-  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
-}
+// Singleton pattern untuk mencegah multiple instances
+let serviceClient: any = null
 
-export const supabaseService = createClient(
-  supabaseUrl,
-  supabaseServiceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
+export const getSupabaseService = () => {
+  if (!serviceClient) {
+    serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    })
   }
-)
-
-// Utility function untuk mengecek apakah service client sudah terkonfigurasi dengan benar
-export const checkServiceClientConfig = () => {
-  const hasAdminAccess = Boolean(supabaseService.auth.admin)
-  const projectUrl = supabaseService.supabaseUrl
-  
-  console.log('Service Client Check:', {
-    hasAdminAccess,
-    projectUrl,
-    isServiceRole: supabaseServiceRoleKey.includes('service_role')
-  })
-  
-  return hasAdminAccess
+  return serviceClient
 }
+
+export const supabaseService = getSupabaseService()
