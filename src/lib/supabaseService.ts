@@ -1,29 +1,42 @@
 // lib/supabaseService.ts
 import { createClient } from '@supabase/supabase-js'
 
+// Debug logging
+console.log('Environment Variables Check:', {
+  availableEnvs: import.meta.env,
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  hasServiceKey: !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+  // Jangan log full service key untuk keamanan
+});
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY // Perhatikan prefix VITE_
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.error('Environment variables not found:', {
-    hasUrl: !!supabaseUrl,
-    hasServiceKey: !!supabaseServiceRoleKey
+  console.error('Missing environment variables:', {
+    url: !!supabaseUrl,
+    serviceKey: !!supabaseServiceRoleKey
   });
-  throw new Error('Required environment variables are missing')
+  throw new Error('Required environment variables are missing. Check .env.local file')
 }
 
-// Singleton pattern untuk mencegah multiple instances
 let serviceClient: any = null
 
 export const getSupabaseService = () => {
   if (!serviceClient) {
-    serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-      }
-    })
+    try {
+      serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      })
+      console.log('Supabase service client created successfully')
+    } catch (error) {
+      console.error('Error creating Supabase service client:', error)
+      throw error
+    }
   }
   return serviceClient
 }
