@@ -20,6 +20,7 @@ function AddUser() {
       password: 'auditoptima',
     });
 
+    
     if (signUpError) throw signUpError;
 
     if (userData.user) {
@@ -51,6 +52,14 @@ function AddUser() {
     setLoading(false);
   }
 };
+
+  useEffect(() => {
+  const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Auth state changed:', event, session);
+  });
+
+  return () => subscription?.unsubscribe();
+}, []);
 
   return (
     <div className="max-w-2xl mx-auto p-6">
