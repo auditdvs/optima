@@ -2,6 +2,75 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { FileSpreadsheet, AlertTriangle, File, Download } from 'lucide-react';
 
+function THCLinks() {
+  const thcLinks = [
+    {
+      url: "https://olah-data-thc.streamlit.app/",
+      title: "THC Link 1",
+      description: "Regional : A, B, C"
+    },
+    {
+      url: "https://thc-alter-2.streamlit.app/",
+      title: "THC Link 2",
+      description: "Regional D, E, F"
+    },
+    {
+      url: "https://thc-alter-0103.streamlit.app/",
+      title: "THC Link 3",
+      description: "Regional G, H, I"
+    },
+    {
+      url: "https://thc-0104.streamlit.app/",
+      title: "THC Link 4",
+      description: "Regional J, K, L"
+    },
+    {
+      url: "https://thc-0105.streamlit.app/",
+      title: "THC Link 5",
+      description: "Regional M, N, O"
+    },
+    {
+      url: "https://thc-0106.streamlit.app/",
+      title: "THC Link 6",
+      description: "Regional P, Q, R, S"
+    },
+    {
+      url: "https://thc-link-adm.streamlit.app/",
+      title: "Admin Only",
+      description: "This links only for admin's"
+    }
+  ];
+
+  return (
+    <div className="mt-6 bg-white rounded-lg shadow p-6">
+      <div className="flex items-center mb-6">
+        <Link to="/tools/thc-processing" className="text-blue-600 hover:text-blue-800">
+          ← Kembali
+        </Link>
+      </div>
+      
+      <h2 className="text-xl font-semibold mb-4">THC Regional Links</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {thcLinks.map((link, index) => (
+          <a
+            key={index}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="no-underline"
+          >
+            <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+              <h3 className="text-lg font-semibold mb-2">{link.title}</h3>
+              <p className="text-gray-600">{link.description}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Tools() {
   const location = useLocation();
   
@@ -58,6 +127,7 @@ function Tools() {
 
       <Routes>
         <Route path="thc-processing" element={<THCProcessing />} />
+        <Route path="thc-processing/thc-links" element={<THCLinks />} />
         <Route path="anomaly-processing" element={<AnomalyProcessing />} />
         <Route path="tools-update" element={<UpdateTools />} />
       </Routes>
@@ -71,7 +141,7 @@ function THCProcessing() {
       <h2 className="text-xl font-semibold mb-4">Data Processing Steps</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Link to="/thc-links" className="no-underline">
+        <Link to="/tools/thc-processing/thc-links" className="no-underline">
           <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
             <h3 className="text-lg font-semibold mb-2">01. THC</h3>
             <p className="text-gray-600">Pengolahan data ini menggunakan bahan THC, Db Simpanan dan Db Pinjaman.</p>
