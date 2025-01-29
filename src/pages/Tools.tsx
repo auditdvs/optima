@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { FileSpreadsheet, AlertTriangle, File } from 'lucide-react';
 
 function Tools() {
   const location = useLocation();
@@ -39,11 +39,27 @@ function Tools() {
             </div>
           </div>
         </Link>
+
+        <Link 
+          to="/tools/tools-update"
+          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-green-100 text-green-600">
+              <File size={24} />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Tools Updates</h3>
+              <p className="text-sm text-gray-600">Updated tools anomalies etc</p>
+            </div>
+          </div>
+        </Link>
       </div>
 
       <Routes>
         <Route path="thc-processing" element={<THCProcessing />} />
         <Route path="anomaly-processing" element={<AnomalyProcessing />} />
+        <Route path="tools-update" element={<UpdateTools />} />
       </Routes>
     </div>
   );
@@ -130,6 +146,76 @@ function AnomalyProcessing() {
         >
           <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
             <h3 className="text-lg font-semibold mb-2">THC Simpanan</h3>
+            <p className="text-gray-600">Pengolahan data ini berdasarkan nilai rata-rata, nilai yang sering muncul dan nilai yang berbeda jauh dari kebiasaan anggota.</p>
+          </div>
+        </a>
+
+        <a 
+          href="https://pinjaman-ke.streamlit.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="no-underline"
+        >
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">THC Pinjaman</h3>
+            <p className="text-gray-600">Pengolahan data ini berdasarkan ketentuan plafon pembiayaan per pinjaman ke-, jangka waktu, jenis pinjaman (sanitasi), masuk atau tidak nya ke dalam simpanan (25%).</p>
+          </div>
+        </a>
+
+        <a 
+          href="https://anomali-keseluruhan.streamlit.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="no-underline"
+        >
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">Analisa Anomali Keseluruhan</h3>
+            <p className="text-gray-600">Pengolahan data ini bertujuan untuk menganalisa total anomali antara pinjaman dan simpanan berdasarkan Petugas Lapang, Center Meeting dan Jadwal Center Meeting.</p>
+          </div>
+        </a>
+
+        <a 
+          href="https://filter-anggota-lebih-dari-8.streamlit.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="no-underline"
+        >
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">Anggota lebih dari 8</h3>
+            <p className="text-gray-600">Pengolahan data ini bertujuan untuk memfilter anggota di center yang lebih dari 8 berdasarkan nilai transaksi harian.</p>
+          </div>
+        </a>
+
+        <a 
+          href="https://filter-prr.streamlit.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="no-underline"
+        >
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">Filter Pencairan Renovasi Rumah</h3>
+            <p className="text-gray-600">Pengolahan data ini bertujuan untuk mengecek pencairan renovasi rumah, sesuai ketentuan atau tidaknya.</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function UpdateTools() {
+  return (
+    <div className="mt-6 bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold mb-4">Tools update by DVS</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <a 
+          href="https://thc-simpanan.streamlit.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="no-underline"
+        >
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">Format data thc</h3>
             <p className="text-gray-600">Pengolahan data ini berdasarkan nilai rata-rata, nilai yang sering muncul dan nilai yang berbeda jauh dari kebiasaan anggota.</p>
           </div>
         </a>
