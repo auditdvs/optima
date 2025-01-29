@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FileSpreadsheet, AlertTriangle, File } from 'lucide-react';
+import { FileSpreadsheet, AlertTriangle, File, Download } from 'lucide-react';
 
 function Tools() {
   const location = useLocation();
@@ -203,70 +203,44 @@ function AnomalyProcessing() {
 }
 
 function UpdateTools() {
+  const tools = [
+    {
+      title: "Format data THC Gabungan Pivot",
+      description: "Format data THC gabungan yang sudah diselaraskan dengan tools THC.",
+      url: "https://docs.google.com/spreadsheets/d/1i0cTy-rbn3iMdLAnjxLk0pwv5p6LQTJM/export?format=xlsx"
+    },
+    {
+      title: "Format Laporan",
+      description: "Contoh format laporan yang baik dan benar.",
+      url: "https://drive.google.com/uc?export=download&id=1BAddVvqtT0ciWGan_3YR8SsRHG3gA6Ce"
+    },
+    {
+      title: "Absensi dan Berita acara",
+      description: "Contoh format berita acara, agenda entrance dan exit meeting.",
+      url: "https://drive.google.com/uc?export=download&id=1SWTh4x1_19lFaTZX7Uz7Bwwv9jUpUmBy"
+    }
+  ];
+
   return (
-    <div className="mt-6 bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Tools update by DVS</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <a 
-          href="https://thc-simpanan.streamlit.app/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="no-underline"
-        >
-          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Format data thc</h3>
-            <p className="text-gray-600">Pengolahan data ini berdasarkan nilai rata-rata, nilai yang sering muncul dan nilai yang berbeda jauh dari kebiasaan anggota.</p>
+    <div className="mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tools.map((tool, index) => (
+          <div key={index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold mb-3 text-gray-900">{tool.title}</h3>
+              <p className="text-gray-600 mb-6">{tool.description}</p>
+              <a
+                href={tool.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 group"
+              >
+                <Download className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                Download File
+              </a>
+            </div>
           </div>
-        </a>
-
-        <a 
-          href="https://pinjaman-ke.streamlit.app/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="no-underline"
-        >
-          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">THC Pinjaman</h3>
-            <p className="text-gray-600">Pengolahan data ini berdasarkan ketentuan plafon pembiayaan per pinjaman ke-, jangka waktu, jenis pinjaman (sanitasi), masuk atau tidak nya ke dalam simpanan (25%).</p>
-          </div>
-        </a>
-
-        <a 
-          href="https://anomali-keseluruhan.streamlit.app/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="no-underline"
-        >
-          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Analisa Anomali Keseluruhan</h3>
-            <p className="text-gray-600">Pengolahan data ini bertujuan untuk menganalisa total anomali antara pinjaman dan simpanan berdasarkan Petugas Lapang, Center Meeting dan Jadwal Center Meeting.</p>
-          </div>
-        </a>
-
-        <a 
-          href="https://filter-anggota-lebih-dari-8.streamlit.app/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="no-underline"
-        >
-          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Anggota lebih dari 8</h3>
-            <p className="text-gray-600">Pengolahan data ini bertujuan untuk memfilter anggota di center yang lebih dari 8 berdasarkan nilai transaksi harian.</p>
-          </div>
-        </a>
-
-        <a 
-          href="https://filter-prr.streamlit.app/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="no-underline"
-        >
-          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Filter Pencairan Renovasi Rumah</h3>
-            <p className="text-gray-600">Pengolahan data ini bertujuan untuk mengecek pencairan renovasi rumah, sesuai ketentuan atau tidaknya.</p>
-          </div>
-        </a>
+        ))}
       </div>
     </div>
   );
