@@ -73,7 +73,7 @@ const Dashboard = () => {
 
       // Fetch work papers for the current year
       const currentYear = new Date().getFullYear();
-      const startOfYear = new Date(currentYear, 0, 1).toISOString();
+      const startOfYear = new Date(currentYear - 1, 11, 1).toISOString();
       const endOfYear = new Date(currentYear, 11, 31).toISOString();
 
       const { data: workPapersData, error: workPapersError } = await supabase
