@@ -25,7 +25,6 @@ interface ChartData {
 }
 
 const RiskDashboard = () => {
-  const { user, userRole } = useAuth();
   const [regularAudits, setRegularAudits] = useState<AuditData[]>([]);
   const [fraudAudits, setFraudAudits] = useState<AuditData[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -37,11 +36,9 @@ const RiskDashboard = () => {
   const [regularSearchTerm, setRegularSearchTerm] = useState('');
   const [fraudSearchTerm, setFraudSearchTerm] = useState('');
 
-
-   useEffect(() => {
-    console.log('RiskDashboard - User:', user);
-    console.log('RiskDashboard - UserRole:', userRole);
-  }, [user, userRole]);
+  useEffect(() => {
+    fetchAudits();
+  }, []);
 
   const fetchAudits = async () => {
     try {
