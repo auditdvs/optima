@@ -70,6 +70,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserRole('user'); // Reset role on sign out
   }
 
+
+  async function fetchUserRole(userId: string) {
+  console.log('Fetching role for userId:', userId);
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    console.log('Role query data:', data);
+    console.log('Role query error:', error);
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching user role:', error);
+      return;
+    }
+    setUserRole(data?.role || 'user');
+  } catch (error) {
+    console.error('Error in fetchUserRole:', error);
+    setUserRole('user');
+  }
+}
+  
   const value = {
     user,
     userRole,
