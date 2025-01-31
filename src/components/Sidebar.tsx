@@ -1,6 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wrench, FileText, Settings, MapPin, ClipboardList, UserPlus } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Wrench, 
+  FileText, 
+  Settings, 
+  MapPin, 
+  ClipboardList, 
+  UserPlus,
+  AlertTriangle 
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
@@ -24,6 +33,13 @@ function Sidebar() {
     menuItems.push(
       { path: '/update-location', icon: MapPin, label: 'Update Location' },
       { path: '/qa-section', icon: ClipboardList, label: 'Update Audits' }
+    );
+  }
+
+  // Add Risk Dashboard for admin and risk roles
+  if (userRole === 'admin' || userRole === 'risk') {
+    menuItems.push(
+      { path: '/risk-dashboard', icon: AlertTriangle, label: 'Risk Dashboard' }
     );
   }
 
