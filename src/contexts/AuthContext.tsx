@@ -43,7 +43,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('role')
         .eq('user_id', userId)
         .maybeSingle();
-      
+
+
+  const userRole = data?.role;
+    
+    console.log('Role:', userRole);
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching user role:', error);
+      return;
+    }
+    
+    setUserRole(userRole || 'user');
+  } catch (error) {
+    console.error('Error in fetchUserRole:', error);
+    setUserRole('user');
+  }
+}
       console.log('Role query data:', data);
       console.log('Role query error:', error);
 
