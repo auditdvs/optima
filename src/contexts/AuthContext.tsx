@@ -36,43 +36,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function fetchUserRole(userId: string) {
-    console.log('Fetching role for userId:', userId);
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-
-  const userRole = data?.role;
+  console.log('Fetching role for userId:', userId);
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
     
-    console.log('Role:', userRole);
-
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching user role:', error);
+      setUserRole('user');
       return;
     }
     
-    setUserRole(userRole || 'user');
+    setUserRole(data?.role || 'user');
   } catch (error) {
     console.error('Error in fetchUserRole:', error);
     setUserRole('user');
   }
 }
-      console.log('Role query data:', data);
-      console.log('Role query error:', error);
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user role:', error);
-        return;
-      }
-      setUserRole(data?.role || 'user');
-    } catch (error) {
-      console.error('Error in fetchUserRole:', error);
-      setUserRole('user');
-    }
-  }
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({
