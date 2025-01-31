@@ -36,22 +36,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function fetchUserRole(userId: string) {
+    console.log('Fetching role for userId:', userId);
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .maybeSingle(); // Use maybeSingle instead of single to handle null case
+        .maybeSingle();
+      
+      console.log('Role query data:', data);
+      console.log('Role query error:', error);
 
-      if (error && error.code !== 'PGRST116') { // Ignore "No rows returned" error
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user role:', error);
         return;
       }
-
-      setUserRole(data?.role || 'user'); // Default to 'user' if no role found
+      setUserRole(data?.role || 'user');
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
-      setUserRole('user'); // Default to 'user' on error
+      setUserRole('user');
     }
   }
 
@@ -69,30 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     setUserRole('user'); // Reset role on sign out
   }
-
-
-  async function fetchUserRole(userId: string) {
-  console.log('Fetching role for userId:', userId);
-  try {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    console.log('Role query data:', data);
-    console.log('Role query error:', error);
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching user role:', error);
-      return;
-    }
-    setUserRole(data?.role || 'user');
-  } catch (error) {
-    console.error('Error in fetchUserRole:', error);
-    setUserRole('user');
-  }
-}
   
   const value = {
     user,
