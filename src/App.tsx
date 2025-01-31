@@ -12,11 +12,12 @@ import QASection from './pages/QA';
 import Tutorials from './pages/Tutorials';
 import CompanyRegulations from './pages/CompanyRegulations';
 import AddUser from './pages/AddUser';
+import RiskDashboard from './pages/RiskDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const queryClient = new QueryClient();
 
-function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin'] }: { 
+function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin', 'risk'] }: { 
   children: React.ReactNode;
   requiredRoles?: string[];
 }) {
@@ -60,6 +61,11 @@ function App() {
               <Route path="qa-section" element={
                 <PrivateRoute requiredRoles={['admin', 'qa']}>
                   <QASection />
+                </PrivateRoute>
+              } />
+              <Route path="risk-dashboard" element={
+                <PrivateRoute requiredRoles={['admin', 'risk']}>
+                  <RiskDashboard />
                 </PrivateRoute>
               } />
               <Route path="add-user" element={
