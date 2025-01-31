@@ -22,9 +22,26 @@ function Sidebar() {
   
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/tools', icon: Wrench, label: 'Tools' },
-    { path: '/workpapers', icon: FileText, label: 'Work Papers' },
-    { path: '/tutorials', icon: FileText, label: 'Tutorials' },
+     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', allowedRoles: ['admin', 'qa', 'user', 'risk'] },
+  { 
+    path: '/tools', 
+    icon: Wrench, 
+    label: 'Tools', 
+    allowedRoles: ['admin', 'qa', 'user'] 
+  },
+  { 
+    path: '/workpapers', 
+    icon: FileText, 
+    label: 'Work Papers', 
+    allowedRoles: ['admin', 'qa', 'user'] 
+  },
+  { 
+    path: '/tutorials', 
+    icon: FileText, 
+    label: 'Tutorials', 
+    allowedRoles: ['admin', 'qa', 'user'] 
+  },
+    
     { path: '/companyregulations', icon: FileText, label: 'Company Regulations' },
   ];
   
