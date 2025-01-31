@@ -22,26 +22,6 @@ function Sidebar() {
   
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', allowedRoles: ['admin', 'qa', 'user', 'risk'] },
-  { 
-    path: '/tools', 
-    icon: Wrench, 
-    label: 'Tools', 
-    allowedRoles: ['admin', 'qa', 'user'] 
-  },
-  { 
-    path: '/workpapers', 
-    icon: FileText, 
-    label: 'Work Papers', 
-    allowedRoles: ['admin', 'qa', 'user'] 
-  },
-  { 
-    path: '/tutorials', 
-    icon: FileText, 
-    label: 'Tutorials', 
-    allowedRoles: ['admin', 'qa', 'user'] 
-  },
-    
     { path: '/companyregulations', icon: FileText, label: 'Company Regulations' },
   ];
   
@@ -64,6 +44,14 @@ function Sidebar() {
   if (userRole === 'admin') {
     menuItems.push(
       { path: '/add-user', icon: UserPlus, label: 'Add User' }
+    );
+  }
+
+    if (userRole === 'admin' || userRole === 'qa' || userRole === 'user') {
+    menuItems.push(
+    { path: '/tools', icon: Wrench, label: 'Tools' },
+    { path: '/workpapers', icon: FileText, label: 'Work Papers' },
+    { path: '/tutorials', icon: FileText, label: 'Tutorials' }
     );
   }
   
