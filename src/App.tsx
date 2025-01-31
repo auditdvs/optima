@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const queryClient = new QueryClient();
 
-function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin'] }: { 
+function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin', 'risk'] }: { 
   children: React.ReactNode;
   requiredRoles?: string[];
 }) {
@@ -49,26 +49,10 @@ function App() {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="tools/*" element={
-                <PrivateRoute requiredRoles={['user', 'qa', 'admin']}>
-                  <Tools />
-                </PrivateRoute>
-              } />
-              <Route path="workpapers" element={
-                <PrivateRoute requiredRoles={['user', 'qa', 'admin']}>
-                  <WorkPapers />
-                </PrivateRoute>
-              } />
-              <Route path="tutorials" element={
-                <PrivateRoute requiredRoles={['user', 'qa', 'admin']}>
-                  <Tutorials />
-                </PrivateRoute>
-              } />
-              <Route path="companyRegulations" element={
-                <PrivateRoute requiredRoles={['user', 'qa', 'admin']}>
-                  <CompanyRegulations />
-                </PrivateRoute>
-              } />
+              <Route path="tools/*" element={<Tools />} />
+              <Route path="workpapers" element={<WorkPapers />} />
+              <Route path="tutorials" element={<Tutorials />} />
+              <Route path="companyRegulations" element={<CompanyRegulations />} />
               <Route path="update-location" element={
                 <PrivateRoute requiredRoles={['admin', 'qa']}>
                   <UpdateLocation />
@@ -80,20 +64,13 @@ function App() {
                 </PrivateRoute>
               } />
               <Route path="risk-dashboard" element={
-                <PrivateRoute requiredRoles={['risk']}>
+                <PrivateRoute requiredRoles={['admin', 'risk']}>
                   <RiskDashboard />
                 </PrivateRoute>
               } />
               <Route path="add-user" element={
                 <PrivateRoute requiredRoles={['admin']}>
                   <AddUser />
-                </PrivateRoute>
-              } />
-              
-              {/* Redirect for risk role */}
-              <Route path="*" element={
-                <PrivateRoute requiredRoles={['risk']}>
-                  <Navigate to="/risk-dashboard" replace />
                 </PrivateRoute>
               } />
             </Route>
