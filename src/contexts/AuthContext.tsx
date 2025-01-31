@@ -36,26 +36,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function fetchUserRole(userId: string) {
-  console.log('Fetching role for userId:', userId);
-  try {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching user role:', error);
-      setUserRole('user');
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle(); // Use maybeSingle instead of single to handle null case
+
+      if (error && error.code !== 'PGRST116') { // Ignore "No rows returned" error
+        console.error('Error fetching user role:', error);
+        return;
+      }
+
+      setUserRole(data?.role || 'user'); // Default to 'user' if no role found
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
+      setUserRole('user'); // Default to 'user' on error
     }
-    
-    setUserRole(data?.role || 'user');
-  } catch (error) {
-    console.error('Error in fetchUserRole:', error);
-    setUserRole('user');
   }
-}
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({
@@ -71,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     setUserRole('user'); // Reset role on sign out
   }
-  
+
   const value = {
     user,
     userRole,
