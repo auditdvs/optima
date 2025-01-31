@@ -49,9 +49,21 @@ function App() {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="tools/*" element={<Tools />} />
-              <Route path="workpapers" element={<WorkPapers />} />
-              <Route path="tutorials" element={<Tutorials />} />
+                            <Route path="tools/*" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <Tools />
+                </PrivateRoute>
+              } />
+              <Route path="workpapers" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <WorkPapers />
+                </PrivateRoute>
+              } />
+              <Route path="tutorials" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <Tutorials />
+                </PrivateRoute>
+              } />
               <Route path="companyRegulations" element={<CompanyRegulations />} />
               <Route path="update-location" element={
                 <PrivateRoute requiredRoles={['admin', 'qa']}>
@@ -64,7 +76,7 @@ function App() {
                 </PrivateRoute>
               } />
               <Route path="risk-dashboard" element={
-                <PrivateRoute requiredRoles={['admin', 'risk']}>
+                <PrivateRoute requiredRoles={['admin', 'qa', 'risk']}>
                   <RiskDashboard />
                 </PrivateRoute>
               } />
