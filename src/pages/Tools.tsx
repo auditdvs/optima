@@ -245,14 +245,14 @@ function AnomalyProcessing() {
         </a>
 
         <a 
-          href="https://filter-anggota-lebih-dari-8.streamlit.app/" 
+          href="https://danaresiko.streamlit.app/" 
           target="_blank" 
           rel="noopener noreferrer"
           className="no-underline"
         >
           <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Anggota lebih dari 8</h3>
-            <p className="text-gray-600">Pengolahan data ini bertujuan untuk memfilter anggota di center yang lebih dari 8 berdasarkan nilai transaksi harian.</p>
+            <h3 className="text-lg font-semibold mb-2">Anomali Danaresiko</h3>
+            <p className="text-gray-600">Pengolahan data ini bertujuan untuk mengecek data anggota dan yang diajukan danaresiko.</p>
           </div>
         </a>
 
