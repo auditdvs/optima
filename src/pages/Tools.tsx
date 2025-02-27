@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FileSpreadsheet, AlertTriangle, File, Download } from 'lucide-react';
+import { FileSpreadsheet, AlertTriangle, File, Download, ClipboardList } from 'lucide-react';
 
 function THCLinks() {
   const thcLinks = [
@@ -71,6 +71,70 @@ function THCLinks() {
   );
 }
 
+function WorkPaperLinks() {
+  const workPaperLinks = [
+    {
+      url: "https://kk-anggota-keluar.streamlit.app/",
+      title: "Kertas Kerja - Anggota Keluar",
+      description: "Ini berisikan untuk sampel anggota keluar."
+    },
+    {
+      url: "https://kk-anggota-par.streamlit.app/",
+      title: "Kertas Kerja - Anggota PAR",
+      description: "Ini berisikan untuk sampel anggota PAR"
+    },
+    {
+      url: "https://kk-konsumsi.streamlit.app/",
+      title: "Kertas Kerja - Konsumsi",
+      description: "Ini berisikan untuk pengecekkan biaya pengeluaran konsumsi, beradasarkan kriteria total kuantitas beras, galon, gula, dll"
+    },
+    {
+      url: "https://kk-simpanan-pinjaman.streamlit.app/",
+      title: "Kertas Kerja - Simpanan dan Pinjaman",
+      description: "Ini berisikan simpanan dan pinjaman berdasarkan center sampel dari THC yang sudah di buat. Tolong pilih center sesuai sampel yang dipakai"
+    },
+    {
+      url: "https://analysis-trx-bbm.streamlit.app/",
+      title: "Kertas Kerja - Analisa BBM",
+      description: "Ini berisikan ketentuan maksimal jumlah BBM dalam 1 bulan sesuai dengan jabatan"
+    },
+    {
+      url: "https://analysis-trx-fc.streamlit.app/",
+      title: "Kertas Kerja - Analisa Fotocopy",
+      description: "Ini berisikan untuk jumlah form yang difotocopy, berdasarkan jumlah kewajaran harga per lembar."
+    }
+  ];
+
+  return (
+    <div className="mt-6 bg-white rounded-lg shadow p-6">
+      <div className="flex items-center mb-6">
+        <Link to="/tools/work-paper" className="text-blue-600 hover:text-blue-800">
+          ← Kembali
+        </Link>
+      </div>
+      
+      <h2 className="text-xl font-semibold mb-4">Kertas Kerja Links</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {workPaperLinks.map((link, index) => (
+          <a
+            key={index}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="no-underline"
+          >
+            <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+              <h3 className="text-lg font-semibold mb-2">{link.title}</h3>
+              <p className="text-gray-600">{link.description}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Tools() {
   const location = useLocation();
   
@@ -110,6 +174,21 @@ function Tools() {
         </Link>
 
         <Link 
+          to="/tools/work-paper"
+          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+              <ClipboardList size={24} />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Work Paper</h3>
+              <p className="text-sm text-gray-600">Access work paper templates and tools</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link 
           to="/tools/tools-update"
           className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
         >
@@ -129,6 +208,8 @@ function Tools() {
         <Route path="thc-processing" element={<THCProcessing />} />
         <Route path="thc-processing/thc-links" element={<THCLinks />} />
         <Route path="anomaly-processing" element={<AnomalyProcessing />} />
+        <Route path="work-paper" element={<WorkPaper />} />
+        <Route path="work-paper/work-paper-links" element={<WorkPaperLinks />} />
         <Route path="tools-update" element={<UpdateTools />} />
       </Routes>
     </div>
@@ -197,6 +278,23 @@ function THCProcessing() {
             <p className="text-gray-600">Pengolahan data ini menggunakan bahan data sebelumnya (THC Final yang gabungan dari Simpanan dan Pinjaman, TLP, dan KDP).</p>
           </div>
         </a>
+      </div>
+    </div>
+  );
+}
+
+function WorkPaper() {
+  return (
+    <div className="mt-6 bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold mb-4">Work Paper Tools</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Link to="/tools/work-paper/work-paper-links" className="no-underline">
+          <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-semibold mb-2">Kertas Kerja</h3>
+            <p className="text-gray-600">Tools untuk generate kertas kerja pemeriksaan audit.</p>
+          </div>
+        </Link>
       </div>
     </div>
   );
