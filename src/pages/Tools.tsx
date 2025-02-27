@@ -93,6 +93,11 @@ function WorkPaperLinks() {
       title: "Kertas Kerja - Simpanan dan Pinjaman",
       description: "Ini berisikan simpanan dan pinjaman berdasarkan center sampel dari THC yang sudah di buat. Tolong pilih center sesuai sampel yang dipakai"
     },
+        {
+      url: "https://kk-santunan-meninggal.streamlit.app/",
+      title: "Kertas Kerja - Santunan Meninggal",
+      description: "Ini berisikan pengecekkan santunan anggota dan suami meninggal"
+    },
     {
       url: "https://analysis-trx-bbm.streamlit.app/",
       title: "Kertas Kerja - Analisa BBM",
