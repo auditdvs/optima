@@ -180,7 +180,7 @@ function Tools() {
 
         <Link 
           to="/tools/work-paper"
-          className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+          className="cursor-not-allowed bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-purple-100 text-purple-600">
