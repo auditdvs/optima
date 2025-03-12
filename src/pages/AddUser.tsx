@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus } from 'lucide-react';
+import { UserRoundPlus } from 'lucide-react';
+import { supabaseService } from '../lib/supabaseService';
 
 function AddUser() {
   const [email, setEmail] = useState('');
@@ -13,8 +14,9 @@ function AddUser() {
     setMessage(null);
 
     try {
-      // Create user with default password
-      const { data: userData, error: signUpError } = await supabase.auth.signUp({
+      // Gunakan service role untuk membuat pengguna, tapi dalam konteks yang terpisah
+      const adminAuth = supabaseService.auth.admin;
+      const { data: userData, error: signUpError } = await adminAuth.createUser({
         email,
         password: 'auditoptima',
       });
@@ -22,21 +24,21 @@ function AddUser() {
       if (signUpError) throw signUpError;
 
       if (userData.user) {
-        // Add user role
-        const { error: roleError } = await supabase
+        // Tambahkan role user ke tabel user_roles menggunakan service client
+        const { error: roleError } = await supabaseService
           .from('user_roles')
           .insert([
             {
               user_id: userData.user.id,
-              role: 'user'
-            }
+              role: 'user',
+            },
           ]);
 
         if (roleError) throw roleError;
 
         setMessage({
           text: 'User created successfully with default password: auditoptima',
-          type: 'success'
+          type: 'success',
         });
         setEmail('');
       }
@@ -44,7 +46,7 @@ function AddUser() {
       console.error('Error creating user:', error);
       setMessage({
         text: 'Failed to create user. Please try again.',
-        type: 'error'
+        type: 'error',
       });
     } finally {
       setLoading(false);
@@ -54,7 +56,7 @@ function AddUser() {
   return (
     <div className="max-w-2xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-8">
-        <UserPlus className="h-8 w-8 text-indigo-600" />
+        <UserRoundPlus className="h-8 w-8 text-indigo-600" />
         <h1 className="text-2xl font-bold text-gray-900">Add New User</h1>
       </div>
 

@@ -1,6 +1,15 @@
-import React from 'react';
+import {
+  Table2,
+  FileVideo,
+  FileText,
+  LayoutDashboard,
+  MapPinPlus,
+  FilePenLine,
+  UserRoundPlus,
+  Library,
+  Wrench
+} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wrench, FileText, Settings, MapPin, ClipboardList, UserPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
@@ -13,34 +22,46 @@ function Sidebar() {
   
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/tools', icon: Wrench, label: 'Tools' },
-    { path: '/workpapers', icon: FileText, label: 'Work Papers' },
-    { path: '/tutorials', icon: FileText, label: 'Tutorials' },
-    { path: '/companyregulations', icon: FileText, label: 'Company Regulations' },
+    { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
   ];
   
   // Only show admin and QA-specific links for admin and qa roles
   if (userRole === 'admin' || userRole === 'qa') {
     menuItems.push(
-      { path: '/update-location', icon: MapPin, label: 'Update Location' },
-      { path: '/qa-section', icon: ClipboardList, label: 'Update Audits' }
+      { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
+      { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' }
+    );
+  }
+
+  // Add Risk Dashboard for admin and risk roles
+  if (userRole === 'admin' || userRole === 'risk') {
+    menuItems.push(
+      { path: '/risk-dashboard', icon: Table2, label: 'Risk Dashboard' }
     );
   }
 
   // Add user management link only for admin role
   if (userRole === 'admin') {
     menuItems.push(
-      { path: '/add-user', icon: UserPlus, label: 'Add User' }
+      { path: '/add-user', icon: UserRoundPlus, label: 'Add User' }
+    );
+  }
+
+  if (userRole === 'admin' || userRole === 'qa' || userRole === 'user') {
+    menuItems.push(
+      { path: '/tools', icon: Wrench, label: 'Tools' },
+      { path: '/workpapers', icon: FileText, label: 'Work Papers' },
+      { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
     );
   }
   
   return (
-    <div className="flex flex-col w-64 bg-white border-r">
+    <div className="flex flex-col h-screen bg-white border-r w-full">
       <div className="flex items-center justify-center h-16 border-b">
         <h1 className="text-xl font-bold text-indigo-600">OPTIMA</h1>
       </div>
       
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
         {menuItems.map(({ path, icon: Icon, label }) => (
           <Link
             key={path}

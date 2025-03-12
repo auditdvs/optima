@@ -7,6 +7,44 @@ export default {
   plugins: [],
 };
 
+// tailwind.config.js
+
+module.exports = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: [
+          'YourCustomFont',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          '"Noto Sans"',
+          'sans-serif',
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+          '"Noto Color Emoji"',
+        ],
+        serif: [
+          'YourCustomFontSerif',
+          'ui-serif',
+          'Georgia',
+          'Cambria',
+          '"Times New Roman"',
+          'Times',
+          'serif',
+        ],
+      },
+    },
+  },
+  plugins: [],
+};
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],

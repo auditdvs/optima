@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 function Login() {
@@ -62,7 +62,7 @@ function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="rounded-full bg-indigo-100 p-3">
-            <Shield className="h-12 w-12 text-indigo-600" />
+            <Users className="h-12 w-12 text-indigo-600" />
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { SearchBar } from '../components/SearchBar';
+import { useMemo, useState } from 'react';
 import { DocumentCard } from '../components/DocumentCard';
+import { SearchBar } from '../components/SearchBar';
 import { documents } from '../data/documents';
 import '../styles/companyRegulations.css';
 
@@ -28,8 +28,8 @@ export default function CompanyRegulations() {
       </div>
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="pt-16 pb-4">
-          <div className="search-container">
+        <div className="pt-0 pb-4">
+          <div className="search-container mb-0">
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
           </div>
 
@@ -38,10 +38,12 @@ export default function CompanyRegulations() {
               No documents match your search
             </div>
           ) : (
-            <div className="documents-grid mt-6">
+            <div className="max-h-[calc(100vh-300px)] overflow-y-auto scroll-container">
+              <div className="documents-grid mt-6 mb-6">
               {filteredDocuments.map((doc) => (
                 <DocumentCard key={doc.id} document={doc} />
               ))}
+              </div>
             </div>
           )}
         </div>

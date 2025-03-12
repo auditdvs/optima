@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Trash2, ChevronDown } from 'lucide-react';
 import { CheckboxGroup, CheckboxOption } from '../components/ui/checkbox';
+import { Toaster, toast } from 'react-hot-toast';
+import Loader from '../components/Loader';
 
 interface WorkPaper {
   id?: string;
@@ -25,7 +27,7 @@ interface Branch {
 const QASection: React.FC = () => {
   const [workPapers, setWorkPapers] = useState<WorkPaper[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showAuditors, setShowAuditors] = useState(false);
   const [newWorkPaper, setNewWorkPaper] = useState<WorkPaper>({
     branch_name: '',
@@ -72,7 +74,7 @@ const QASection: React.FC = () => {
     { label: 'Novi Dwi Juanda', value: 'novi' },
     { label: 'Afdal Juanda', value: 'afdal' },
     { label: 'Kandidus Yosef Banu', value: 'kandidus' },
-    { label: 'Muhammad Alfian Sidiq', value: 'muhammad' },
+    { label: 'Muhammad Alfian Sidiq', value: 'Alfian' },
     { label: 'Fadhlika Sugeng Achmadani, S.E', value: 'fadhlika' },
     { label: 'Hendra Hermawan', value: 'hendra' },
     { label: 'Dadang Supriatna', value: 'dadang' },
@@ -87,8 +89,15 @@ const QASection: React.FC = () => {
   const inputterOptions = ['Ayu', 'Lise', 'Ganjar', 'Dede', 'Afan'];
 
   useEffect(() => {
+    setLoading(true);
     fetchBranches();
     fetchWorkPapers();
+
+  const timer = setTimeout(() => {
+    setLoading(false);
+  }, 3000);
+  
+  return () => clearTimeout(timer);
   }, []);
 
   const fetchBranches = async () => {
@@ -102,7 +111,7 @@ const QASection: React.FC = () => {
       if (data) setBranches(data);
     } catch (error) {
       console.error('Error fetching branches:', error);
-      setMessage({ text: 'Failed to fetch branches', type: 'error' });
+      toast.error('Failed to fetch branches');
     }
   };
 
@@ -119,9 +128,10 @@ const QASection: React.FC = () => {
       if (data) setWorkPapers(data);
     } catch (error) {
       console.error('Error fetching work papers:', error);
-      setMessage({ text: 'Failed to fetch work papers', type: 'error' });
+      toast.error('Failed to fetch work papers');
     }
   };
+
 
   const handleDeleteWorkPaper = async (id: string) => {
     if (!confirm('Are you sure you want to delete this work paper?')) return;
@@ -144,10 +154,10 @@ const QASection: React.FC = () => {
       if (workPaperError) throw workPaperError;
 
       setWorkPapers(workPapers.filter(wp => wp.id !== id));
-      setMessage({ text: 'Work paper deleted successfully', type: 'success' });
+      toast.success('Work paper deleted successfully');
     } catch (error) {
       console.error('Error deleting work paper:', error);
-      setMessage({ text: 'Failed to delete work paper', type: 'error' });
+      toast.error('Failed to delete work paper');
     }
   };
 
@@ -166,22 +176,23 @@ const QASection: React.FC = () => {
 
     // Validate inputs
     if (new Date(newWorkPaper.audit_start_date) > new Date(newWorkPaper.audit_end_date)) {
-      setMessage({ text: 'Start date cannot be after end date', type: 'error' });
+      toast.error('Start date cannot be after end date');
       return;
     }
 
     if (newWorkPaper.audit_type === 'fraud' && !newWorkPaper.fraud_amount) {
-      setMessage({ text: 'Please provide a fraud amount for fraud audit type', type: 'error' });
+      toast.error('Please provide a fraud amount for fraud audit type');
       return;
     }
 
     if (newWorkPaper.audit_type === 'fraud' && !newWorkPaper.fraud_staff) {
-    setMessage({ text: 'Please provide fraud staff name for fraud audit type', type: 'error' });
-    return;
-  }
+      toast.error('Please provide fraud staff name for fraud audit type');
+      return;
+    }
 
 
     try {
+      setLoading(true);
       // Insert work paper
       const { data: workPaperData, error: workPaperError } = await supabase
         .from('work_papers')
@@ -233,43 +244,34 @@ const QASection: React.FC = () => {
         auditors: []
       });
 
-      setMessage({
-        text: 'Work paper added successfully!',
-        type: 'success'
-      });
+      toast.success('Work paper added successfully!');
+      setTimeout(() => {
+        setLoading(false);
+      }, 3000);
     } catch (error) {
       console.error('Error adding work paper:', error);
-      setMessage({
-        text: 'Failed to add work paper',
-        type: 'error'
-      });
+      toast.error('Failed to add work paper');
+      setLoading(false);
     }
   };
 
   if (!branches || branches.length < 1) {
-    return <div>Loading...</div>;
+    return <Loader />;
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <h2 className="text-2xl font-bold">QA Work Papers</h2>
+    <div className="space-y-5 p-4 flex flex-col">
+      <Toaster position="bottom-right" />
+      <h2 className="text-2xl font-bold">Update data input audits</h2>
       
-      {message && (
-        <div className={`p-4 rounded-md ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700' 
-            : 'bg-red-50 text-red-700'
-        }`}>
-          {message.text}
-        </div>
-      )}
+      {loading && <Loader />}
 
-      <form onSubmit={handleAddWorkPaper} className="grid grid-cols-3 gap-4">
+      <form onSubmit={handleAddWorkPaper} className="grid grid-cols-3 gap-2">
         <select
           value={newWorkPaper.branch_name}
           onChange={(e) => setNewWorkPaper({...newWorkPaper, branch_name: e.target.value})}
           required
-          className="border p-2 rounded"
+          className="border p-1 rounded"
         >
           <option value="">Select Branch</option>          
           {branches.map(branch => (
@@ -370,7 +372,7 @@ const QASection: React.FC = () => {
               <ChevronDown className={`w-5 h-5 transition-transform ${showAuditors ? 'transform rotate-180' : ''}`} />
             </button>
             {showAuditors && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-y-auto p-3">
                 <CheckboxGroup
                   options={auditorOptions}
                   selectedOptions={newWorkPaper.auditors}
@@ -391,10 +393,11 @@ const QASection: React.FC = () => {
         </button>
       </form>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border">
-          <thead>
-            <tr className="bg-gray-100">
+      <div className="w-full overflow-x-auto">
+        <div className="w-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 390px)" }}>
+        <table className="w-full border border-collapse table-auto">
+          <thead className='static top-0 z-10 bg-stone-50'>
+            <tr>
               <th className="p-2 border">Branch</th>
               <th className="p-2 border">Start Date</th>
               <th className="p-2 border">End Date</th>
@@ -409,7 +412,7 @@ const QASection: React.FC = () => {
           </thead>
           <tbody>
             {workPapers.map((wp) => (
-  <tr key={wp.id} className="hover:bg-gray-50">
+  <tr key={wp.id} className="hover:bg-stone-50">
     <td className="p-2 border">{wp.branch_name}</td>
     <td className="p-2 border">{wp.audit_start_date}</td>
     <td className="p-2 border">{wp.audit_end_date}</td>
@@ -437,6 +440,7 @@ const QASection: React.FC = () => {
 ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

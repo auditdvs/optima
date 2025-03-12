@@ -12,11 +12,12 @@ import QASection from './pages/QA';
 import Tutorials from './pages/Tutorials';
 import CompanyRegulations from './pages/CompanyRegulations';
 import AddUser from './pages/AddUser';
+import RiskDashboard from './pages/RiskDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const queryClient = new QueryClient();
 
-function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin'] }: { 
+function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'admin', 'risk'] }: { 
   children: React.ReactNode;
   requiredRoles?: string[];
 }) {
@@ -48,9 +49,21 @@ function App() {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="tools/*" element={<Tools />} />
-              <Route path="workpapers" element={<WorkPapers />} />
-              <Route path="tutorials" element={<Tutorials />} />
+                            <Route path="tools/*" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <Tools />
+                </PrivateRoute>
+              } />
+              <Route path="workpapers" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <WorkPapers />
+                </PrivateRoute>
+              } />
+              <Route path="tutorials" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'user']}>
+                  <Tutorials />
+                </PrivateRoute>
+              } />
               <Route path="companyRegulations" element={<CompanyRegulations />} />
               <Route path="update-location" element={
                 <PrivateRoute requiredRoles={['admin', 'qa']}>
@@ -60,6 +73,11 @@ function App() {
               <Route path="qa-section" element={
                 <PrivateRoute requiredRoles={['admin', 'qa']}>
                   <QASection />
+                </PrivateRoute>
+              } />
+              <Route path="risk-dashboard" element={
+                <PrivateRoute requiredRoles={['admin', 'qa', 'risk']}>
+                  <RiskDashboard />
                 </PrivateRoute>
               } />
               <Route path="add-user" element={
