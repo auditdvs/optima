@@ -5,7 +5,7 @@ import {
   LayoutDashboard,
   MapPinPlus,
   FilePenLine,
-  UserRoundPlus,
+  UserCog,
   Library,
   Wrench
 } from 'lucide-react';
@@ -43,7 +43,7 @@ function Sidebar() {
   // Add user management link only for admin role
   if (userRole === 'admin') {
     menuItems.push(
-      { path: '/add-user', icon: UserRoundPlus, label: 'Add User' }
+      { path: '/add-user', icon: UserCog, label: 'User Management' }
     );
   }
 
