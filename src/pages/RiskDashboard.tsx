@@ -49,6 +49,7 @@ const RiskDashboard = () => {
   });
   const [downloadFormat, setDownloadFormat] = useState<'xlsx' | 'pdf' | 'csv'>('xlsx');
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchAudits();
@@ -56,6 +57,7 @@ const RiskDashboard = () => {
 
   const fetchAudits = async () => {
     try {
+      setIsLoading(true);
       // Fetch fraud audits
       const { data: fraudData, error: fraudError } = await supabase
         .from('work_papers')
@@ -90,13 +92,11 @@ const RiskDashboard = () => {
         
         const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
         
-        // Calculate collection fee based on payments and due date
         let collectionFee = 'NO';
         if (caseDetails?.due_date) {
           const dueDate = new Date(caseDetails.due_date);
           const sixMonthsAfterDueDate = addMonths(dueDate, 6);
           
-          // If no payments or last payment is after 6 months from due date
           if (payments.length === 0 && isAfter(new Date(), sixMonthsAfterDueDate)) {
             collectionFee = 'YES';
           } else if (payments.length > 0) {
@@ -120,6 +120,8 @@ const RiskDashboard = () => {
       setFraudAudits(processedFraudAudits || []);
     } catch (error) {
       console.error('Error fetching audits:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -381,6 +383,18 @@ const RiskDashboard = () => {
 
   const filteredFraudAudits = filterFraudAudits(fraudAudits);
 
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="space-y-4">
+      <div className="h-8 bg-gray-200 rounded animate-pulse w-1/4"></div>
+      <div className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-20 bg-gray-200 rounded animate-pulse"></div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 p-4 relative">
       <div className="flex justify-between items-center">
@@ -388,7 +402,8 @@ const RiskDashboard = () => {
         <div className="relative">
           <button 
             onClick={() => setShowDownloadOptions(!showDownloadOptions)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+            className={`flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isLoading}
           >
             <Download className="h-4 w-4" />
             Download Report
@@ -436,90 +451,96 @@ const RiskDashboard = () => {
                 placeholder="Search branch or fraud staff..."
                 value={fraudSearchTerm}
                 onChange={(e) => setFraudSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoading}
               />
             </div>
           </div>
-          <div className="overflow-x-auto w-full">
-            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Branch Name</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  <TableHead>Fraud Staff</TableHead>
-                  <TableHead>Fraud Amount</TableHead>
-                  <TableHead>Amount Paid</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Collection Fee</TableHead>
-                  <TableHead>PIC</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFraudAudits.map((audit) => (
-                  <TableRow key={audit.id} className={
-                    isDueDatePassed(audit.due_date, audit.fraud_amount_paid, audit.fraud_amount) 
-                      ? 'bg-red-50' 
-                      : 'hover:bg-gray-50'
-                  }>
-                    <TableCell className={isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount) ? 'bg-green-100' : ''}>
-                      {audit.branch_name}
-                    </TableCell>
-                    <TableCell>{formatDate(audit.audit_start_date)}</TableCell>
-                    <TableCell>{formatDate(audit.audit_end_date)}</TableCell>
-                    <TableCell>{audit.fraud_staff}</TableCell>
-                    <TableCell>{formatCurrency(audit.fraud_amount || 0)}</TableCell>
-                    <TableCell>{formatCurrency(audit.fraud_amount_paid || 0)}</TableCell>
-                    <TableCell>
-                      <input
-                        type="date"
-                        value={audit.due_date || ''}
-                        onChange={(e) => handleUpdateFraudCase(audit.id, 'due_date', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm w-32"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <span className="px-2 py-1 rounded text-sm">
-                        {audit.fraud_collection_fee || 'NO'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <input
-                        type="text"
-                        value={audit.pic || ''}
-                        onChange={(e) => {
-                          if (e.target.value.length <= 20) {
-                            handleUpdateFraudCase(audit.id, 'pic', e.target.value);
-                          }
-                        }}
-                        maxLength={20}
-                        className="border rounded px-2 py-1 text-sm w-32"
-                        placeholder="PIC name"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => {
-                          setSelectedFraudCase(audit);
-                          setPaymentInput({
-                            ...paymentInput,
-                            fraudStaffName: audit.fraud_staff || ''
-                          });
-                          setShowSidebar(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                      >
-                        Add Payment
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          
+          {isLoading ? (
+            <LoadingSkeleton />
+          ) : (
+            <div className="overflow-x-auto w-full">
+              <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Branch Name</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Fraud Staff</TableHead>
+                      <TableHead>Fraud Amount</TableHead>
+                      <TableHead>Amount Paid</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Collection Fee</TableHead>
+                      <TableHead>PIC</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFraudAudits.map((audit) => (
+                      <TableRow key={audit.id} className={
+                        isDueDatePassed(audit.due_date, audit.fraud_amount_paid, audit.fraud_amount) 
+                          ? 'bg-red-50' 
+                          : 'hover:bg-gray-50'
+                      }>
+                        <TableCell className={isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount) ? 'bg-green-100' : ''}>
+                          {audit.branch_name}
+                        </TableCell>
+                        <TableCell>{formatDate(audit.audit_start_date)}</TableCell>
+                        <TableCell>{formatDate(audit.audit_end_date)}</TableCell>
+                        <TableCell>{audit.fraud_staff}</TableCell>
+                        <TableCell>{formatCurrency(audit.fraud_amount || 0)}</TableCell>
+                        <TableCell>{formatCurrency(audit.fraud_amount_paid || 0)}</TableCell>
+                        <TableCell>
+                          <input
+                            type="date"
+                            value={audit.due_date || ''}
+                            onChange={(e) => handleUpdateFraudCase(audit.id, 'due_date', e.target.value)}
+                            className="border rounded px-2 py-1 text-sm w-32"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-1 rounded text-sm">
+                            {audit.fraud_collection_fee || 'NO'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <input
+                            type="text"
+                            value={audit.pic || ''}
+                            onChange={(e) => {
+                              if (e.target.value.length <= 20) {
+                                handleUpdateFraudCase(audit.id, 'pic', e.target.value);
+                              }
+                            }}
+                            maxLength={20}
+                            className="border rounded px-2 py-1 text-sm w-32"
+                            placeholder="PIC name"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            onClick={() => {
+                              setSelectedFraudCase(audit);
+                              setPaymentInput({
+                                ...paymentInput,
+                                fraudStaffName: audit.fraud_staff || ''
+                              });
+                              setShowSidebar(true);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                          >
+                            Add Payment
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 

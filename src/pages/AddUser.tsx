@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserPlus, UserPen, X } from 'lucide-react';
+import { UserPlus, UserPen, X, Trash2, RefreshCw } from 'lucide-react';
 import { supabaseService } from '../lib/supabaseService';
 import { formatDistanceToNow } from 'date-fns';
 import toast, { Toaster } from 'react-hot-toast';
@@ -196,7 +196,7 @@ function UserControlPanel() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
       const { data: { users }, error } = await supabaseService.auth.admin.listUsers();
@@ -216,7 +216,8 @@ function UserControlPanel() {
                 ? 'ACTIVE' 
                 : 'OFFLINE'
       }));
-    }
+    },
+    refetchInterval: 30000 // Auto refresh every 30 seconds
   });
 
   const addUserMutation = useMutation({
@@ -269,12 +270,39 @@ function UserControlPanel() {
     }
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // Delete user roles first
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      
+      // Delete user profile
+      await supabase.from('profiles').delete().eq('id', userId);
+      
+      // Delete the user from auth
+      await supabaseService.auth.admin.deleteUser(userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User deleted successfully');
+    },
+    onError: (error) => {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user');
+    }
+  });
+
   const handleAddUser = async (email: string, fullName: string, role: string) => {
     await addUserMutation.mutateAsync({ email, fullName, role });
   };
 
   const handleEditUser = async (userId: string, fullName: string, role: string) => {
     await updateUserMutation.mutateAsync({ userId, fullName, role });
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      await deleteUserMutation.mutateAsync(userId);
+    }
   };
 
   return (
@@ -286,70 +314,89 @@ function UserControlPanel() {
           <h1 className="text-2xl font-bold text-gray-900">Manage Users</h1>
           <p className="text-sm text-gray-500">Manage users within the application, including viewing active status, adding new users, editing user information, and deleting unnecessary accounts.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
-        >
-          <UserPlus className="h-5 w-5" />
-          Add User
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => refetch()}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <RefreshCw className="h-5 w-5" />
+            Refresh
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+          >
+            <UserPlus className="h-5 w-5" />
+            Add User
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="max-h-[600px] overflow-y-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users?.map((user) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.full_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                    user.role === 'qa' ? 'bg-blue-100 text-blue-800' :
-                    user.role === 'risk' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {user.role.toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
-                      user.status === 'ACTIVE' ? 'bg-green-400' : 'bg-gray-400'
-                    }`} />
-                    <span className="text-sm text-gray-500">
-                      {user.status === 'ACTIVE' ? 'Active' : 
-                        user.last_sign_in_at ? 
-                          `Online ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
-                          'Never logged in'}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <button
-                    onClick={() => {
-                      setSelectedUser(user);
-                      setShowEditModal(true);
-                    }}
-                    className="text-indigo-600 hover:text-indigo-900"
-                  >
-                    <UserPen className="h-4 w-4" />
-                  </button>
-                </td>
+        <div className="max-h-[600px] overflow-y-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users?.map((user) => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.full_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                      user.role === 'qa' ? 'bg-blue-100 text-blue-800' :
+                      user.role === 'risk' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {user.role.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
+                        user.status === 'ACTIVE' ? 'bg-green-400' : 'bg-gray-400'
+                      }`} />
+                      <span className="text-sm text-gray-500">
+                        {user.status === 'ACTIVE' ? 'Active' : 
+                          user.last_sign_in_at ? 
+                            `Online ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
+                            'Never logged in'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowEditModal(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Edit user"
+                      >
+                        <UserPen className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete user"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
