@@ -455,6 +455,18 @@
   dependencies:
     "@tanstack/query-core" "5.64.2"
 
+"@tanstack/react-table@^8.21.2":
+  version "8.21.2"
+  resolved "https://registry.npmjs.org/@tanstack/react-table/-/react-table-8.21.2.tgz"
+  integrity sha512-11tNlEDTdIhMJba2RBH+ecJ9l1zgS2kjmexDPAraulc8jeNA4xocSNeyzextT0XJyASil4XsCYlJmf5jEWAtYg==
+  dependencies:
+    "@tanstack/table-core" "8.21.2"
+
+"@tanstack/table-core@8.21.2":
+  version "8.21.2"
+  resolved "https://registry.npmjs.org/@tanstack/table-core/-/table-core-8.21.2.tgz"
+  integrity sha512-uvXk/U4cBiFMxt+p9/G7yUWI/UbHYbyghLCjlpWZ3mLeIZiUBSKcUnw9UnKkdRz7Z/N4UBuFLWQdJCjUe7HjvA==
+
 "@types/babel__core@^7.20.5":
   version "7.20.5"
   resolved "https://registry.npmjs.org/@types/babel__core/-/babel__core-7.20.5.tgz"

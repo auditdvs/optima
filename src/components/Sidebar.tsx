@@ -7,7 +7,8 @@ import {
   FilePenLine,
   UserCog,
   Library,
-  Wrench
+  Wrench,
+  Users
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,32 +26,38 @@ function Sidebar() {
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
   ];
   
-  // Only show admin and QA-specific links for admin and qa roles
-  if (userRole === 'admin' || userRole === 'qa') {
+  // super admin, qa dan dvs
+  if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs') {
     menuItems.push(
       { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
       { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' }
     );
   }
+  // super admin dan qa
+  if (userRole === 'superadmin' || userRole === 'qa') {
+    menuItems.push(
+      { path: '/qa-management', icon: Users, label: 'QA Management' }
+    );
+  }
 
-  // Add Risk Dashboard for admin and risk roles
-  if (userRole === 'admin' || userRole === 'risk') {
+  // super admin dan risk
+  if (userRole === 'superadmin' || userRole === 'risk') {
     menuItems.push(
       { path: '/risk-dashboard', icon: Table2, label: 'Risk Dashboard' }
     );
   }
 
-  // Add user management link only for admin role
-  if (userRole === 'admin') {
+  // superadmin only
+  if (userRole === 'superadmin') {
     menuItems.push(
-      { path: '/add-user', icon: UserCog, label: 'User Management' }
+      { path: '/add-user', icon: UserCog, label: 'User Management' },
+      { path: '/workpapers', icon: FileText, label: 'Work Papers' }
     );
   }
-
-  if (userRole === 'admin' || userRole === 'qa' || userRole === 'user') {
+  // all user IA
+  if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'user'|| userRole === 'dvs') {
     menuItems.push(
       { path: '/tools', icon: Wrench, label: 'Tools' },
-      { path: '/workpapers', icon: FileText, label: 'Work Papers' },
       { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
     );
   }

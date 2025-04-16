@@ -26,19 +26,28 @@
     --radius: 0.5rem;
 
   }
-  html, body {
-    overflow-x: hidden;
-  }
-  
-/* Untuk semua elemen */
-* {
-  scrollbar-width: none; /* Untuk Firefox */
+
+/* Scrollbar vertikal */
+::-webkit-scrollbar {
+  width: 0.5rem;  
+  height: 0.5rem;
 }
 
-/* Untuk Webkit (Chrome, Safari) */
-::-webkit-scrollbar {
-  display: none; /* Menyembunyikan scrollbar */
+
+/* Track (background dari scrollbar) */
+::-webkit-scrollbar-track {
+  background-color: #d4d9e1; 
+  border-radius: 9999px;
 }
+
+/* Thumb (bagian geser) */
+::-webkit-scrollbar-thumb {
+  background-color: #888b91;
+  border-radius: 9999px;    
+}
+
+
+
 
 
 

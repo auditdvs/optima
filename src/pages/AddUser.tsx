@@ -10,7 +10,7 @@ interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'qa' | 'risk' | 'user';
+  role: 'superadmin'| 'manager' |'dvs'| 'qa' | 'risk' | 'user';
   last_sign_in_at: string | null;
   status: 'ACTIVE' | 'OFFLINE';
 }
@@ -92,7 +92,9 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
               <option value="user">User</option>
               <option value="qa">QA</option>
               <option value="risk">Risk</option>
-              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="superadmin">Super Admin</option>
+              <option value="dvs">dvs</option>
             </select>
           </div>
           <button
@@ -135,6 +137,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, on
     }
   };
 
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -174,7 +177,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, on
               <option value="user">User</option>
               <option value="qa">QA</option>
               <option value="risk">Risk</option>
-              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="superadmin">Super Admin</option>
+              <option value="dvs">DVS</option>
             </select>
           </div>
           <button
@@ -199,8 +204,11 @@ function UserControlPanel() {
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
+      console.log('Fetching users...');
       const { data: { users }, error } = await supabaseService.auth.admin.listUsers();
       if (error) throw error;
+
+      console.log('Users fetched:', users);
 
       const { data: userRoles } = await supabase.from('user_roles').select('*');
       const { data: userProfiles } = await supabase.from('profiles').select('*');
@@ -333,7 +341,7 @@ function UserControlPanel() {
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="max-h-[600px] overflow-y-auto">
+        <div className="max-h-[900px] overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
