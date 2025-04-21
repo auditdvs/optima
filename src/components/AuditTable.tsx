@@ -7,9 +7,11 @@ import {
   SortingState,
   useReactTable
 } from '@tanstack/react-table';
-import { ArrowUpDown, MessageSquare, Plus, Search } from 'lucide-react';
+import { saveAs } from 'file-saver';
+import { ArrowUpDown, Download, MessageSquare, Plus, Search } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabaseClient';
 import { CustomCheckbox } from './CustomCheckbox';
 
@@ -280,6 +282,44 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     } catch (error) {
       console.error('Error fetching audit data:', error);
       toast.error('Failed to fetch audit data');
+    }
+  };
+
+  const handleDownload = () => {
+    try {
+      const exportData = data.map(item => ({
+        'No': item.no,
+        'Branch Name': item.branchName,
+        'Audit Period Start': item.auditPeriodStart,
+        'Audit Period End': item.auditPeriodEnd,
+        'PIC': item.pic,
+        'DAPA': item.dapa ? '✓' : '✗',
+        'Revised DAPA': item.revisedDapa ? '✓' : '✗',
+        'DAPA Supporting Data': item.dapaSupportingData ? '✓' : '✗',
+        'Assignment Letter': item.assignmentLetter ? '✓' : '✗',
+        'Entrance Agenda': item.entrance_agenda ? '✓' : '✗',
+        'Entrance Attendance': item.entranceAttendance ? '✓' : '✗',
+        'Audit Working Papers': item.auditWorkingPapers ? '✓' : '✗',
+        'Exit Meeting Minutes': item.exitMeetingMinutes ? '✓' : '✗',
+        'Exit Attendance List': item.exitAttendanceList ? '✓' : '✗',
+        'Audit Result Letter': item.auditResultLetter ? '✓' : '✗',
+        'RTA': item.rta ? '✓' : '✗',
+        'Monitoring': item.monitoring,
+        'Comment': item.comment || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Audit Regular');
+      
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(dataBlob, 'audit_regular_report.xlsx');
+      
+      toast.success('Report downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast.error('Failed to download report');
     }
   };
 
@@ -686,13 +726,22 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
             className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-        <button
-          onClick={() => setShowAddBranchModal(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Branch
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-green-700"
+          >
+            <Download className="h-4 w-4" />
+            Download Report
+          </button>
+          <button
+            onClick={() => setShowAddBranchModal(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Branch
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
