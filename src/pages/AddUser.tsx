@@ -341,7 +341,7 @@ function UserControlPanel() {
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="max-h-[900px] overflow-y-auto">
+        <div className="max-h-[630px] overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

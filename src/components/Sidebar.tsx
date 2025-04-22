@@ -63,7 +63,7 @@ function Sidebar() {
   }
   
   return (
-    <div className="flex flex-col h-screen bg-white border-r w-full">
+    <div className="hidden md:flex flex-col h-screen bg-white border-r w-64">
       <div className="flex items-center justify-center h-16 border-b">
         <h1 className="text-xl font-bold text-indigo-600">OPTIMA</h1>
       </div>
