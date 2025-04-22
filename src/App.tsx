@@ -77,7 +77,7 @@ function App() {
                 </PrivateRoute>
               } />
               <Route path="qa-management" element={
-                <PrivateRoute requiredRoles={['superadmin', 'qa']}>
+                <PrivateRoute requiredRoles={['superadmin', 'qa', 'manager']}>
                   <QAManagement />
                 </PrivateRoute>
               } />

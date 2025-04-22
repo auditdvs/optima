@@ -26,22 +26,22 @@ function Sidebar() {
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
   ];
   
-  // super admin, qa dan dvs
-  if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs') {
+  // super admin, qa, manager dan dvs
+  if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs' || userRole === 'manager') { 
     menuItems.push(
       { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
       { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' }
     );
   }
   // super admin dan qa
-  if (userRole === 'superadmin' || userRole === 'qa') {
+  if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'manager') {
     menuItems.push(
       { path: '/qa-management', icon: Users, label: 'QA Management' }
     );
   }
 
   // super admin dan risk
-  if (userRole === 'superadmin' || userRole === 'risk') {
+  if (userRole === 'superadmin' || userRole === 'risk' || userRole === 'manager') {
     menuItems.push(
       { path: '/risk-dashboard', icon: Table2, label: 'Risk Dashboard' }
     );
@@ -55,7 +55,7 @@ function Sidebar() {
     );
   }
   // all user IA
-  if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'user'|| userRole === 'dvs') {
+  if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'user'|| userRole === 'dvs'|| userRole === 'manager') {
     menuItems.push(
       { path: '/tools', icon: Wrench, label: 'Tools' },
       { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
