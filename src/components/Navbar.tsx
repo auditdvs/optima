@@ -28,10 +28,12 @@ function Navbar() {
 
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
-      <div className="text-sm text-gray-600">
-        Hello, {fullName}
+      <div className="group"> 
+      <div className="text-sm text-gray-600 group-hover:animate-bounce cursor-pointer">
+        Hello, {fullName}. Have a great day!
       </div>
-      
+      </div>
+
       <div className="flex items-center space-x-6">
         {/* Audit Rating */}
         <Link
