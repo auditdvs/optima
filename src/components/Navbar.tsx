@@ -1,13 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Info, LogOut, AlignStartVertical, ChartNoAxesColumn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 function Navbar() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const [fullName, setFullName] = useState('');
+
+  useEffect(() => {
+    async function fetchUserProfile() {
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
+          setFullName(data.full_name);
+        }
+      }
+    }
+
+    fetchUserProfile();
+  }, [user]);
 
   return (
-    <div className="h-16 bg-white border-b flex items-center justify-end px-6 w-full max-w-fit-content">
+    <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
+      <div className="text-sm text-gray-600">
+        Hello, {fullName}
+      </div>
+      
       <div className="flex items-center space-x-6">
         {/* Audit Rating */}
         <Link
