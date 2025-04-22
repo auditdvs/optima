@@ -27,12 +27,13 @@ function Navbar() {
   }, [user]);
 
   return (
-    <a href="https://i.pinimg.com/736x/f4/7d/1a/f47d1a20470813af55020d51c4f5159a.jpg" target="_blank" rel="noopener noreferrer"> 
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
-      <div className="group"> 
+      <div className="group">
+        <a href="https://i.pinimg.com/736x/f4/7d/1a/f47d1a20470813af55020d51c4f5159a.jpg" target="_blank" rel="noopener noreferrer"> 
       <div className="text-sm text-gray-600 group-hover:animate-bounce cursor-pointer">
         Hello, {fullName}. Have a great day!
       </div>
+        </a>
       </div>
 
       <div className="flex items-center space-x-6">
@@ -72,7 +73,6 @@ function Navbar() {
         </button>
       </div>
     </div>
-    </a>
   );
 }
 
