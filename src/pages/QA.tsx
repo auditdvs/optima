@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { Trash2, ChevronDown } from 'lucide-react';
-import { CheckboxGroup, CheckboxOption } from '../components/ui/checkbox';
+import { ChevronDown, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import Loader from '../components/Loader';
+import { CheckboxGroup, CheckboxOption } from '../components/ui/checkbox';
+import { supabase } from '../lib/supabaseClient';
 
 interface WorkPaper {
   id?: string;
@@ -52,7 +52,6 @@ const QASection: React.FC = () => {
     { label: 'Indah Marsita', value: 'indah' },
     { label: 'Aditya Dwi Susanto', value: 'aditya' },
     { label: 'Achmad Miftachul Huda, S.E', value: 'miftach' },
-    { label: 'Dwi Purnawigati', value: 'dwi' },
     { label: 'Heri Hermawan', value: 'heri' },
     { label: 'Aris Munandar', value: 'aris' },
     { label: 'Sandi Mulyadi', value: 'sandi' },
@@ -60,7 +59,7 @@ const QASection: React.FC = () => {
     { label: 'Widya Lestari', value: 'widya' },
     { label: 'Retno Istiyanto, A.Md', value: 'retno' },
     { label: 'Ade Yadi Heryadi', value: 'ade' },
-    { label: 'Muhamad Yunus', value: 'myunus' },
+    { label: 'Muhamad Yunus', value: 'yunus' },
     { label: 'Dara Fusvita Adityacakra, S.Tr.Akun', value: 'dara' },
     { label: 'Lukman Yasir', value: 'lukman' },
     { label: 'Ngadiman', value: 'ngadiman' },
@@ -74,12 +73,12 @@ const QASection: React.FC = () => {
     { label: 'Novi Dwi Juanda', value: 'novi' },
     { label: 'Afdal Juanda', value: 'afdal' },
     { label: 'Kandidus Yosef Banu', value: 'kandidus' },
-    { label: 'Muhammad Alfian Sidiq', value: 'Alfian' },
+    { label: 'Muhammad Alfian Sidiq', value: 'alfian' },
     { label: 'Fadhlika Sugeng Achmadani, S.E', value: 'fadhlika' },
     { label: 'Hendra Hermawan', value: 'hendra' },
     { label: 'Dadang Supriatna', value: 'dadang' },
-    { label: 'Rivaldi Ando D Laudu', value: 'rivaldi' },
     { label: 'Yogi Nugraha', value: 'yogi' },
+    { label: 'Iqbal Darmazi', value: 'iqbal' },
     { label: 'Ganjar Raharja', value: 'ganjar' },
     { label: 'Dede Yudha Nersanto', value: 'dede' },
     { label: 'Ayu Sri Erian Agustin', value: 'eri' },
