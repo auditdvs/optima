@@ -6,6 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import AuditTable from '../components/AuditTable';
 import { AuditFraudTable } from '../components/AuditFraudTable';
 import { RegularAuditRecap } from '../components/RegularAuditRecap';
+import { RPMLetterTable } from '../components/RPMLetterTable';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
@@ -152,7 +153,7 @@ const QAManagement: React.FC = () => {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedAuditor, setSelectedAuditor] = useState<AuditorWithAssignments | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap'>('auditors');
+  const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm'>('auditors');
   const [formData, setFormData] = useState<AddAuditorForm>({
     name: '',
     auditor_id: '',
@@ -426,6 +427,17 @@ const QAManagement: React.FC = () => {
             <Table2 className="h-5 w-5" />
             Regular Audit Recap
           </button>
+          <button
+            onClick={() => setActiveTab('rpm')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+              activeTab === 'rpm'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Table2 className="h-5 w-5" />
+            RPM Letter
+          </button>
         </div>
       </div>
 
@@ -523,6 +535,16 @@ const QAManagement: React.FC = () => {
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
                 <AuditFraudTable />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : activeTab === 'rpm' ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="overflow-x-auto">
+              <div className="inline-block min-w-full align-middle">
+                <RPMLetterTable />
               </div>
             </div>
           </CardContent>
