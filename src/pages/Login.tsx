@@ -330,7 +330,7 @@ function Login() {
                         <h3 className="text-sm font-medium text-gray-900">Contact Information</h3>
                       </div>
                       <p className="text-sm text-gray-600">
-                        Need assistance? Contact the person in charge for your area. For technical issues, please reach out to auditdvs@gmail.com.
+                        Need assistance? Contact the person in charge for your area. For technical issues, please reach out to dvsaudit@gmail.com.
                       </p>
                     </div>
                   </div>
