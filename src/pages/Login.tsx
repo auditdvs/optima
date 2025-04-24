@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { Info, Users } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Info, Shield, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 function Login() {

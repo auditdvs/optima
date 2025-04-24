@@ -7,6 +7,7 @@ import AddUser from './pages/AddUser';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import ManagerDashboard from './pages/ManagerDashboard';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
@@ -14,7 +15,6 @@ import RiskDashboard from './pages/RiskDashboard';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UpdateLocation from './pages/UpdateLocation';
-import WorkPapers from './pages/WorkPapers';
 
 const queryClient = new QueryClient();
 
@@ -55,9 +55,9 @@ function App() {
                   <Tools />
                 </PrivateRoute>
               } />
-              <Route path="workpapers" element={
-                <PrivateRoute requiredRoles={['qa', 'superadmin','dvs','manager']}>
-                  <WorkPapers />
+              <Route path="manager-dashboard" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager']}>
+                  <ManagerDashboard />
                 </PrivateRoute>
               } />
               <Route path="tutorials" element={
