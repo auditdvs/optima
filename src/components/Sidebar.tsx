@@ -8,6 +8,7 @@ import {
   UserCog,
   Library,
   Wrench,
+  ChartPie,
   Users
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -21,6 +22,9 @@ function Sidebar() {
     return location.pathname.startsWith(path);
   };
   
+  if (!userRole) return null; // Tunggu role-nya ready
+
+
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
@@ -39,6 +43,12 @@ function Sidebar() {
       { path: '/qa-management', icon: Users, label: 'QA Management' }
     );
   }
+    // super admin dan manager
+    if (userRole === 'superadmin' || userRole === 'manager') {
+      menuItems.push(
+        { path: '/manager-dashboard', icon: ChartPie, label: 'Manager Dashboard' }
+      );
+    }
 
   // super admin dan risk
   if (userRole === 'superadmin' || userRole === 'risk' || userRole === 'manager') {

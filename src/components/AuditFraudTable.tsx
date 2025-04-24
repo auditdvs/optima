@@ -18,6 +18,7 @@ import { saveAs } from 'file-saver';
 interface AuditFraudData {
   id?: string;
   branch_name: string;
+  region: string;
   pic: string;
   data_preparation: boolean;
   assignment_letter: boolean;
@@ -32,6 +33,7 @@ interface AddEditBranchModalProps {
   onClose: () => void;
   onSubmit: (branchData: { 
     branch_name: string;
+    region: string;
     pic: string;
   }) => void;
   initialData?: AuditFraudData;
@@ -46,6 +48,7 @@ const AddEditBranchModal: React.FC<AddEditBranchModalProps> = ({
   isEditing = false 
 }) => {
   const [branchName, setBranchName] = useState<string>(initialData?.branch_name || '');
+  const [region, setRegion] = useState<string>(initialData?.region || '');
   const [pic, setPic] = useState<string>(initialData?.pic || '');
 
   if (!isOpen) return null;
@@ -53,6 +56,7 @@ const AddEditBranchModal: React.FC<AddEditBranchModalProps> = ({
   const handleSubmit = () => {
     onSubmit({
       branch_name: branchName,
+      region: region,
       pic: pic
     });
     onClose();
@@ -71,6 +75,17 @@ const AddEditBranchModal: React.FC<AddEditBranchModalProps> = ({
               onChange={(e) => setBranchName(e.target.value)}
               className="w-full p-2 border rounded"
               placeholder="Enter branch name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+            <input
+              type="text"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full p-2 border rounded"
+              placeholder="Enter Region"
             />
           </div>
           
@@ -135,18 +150,19 @@ export const AuditFraudTable: React.FC = () => {
     }
   };
 
-  const handleAddOrEditBranch = async (branchData: { branch_name: string; pic: string }) => {
+  const handleAddOrEditBranch = async (branchData: { branch_name: string; region: string; pic: string }) => {
     try {
       if (isEditing && selectedAudit?.id) {
         const { error } = await supabase
           .from('audit_fraud')
           .update({
             branch_name: branchData.branch_name,
+            region: branchData.region, // Use the value from branchData
             pic: branchData.pic,
             updated_at: new Date().toISOString()
           })
           .eq('id', selectedAudit.id);
-
+  
         if (error) throw error;
         toast.success('Branch updated successfully');
       } else {
@@ -154,6 +170,7 @@ export const AuditFraudTable: React.FC = () => {
           .from('audit_fraud')
           .insert([{
             branch_name: branchData.branch_name,
+            region: branchData.region, // Use the value from branchData
             pic: branchData.pic,
             data_preparation: false,
             assignment_letter: false,
@@ -161,7 +178,7 @@ export const AuditFraudTable: React.FC = () => {
             audit_report: false,
             detailed_findings: false
           }]);
-
+  
         if (error) throw error;
         toast.success('Branch added successfully');
       }
@@ -171,7 +188,7 @@ export const AuditFraudTable: React.FC = () => {
       toast.error(isEditing ? 'Failed to update branch' : 'Failed to add branch');
     }
   };
-
+  
   const handleDeleteAudit = async (id: string) => {
     try {
       const { error } = await supabase
@@ -215,6 +232,7 @@ export const AuditFraudTable: React.FC = () => {
       const exportData = auditData.map(item => ({
         'Branch Name': item.branch_name,
         'PIC': item.pic,
+        'Region': item.region,
         'Data Preparation': item.data_preparation ? '✓' : '✗',
         'Assignment Letter': item.assignment_letter ? '✓' : '✗',
         'Audit Working Papers': item.audit_working_papers ? '✓' : '✗',
@@ -249,6 +267,10 @@ export const AuditFraudTable: React.FC = () => {
           />
         </div>
       ),
+      cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('region', {
+      header: 'Region',
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('pic', {
