@@ -1,15 +1,14 @@
 import {
-  Table2,
-  FileVideo,
-  FileText,
-  LayoutDashboard,
-  MapPinPlus,
-  FilePenLine,
-  UserCog,
-  Library,
-  Wrench,
   ChartPie,
-  Users
+  FilePenLine,
+  FileVideo,
+  LayoutDashboard,
+  Library,
+  MapPinPlus,
+  Table2,
+  UserCog,
+  Users,
+  Wrench
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,8 +21,7 @@ function Sidebar() {
     return location.pathname.startsWith(path);
   };
   
-  if (!userRole) return null; // Tunggu role-nya ready
-
+  if (!userRole) return null;
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -37,18 +35,13 @@ function Sidebar() {
       { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' }
     );
   }
+
   // super admin dan qa
   if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'manager') {
     menuItems.push(
       { path: '/qa-management', icon: Users, label: 'QA Management' }
     );
   }
-    // super admin dan manager
-    if (userRole === 'superadmin' || userRole === 'manager') {
-      menuItems.push(
-        { path: '/manager-dashboard', icon: ChartPie, label: 'Manager Dashboard' }
-      );
-    }
 
   // super admin dan risk
   if (userRole === 'superadmin' || userRole === 'risk' || userRole === 'manager') {
@@ -60,10 +53,17 @@ function Sidebar() {
   // superadmin only
   if (userRole === 'superadmin') {
     menuItems.push(
-      { path: '/add-user', icon: UserCog, label: 'User Management' },
-      { path: '/workpapers', icon: FileText, label: 'Work Papers' }
+      { path: '/add-user', icon: UserCog, label: 'User Management' }
     );
   }
+
+  // manager dashboard
+  if (userRole === 'superadmin' || userRole === 'manager') {
+    menuItems.push(
+      { path: '/manager-dashboard', icon: ChartPie, label: 'Manager Dashboard' }
+    );
+  }
+
   // all user IA
   if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'user'|| userRole === 'dvs'|| userRole === 'manager') {
     menuItems.push(
@@ -72,9 +72,9 @@ function Sidebar() {
     );
   }
   
-  return (
-    <div className="hidden md:flex flex-col h-screen bg-white border-r w-64">
-      <div className="flex items-center justify-center h-16 border-b">
+ return (
+    <div className="flex flex-col h-screen bg-white border-r w-64">
+      <div className="flex items-center justify-center h-10 border-b">
         <h1 className="text-xl font-bold text-indigo-600">OPTIMA</h1>
       </div>
       
