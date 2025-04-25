@@ -1,11 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
+import { saveAs } from 'file-saver';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Download, Search, TrendingUp, Users, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { supabase } from '../lib/supabaseClient';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import { supabase } from '../lib/supabaseClient';
 
 interface DashboardStats {
   totalBranches: number;
@@ -161,34 +161,22 @@ const ManagerDashboard = () => {
 
   const fetchAuditRecapData = async () => {
     try {
-      // Fetch regular audits - removed the monitoring filter
+      // Fetch regular audits
       const { data: regularData, error: regularError } = await supabase
         .from('audit_regular')
-        .select('*');
+        .select('*, pic'); // Include the 'pic' field
 
       if (regularError) throw regularError;
 
-      // Fetch branches to get region information
-      const { data: branchesData, error: branchesError } = await supabase
-        .from('branches')
-        .select('*');
+      // Fetch fraud audits
+      const { data: fraudData, error: fraudError } = await supabase
+        .from('audit_fraud')
+        .select('*, pic'); // Include the 'pic' field
 
-      if (branchesError) throw branchesError;
+      if (fraudError) throw fraudError;
 
-      // Create a mapping of branch names to regions
-      const branchRegionMap = {};
-      branchesData?.forEach(branch => {
-        branchRegionMap[branch.name] = branch.region;
-      });
-
-      // Add region to regular audits
-      const regularAuditsWithRegion = regularData?.map(audit => ({
-        ...audit,
-        region: branchRegionMap[audit.branch_name] || 'Unknown'
-      }));
-
-      // Filter regular audits with 2+ false values
-      const filteredRegularAudits = regularAuditsWithRegion?.filter(audit => {
+      // Process and set data as before
+      const filteredRegularAudits = regularData?.filter(audit => {
         const falseCount = [
           audit.dapa,
           audit.revised_dapa,
@@ -205,28 +193,19 @@ const ManagerDashboard = () => {
         return falseCount >= 2;
       });
 
+      const filteredFraudAudits = fraudData?.filter(audit => {
+        const hasFalseValue = [
+          audit.data_preparation,
+          audit.assignment_letter,
+          audit.audit_working_papers,
+          audit.audit_report,
+          audit.detailed_findings
+        ].some(value => value === false);
+        return hasFalseValue;
+      });
+
       setRegularAudits(filteredRegularAudits || []);
-
-      // Fetch fraud audits - removed the review condition
-      const { data: fraudData, error: fraudError } = await supabase
-        .from('audit_fraud')
-        .select('*');
-
-      if (fraudError) throw fraudError;
-
-// Filter fraud audits with at least one false value
-const filteredFraudAudits = fraudData?.filter(audit => {
-    const hasFalseValue = [
-      audit.data_preparation,
-      audit.assignment_letter,
-      audit.audit_working_papers,
-      audit.audit_report,
-      audit.detailed_findings
-    ].some(value => value === false);
-    return hasFalseValue;
-  });
-  
-  setFraudAudits(filteredFraudAudits || []);
+      setFraudAudits(filteredFraudAudits || []);
     } catch (error) {
       console.error('Error fetching audit recap data:', error);
     }
@@ -575,6 +554,13 @@ const filteredFraudAudits = fraudData?.filter(audit => {
                           Failed Checks
                         </div>
                       </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        <div className="flex items-center">
+                          PIC
+                        </div>
+                      </th>
                     </>
                   ) : (
                     <>
@@ -592,6 +578,13 @@ const filteredFraudAudits = fraudData?.filter(audit => {
                         <div className="flex items-center">
                           Review
                           <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        <div className="flex items-center">
+                          PIC
                         </div>
                       </th>
                     </>
@@ -621,6 +614,9 @@ const filteredFraudAudits = fraudData?.filter(audit => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {getFailedChecksWithAliases(audit, true)}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {audit.pic || 'N/A'}
+                        </td>
                       </>
                     ) : (
                       <>
@@ -629,6 +625,9 @@ const filteredFraudAudits = fraudData?.filter(audit => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {(audit as FraudAudit).review}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {audit.pic || 'N/A'}
                         </td>
                       </>
                     )}

@@ -32,6 +32,7 @@ interface AuditData {
   id?: string;
   no: number;
   branchName: string;
+  region: string;
   auditPeriodStart: string;
   auditPeriodEnd: string;
   pic: string;
@@ -86,6 +87,7 @@ const formatDate = (dateStr: string): string => {
 
 const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onAdd, branches, auditors }) => {
   const [selectedBranch, setSelectedBranch] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [selectedPICs, setSelectedPICs] = useState<string[]>([]);
@@ -132,11 +134,20 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onAdd,
               <option value="">Select a branch</option>
               {branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
-                  {branch.name} ({branch.code} - {branch.region})
+                  {branch.name}
                 </option>
               ))}
             </select>
           </div>
+            <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+            <input
+              type="text"
+              value={branches.find(b => b.id === selectedBranch)?.region || ''}
+              readOnly
+              className="w-full p-2 border rounded bg-gray-50"
+            />
+            </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Audit Period Start</label>
@@ -258,6 +269,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id: item.id,
           no: index + 1,
           branchName: item.branch_name,
+          region: item.region,
           auditPeriodStart: item.audit_period_start,
           auditPeriodEnd: item.audit_period_end,
           pic: item.pic,
@@ -290,6 +302,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       const exportData = data.map(item => ({
         'No': item.no,
         'Branch Name': item.branchName,
+        'region': item.region,
         'Audit Period Start': item.auditPeriodStart,
         'Audit Period End': item.auditPeriodEnd,
         'PIC': item.pic,
@@ -327,6 +340,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     try {
       const dbData = {
         branch_name: newData.branchName,
+        region: newData.region,
         audit_period_start: newData.auditPeriodStart,
         audit_period_end: newData.auditPeriodEnd,
         pic: newData.pic,
@@ -390,6 +404,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     try {
       const newAuditData: Partial<AuditData> = {
         branchName: branchData.name,
+        region: branchData.region,
         auditPeriodStart: branchData.auditPeriodStart || '',
         auditPeriodEnd: branchData.auditPeriodEnd || '',
         pic: branchData.pics.join(', '),
@@ -434,7 +449,19 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       cell: info => <div className="truncate max-w-[200px]" title={info.getValue()}>{info.getValue() || '-'}</div>,
       size: 200,
     }),
-
+    columnHelper.accessor('region', {
+      header: ({ column }) => (
+        <div className="flex items-center gap-2">
+          Region
+          <ArrowUpDown 
+            className="h-4 w-4 cursor-pointer" 
+            onClick={() => column.toggleSorting()}
+          />
+        </div>
+      ),
+      cell: info => info.getValue() || '-',
+      size: 120,
+    }),
     columnHelper.accessor(row => [row.auditPeriodStart, row.auditPeriodEnd], {
       id: 'auditPeriod',
       header: 'Audit Period',
@@ -748,14 +775,14 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
         <div className="inline-block min-w-full align-middle">
           <div className="overflow-hidden border rounded-lg">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 {table.getHeaderGroups().map(headerGroup => (
                   <tr key={headerGroup.id}>
                     {headerGroup.headers.map(header => (
                       <th
                         key={header.id}
                         colSpan={header.colSpan}
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
                       >
                         {header.isPlaceholder ? null : (
                           <div className="flex items-center gap-2">
@@ -771,25 +798,30 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
                 ))}
               </thead>
               <tbody className="divide-y divide-gray-200">
-               {table.getRowModel().rows.map(row => (
-                  <tr 
-                    key={row.id}
-                    className={`
-                      ${row.original.monitoring === 'Adequate' ? 'bg-indigo-300' : ''}
-                      ${row.original.monitoring === 'Inadequate' ? 'bg-rose-300' : ''}
-                      ${row.original.monitoring === '' ? 'bg-stone' : ''}
-                    `}
-                     >
-                    {row.getVisibleCells().map(cell => (
-                      <td
-                        key={cell.id}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {table.getRowModel().rows.map(row => {
+                  const branch = branches.find(b => b.name === row.original.branchName);
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`
+                        ${row.original.monitoring === 'Adequate' ? 'bg-indigo-300' : ''}
+                        ${row.original.monitoring === 'Inadequate' ? 'bg-rose-300' : ''}
+                        ${row.original.monitoring === '' ? 'bg-stone' : ''}
+                      `}
+                    >
+                      {row.getVisibleCells().map(cell => {
+                        return (
+                          <td
+                            key={cell.id}
+                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
