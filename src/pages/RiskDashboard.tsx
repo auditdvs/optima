@@ -18,7 +18,6 @@ interface AuditData {
   rating?: 'low' | 'medium' | 'high';
   fraud_amount?: number;
   fraud_staff?: string;
-  hkp?: number; // Add this line
   work_paper_auditors?: { auditor_name: string }[];
 }
 
@@ -27,7 +26,6 @@ interface FraudPayment {
   work_paper_id: string;
   payment_date: string;
   amount: number;
-  hkp: number;
   created_at: string;
 }
 
@@ -47,8 +45,7 @@ const RiskDashboard = () => {
   const [paymentInput, setPaymentInput] = useState({
     fraudStaffName: '',
     paymentDate: format(new Date(), 'yyyy-MM-dd'),
-    amountPaid: 0,
-    hkpAmount: 0
+    amountPaid: 0
   });
   const [downloadFormat, setDownloadFormat] = useState<'xlsx' | 'pdf' | 'csv'>('xlsx');
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
@@ -128,8 +125,7 @@ const RiskDashboard = () => {
     }
   };
 
-  const formatCurrency = (amount: number | null | undefined) => {
-    if (amount === null || amount === undefined) return 'Rp 0';
+  const formatCurrency = (amount: number) => {
     return `Rp ${amount.toLocaleString('id-ID')}`;
   };
 
@@ -159,8 +155,7 @@ const RiskDashboard = () => {
         .insert({
           work_paper_id: selectedFraudCase.id,
           payment_date: paymentInput.paymentDate,
-          amount: paymentInput.amountPaid || 0,
-          hkp: paymentInput.hkpAmount || 0
+          amount: paymentInput.amountPaid
         })
         .select();
 
@@ -173,47 +168,30 @@ const RiskDashboard = () => {
             id: data[0].id,
             work_paper_id: selectedFraudCase.id,
             payment_date: paymentInput.paymentDate,
-            amount: paymentInput.amountPaid || 0,
-            hkp: paymentInput.hkpAmount || 0,
+            amount: paymentInput.amountPaid,
             created_at: new Date().toISOString()
           };
           
           const updatedPayments = [...(audit.payments || []), newPayment];
           const totalPaid = updatedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-          const totalHkp = updatedPayments.reduce((sum, payment) => sum + payment.hkp, 0);
           
-          // Check if payment completes the fraud amount
-          const isNowFullyPaid = totalPaid >= (audit.fraud_amount || 0);
-          
-          if (isNowFullyPaid) {
-            // Clear due date, collection fee, and PIC in database
-            supabase
-              .from('fraud_cases')
-              .update({
-                due_date: null,
-                fraud_collection_fee: null,
-                pic: null
-              })
-              .eq('work_paper_id', audit.id);
+          // Recalculate collection fee
+          let collectionFee = 'NO';
+          if (audit.due_date) {
+            const dueDate = new Date(audit.due_date);
+            const sixMonthsAfterDueDate = addMonths(dueDate, 6);
+            const lastPaymentDate = new Date(paymentInput.paymentDate);
             
-            // Return updated audit with cleared fields
-            return {
-              ...audit,
-              payments: updatedPayments,
-              fraud_amount_paid: totalPaid,
-              hkp: totalHkp,
-              due_date: null,
-              fraud_collection_fee: null,
-              pic: null
-            };
+            if (isAfter(lastPaymentDate, sixMonthsAfterDueDate)) {
+              collectionFee = 'YES';
+            }
           }
           
-          // Return updated audit without clearing fields
           return {
             ...audit,
             payments: updatedPayments,
             fraud_amount_paid: totalPaid,
-            hkp: totalHkp
+            fraud_collection_fee: collectionFee
           };
         }
         return audit;
@@ -221,14 +199,20 @@ const RiskDashboard = () => {
 
       setFraudAudits(updatedFraudAudits);
       
-      // Reset form and close sidebar
+      // Update collection fee in database
+      const updatedAudit = updatedFraudAudits.find(a => a.id === selectedFraudCase.id);
+      if (updatedAudit) {
+        await updateCollectionFee(updatedAudit.id, updatedAudit.fraud_collection_fee || 'NO');
+      }
+      
+      // Reset form
       setPaymentInput({
         fraudStaffName: '',
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
-        amountPaid: 0,
-        hkpAmount: 0
+        amountPaid: 0
       });
       
+      // Close sidebar
       setShowSidebar(false);
       setSelectedFraudCase(null);
     } catch (error) {
@@ -348,7 +332,6 @@ const RiskDashboard = () => {
       'Fraud Staff': audit.fraud_staff || '-',
       'Fraud Amount': audit.fraud_amount ? formatCurrency(audit.fraud_amount) : '-',
       'Amount Paid': audit.fraud_amount_paid ? formatCurrency(audit.fraud_amount_paid) : '-',
-      'HKP': audit.hkp ? formatCurrency(audit.hkp) : '-', // Add this line
       'Due Date': formatDate(audit.due_date || ''),
       'Collection Fee': audit.fraud_collection_fee || '-',
       'PIC': audit.pic || '-',
@@ -379,13 +362,12 @@ const RiskDashboard = () => {
       // Create table
       (doc as any).autoTable({
         startY: 30,
-        head: [['Branch', 'Fraud Staff', 'Fraud Amount', 'Amount Paid', 'HKP', 'Due Date', 'Status']], // Add 'HKP'
+        head: [['Branch', 'Fraud Staff', 'Fraud Amount', 'Amount Paid', 'Due Date', 'Status']],
         body: data.map(item => [
           item['Branch Name'],
           item['Fraud Staff'],
           item['Fraud Amount'],
           item['Amount Paid'],
-          item['HKP'], // Add this line
           item['Due Date'],
           item['Status']
         ]),
@@ -489,7 +471,6 @@ const RiskDashboard = () => {
                       <TableHead>Fraud Staff</TableHead>
                       <TableHead>Fraud Amount</TableHead>
                       <TableHead>Amount Paid</TableHead>
-                      <TableHead>HKP</TableHead> {/* Add this line */}
                       <TableHead>Due Date</TableHead>
                       <TableHead>Collection Fee</TableHead>
                       <TableHead>PIC</TableHead>
@@ -509,28 +490,18 @@ const RiskDashboard = () => {
                         <TableCell>{formatDate(audit.audit_start_date)}</TableCell>
                         <TableCell>{formatDate(audit.audit_end_date)}</TableCell>
                         <TableCell>{audit.fraud_staff}</TableCell>
-                        <TableCell>{formatCurrency(audit.fraud_amount)}</TableCell>
-                        <TableCell>{formatCurrency(audit.fraud_amount_paid)}</TableCell>
-                        <TableCell>{formatCurrency(audit.hkp)}</TableCell>
+                        <TableCell>{formatCurrency(audit.fraud_amount || 0)}</TableCell>
+                        <TableCell>{formatCurrency(audit.fraud_amount_paid || 0)}</TableCell>
                         <TableCell>
                           <input
                             type="date"
                             value={audit.due_date || ''}
                             onChange={(e) => handleUpdateFraudCase(audit.id, 'due_date', e.target.value)}
-                            className={`border rounded px-2 py-1 text-sm w-32 ${
-                              isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount) 
-                                ? 'bg-gray-100 cursor-not-allowed' 
-                                : ''
-                            }`}
-                            disabled={isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount)}
+                            className="border rounded px-2 py-1 text-sm w-32"
                           />
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-sm ${
-                            isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount) 
-                              ? 'text-gray-400' 
-                              : ''
-                          }`}>
+                          <span className="px-2 py-1 rounded text-sm">
                             {audit.fraud_collection_fee || 'NO'}
                           </span>
                         </TableCell>
@@ -544,13 +515,8 @@ const RiskDashboard = () => {
                               }
                             }}
                             maxLength={20}
-                            className={`border rounded px-2 py-1 text-sm w-32 ${
-                              isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount) 
-                                ? 'bg-gray-100 cursor-not-allowed' 
-                                : ''
-                            }`}
+                            className="border rounded px-2 py-1 text-sm w-32"
                             placeholder="PIC name"
-                            disabled={isFullyPaid(audit.fraud_amount_paid, audit.fraud_amount)}
                           />
                         </TableCell>
                         <TableCell>
@@ -599,11 +565,9 @@ const RiskDashboard = () => {
                     <h3 className="font-medium text-gray-700 mb-2">Case Details</h3>
                     <p className="text-sm text-gray-600">Branch: <span className="font-medium">{selectedFraudCase.branch_name}</span></p>
                     <p className="text-sm text-gray-600">Fraud Staff: <span className="font-medium">{selectedFraudCase.fraud_staff}</span></p>
-                    <p className="text-sm text-gray-600">Total Amount: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount)}</span></p>
-                    <p className="text-sm text-gray-600">Amount Paid: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount_paid)}</span></p>
-                    <p className="text-sm text-gray-600">Remaining: <span className="font-medium">
-                      {formatCurrency((selectedFraudCase.fraud_amount || 0) - (selectedFraudCase.fraud_amount_paid || 0))}
-                    </span></p>
+                    <p className="text-sm text-gray-600">Total Amount: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount || 0)}</span></p>
+                    <p className="text-sm text-gray-600">Amount Paid: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount_paid || 0)}</span></p>
+                    <p className="text-sm text-gray-600">Remaining: <span className="font-medium">{formatCurrency((selectedFraudCase.fraud_amount || 0) - (selectedFraudCase.fraud_amount_paid || 0))}</span></p>
                   </div>
 
                   <div className="space-y-4">
@@ -650,37 +614,13 @@ const RiskDashboard = () => {
                         step="1000"
                       />
                     </div>
-
-                    {/* Add this inside the payment form in the sidebar */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <HandCoins className="inline-block w-4 h-4 mr-1" />
-                        HKP Amount
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rp</span>
-                        <input
-                          type="text"
-                          value={(paymentInput.hkpAmount || 0).toLocaleString('id-ID')}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d]/g, '');
-                            setPaymentInput({
-                              ...paymentInput, 
-                              hkpAmount: parseInt(value) || 0
-                            });
-                          }}
-                          className="w-full border rounded-md px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
                   </div>
 
                   <div className="pt-4">
                     <button
                       onClick={handleAddPayment}
                       className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
-                      disabled={paymentInput.amountPaid <= 0 && paymentInput.hkpAmount <= 0} // Change this line
+                      disabled={paymentInput.amountPaid <= 0}
                     >
                       Add Payment
                     </button>
@@ -691,13 +631,11 @@ const RiskDashboard = () => {
                     <div className="mt-8">
                       <h3 className="font-medium text-gray-700 mb-3">Payment History</h3>
                       <div className="border rounded-md overflow-hidden">
-                        {/* Payment History Table */}
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HKP</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -705,7 +643,6 @@ const RiskDashboard = () => {
                               <tr key={payment.id}>
                                 <td className="px-4 py-2 text-sm text-gray-900">{formatDate(payment.payment_date)}</td>
                                 <td className="px-4 py-2 text-sm text-gray-900">{formatCurrency(payment.amount)}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">{formatCurrency(payment.hkp)}</td>
                               </tr>
                             ))}
                           </tbody>
