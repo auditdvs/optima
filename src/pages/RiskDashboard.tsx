@@ -128,7 +128,8 @@ const RiskDashboard = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined) return 'Rp 0';
     return `Rp ${amount.toLocaleString('id-ID')}`;
   };
 
@@ -508,9 +509,9 @@ const RiskDashboard = () => {
                         <TableCell>{formatDate(audit.audit_start_date)}</TableCell>
                         <TableCell>{formatDate(audit.audit_end_date)}</TableCell>
                         <TableCell>{audit.fraud_staff}</TableCell>
-                        <TableCell>{formatCurrency(audit.fraud_amount || 0)}</TableCell>
-                        <TableCell>{formatCurrency(audit.fraud_amount_paid || 0)}</TableCell>
-                        <TableCell>{formatCurrency(audit.hkp || 0)}</TableCell> {/* Add this line */}
+                        <TableCell>{formatCurrency(audit.fraud_amount)}</TableCell>
+                        <TableCell>{formatCurrency(audit.fraud_amount_paid)}</TableCell>
+                        <TableCell>{formatCurrency(audit.hkp)}</TableCell>
                         <TableCell>
                           <input
                             type="date"
@@ -598,9 +599,11 @@ const RiskDashboard = () => {
                     <h3 className="font-medium text-gray-700 mb-2">Case Details</h3>
                     <p className="text-sm text-gray-600">Branch: <span className="font-medium">{selectedFraudCase.branch_name}</span></p>
                     <p className="text-sm text-gray-600">Fraud Staff: <span className="font-medium">{selectedFraudCase.fraud_staff}</span></p>
-                    <p className="text-sm text-gray-600">Total Amount: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount || 0)}</span></p>
-                    <p className="text-sm text-gray-600">Amount Paid: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount_paid || 0)}</span></p>
-                    <p className="text-sm text-gray-600">Remaining: <span className="font-medium">{formatCurrency((selectedFraudCase.fraud_amount || 0) - (selectedFraudCase.fraud_amount_paid || 0))}</span></p>
+                    <p className="text-sm text-gray-600">Total Amount: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount)}</span></p>
+                    <p className="text-sm text-gray-600">Amount Paid: <span className="font-medium">{formatCurrency(selectedFraudCase.fraud_amount_paid)}</span></p>
+                    <p className="text-sm text-gray-600">Remaining: <span className="font-medium">
+                      {formatCurrency((selectedFraudCase.fraud_amount || 0) - (selectedFraudCase.fraud_amount_paid || 0))}
+                    </span></p>
                   </div>
 
                   <div className="space-y-4">
@@ -658,7 +661,7 @@ const RiskDashboard = () => {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rp</span>
                         <input
                           type="text"
-                          value={paymentInput.hkpAmount.toLocaleString('id-ID')}
+                          value={(paymentInput.hkpAmount || 0).toLocaleString('id-ID')}
                           onChange={(e) => {
                             const value = e.target.value.replace(/[^\d]/g, '');
                             setPaymentInput({
@@ -688,6 +691,7 @@ const RiskDashboard = () => {
                     <div className="mt-8">
                       <h3 className="font-medium text-gray-700 mb-3">Payment History</h3>
                       <div className="border rounded-md overflow-hidden">
+                        {/* Payment History Table */}
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
