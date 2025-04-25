@@ -7,13 +7,13 @@ import {
   SortingState,
   useReactTable
 } from '@tanstack/react-table';
-import { ArrowUpDown, MessageSquare, Plus, Search, Edit2, Download } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import toast from 'react-hot-toast';
-import { CustomCheckbox } from './CustomCheckbox';
-import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { ArrowUpDown, Download, Edit2, MessageSquare, Plus, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { supabase } from '../lib/supabaseClient';
+import { CustomCheckbox } from './CustomCheckbox';
 
 interface AuditFraudData {
   id?: string;
@@ -270,7 +270,15 @@ export const AuditFraudTable: React.FC = () => {
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('region', {
-      header: 'Region',
+      header: ({ column }) => (
+        <div className="flex items-center gap-2">
+          Region
+          <ArrowUpDown 
+            className="h-4 w-4 cursor-pointer" 
+            onClick={() => column.toggleSorting()}
+          />
+        </div>
+      ),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('pic', {
