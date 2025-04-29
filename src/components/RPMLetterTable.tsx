@@ -146,13 +146,18 @@ export const RPMLetterTable: React.FC = () => {
   };
 
   const columns = [
-    columnHelper.accessor(row => letters.indexOf(row as RPMLetter) + 1, {
-      id: 'no',
-      header: 'No',
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('letter_number', {
-      header: 'Number Letter',
+      header: ({ column }) => {
+        return (
+          <button
+            className="flex items-center gap-2"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            NUMBER LETTER
+            <ArrowUpDown className="h-4 w-4" />
+          </button>
+        );
+      },
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('letter_date', {
