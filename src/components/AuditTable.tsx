@@ -71,6 +71,15 @@ interface AddBranchModalProps {
   auditors: Auditor[];
 }
 
+interface EditBranchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: AuditData) => void;
+  data: AuditData;
+  branches: Branch[];
+  auditors: Auditor[];
+}
+
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '-';
   try {
@@ -218,6 +227,10 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
+  const [showEditBranchModal, setShowEditBranchModal] = useState(false);
+  const [editingData, setEditingData] = useState<AuditData | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAudit, setEditingAudit] = useState<AuditData | null>(null);
 
   useEffect(() => {
     fetchBranches();
@@ -336,6 +349,124 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     }
   };
 
+  const EditBranchModal: React.FC<EditBranchModalProps> = ({ isOpen, onClose, onSave, data, branches, auditors }) => {
+    const [branchName, setBranchName] = useState(data.branchName);
+    const [region, setRegion] = useState(data.region);
+    const [periodStart, setPeriodStart] = useState(data.auditPeriodStart || '');
+    const [periodEnd, setPeriodEnd] = useState(data.auditPeriodEnd || '');
+    const [selectedPICs, setSelectedPICs] = useState<string[]>(data.pic ? data.pic.split(', ') : []);
+    
+    if (!isOpen) return null;
+    
+    const handlePICChange = (auditorName: string) => {
+      setSelectedPICs(prev => {
+        if (prev.includes(auditorName)) {
+          return prev.filter(name => name !== auditorName);
+        } else {
+          return [...prev, auditorName];
+        }
+      });
+    };
+    
+    const handleSave = () => {
+      const updatedData: AuditData = {
+        ...data,
+        branchName,
+        region,
+        auditPeriodStart: periodStart,
+        auditPeriodEnd: periodEnd,
+        pic: selectedPICs.join(', ')
+      };
+      
+      onSave(updatedData);
+      onClose();
+    };
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-96">
+          <h2 className="text-xl font-semibold mb-4">Edit Branch</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name</label>
+              <input
+                type="text"
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+              <input
+                type="text"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Audit Period Start</label>
+              <input
+                type="month"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Audit Period End</label>
+              <input
+                type="month"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">PIC (Select Auditors)</label>
+              <div className="max-h-40 overflow-y-auto border rounded p-2">
+                {auditors.map((auditor) => (
+                  <div key={auditor.id} className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      id={`edit-auditor-${auditor.id}`}
+                      checked={selectedPICs.includes(auditor.name)}
+                      onChange={() => handlePICChange(auditor.name)}
+                      className="mr-2"
+                    />
+                    <label htmlFor={`edit-auditor-${auditor.id}`}>
+                      {auditor.name} ({auditor.auditor_id})
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2 mt-6">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   const saveAuditData = async (newData: AuditData) => {
     try {
       const dbData = {
@@ -427,6 +558,27 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     } catch (error) {
       console.error('Error adding branch:', error);
       toast.error('Failed to add branch');
+    }
+  };
+
+  const handleEditBranch = (data: AuditData) => {
+    setEditingData(data);
+    setShowEditBranchModal(true);
+  };
+
+  const handleEdit = (audit: AuditData) => {
+    setEditingAudit(audit);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (updatedData: AuditData) => {
+    try {
+      await saveAuditData(updatedData);
+      setShowEditModal(false);
+      setEditingAudit(null);
+    } catch (error) {
+      console.error('Error updating audit:', error);
+      toast.error('Failed to update audit');
     }
   };
 
@@ -709,19 +861,30 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     columnHelper.accessor('actions', {
       header: 'Actions',
       cell: info => (
-        <button
-          onClick={() => {
-            if (info.row.original.id) {
-              deleteAuditData(info.row.original.id);
-            }
-          }}
-          className="text-red-500 hover:text-red-700"
-          title="Delete row"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleEditBranch(info.row.original)}
+            className="text-blue-500 hover:text-blue-700"
+            title="Edit row"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              if (info.row.original.id) {
+                deleteAuditData(info.row.original.id);
+              }
+            }}
+            className="text-red-500 hover:text-red-700"
+            title="Delete row"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
       ),
     }),
   ];
@@ -835,6 +998,22 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
         branches={branches}
         auditors={auditors}
       />
+
+      {(editingData || editingAudit) && (
+        <EditBranchModal
+          isOpen={showEditBranchModal || showEditModal}
+          onClose={() => {
+            setShowEditBranchModal(false);
+            setShowEditModal(false);
+            setEditingData(null);
+            setEditingAudit(null);
+          }}
+          onSave={saveAuditData}
+          data={editingData || editingAudit!}
+          branches={branches}
+          auditors={auditors}
+        />
+      )}
     </div>
   );
 };
