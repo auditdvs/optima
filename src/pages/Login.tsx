@@ -100,12 +100,12 @@ function Login() {
             <Users className="h-12 w-12 text-indigo-600" />
           </div>
         </div>
-        <h2 className={`mt-6 text-center text-3xl font-extrabold text-gray-900 transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        <h2 className={`mt-1 text-center text-3xl font-extrabold text-gray-900 transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
           OPTIMA Dashboard
         </h2>
       </div>
 
-      <div className={`mt-8 sm:mx-auto sm:w-full sm:max-w-5xl transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+      <div className={`mt-2 sm:mx-auto sm:w-full sm:max-w-5xl transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
         <div className="bg-white overflow-hidden shadow-md rounded-lg">
           <div className="flex flex-col md:flex-row">
             {/* Login Form */}
@@ -272,8 +272,8 @@ function Login() {
             </div>
             
             {/* Person In Charge section */}
-            <div className="md:w-1/2 p-6 bg-gray-50">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 text-center">Person In Charge</h2>
+            <div className="md:w-1/2 p-4 bg-gray-50">
+              <h2 className="text-xl font-bold text-gray-900 mb-1 text-center">Person In Charge</h2>
               
               {loadingPic ? (
                 <div className="flex justify-center py-12">
@@ -294,6 +294,9 @@ function Login() {
                           <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             PIC Area
                           </th>
+                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                            </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -309,6 +312,17 @@ function Login() {
                               <td className="px-4 py-3 text-sm text-gray-500">
                                 {person.pic_area}
                               </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  person.status === 'Active' ? 'bg-green-100 text-green-800' : 
+                                  person.status === 'Sick' ? 'bg-red-100 text-red-800' : 
+                                  person.status === 'On leave' ? 'bg-yellow-100 text-yellow-800' :
+                                  person.status === 'On Branch' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {person.status}
+                                </span>
+                              </td>
                             </tr>
                           ))
                         ) : (
@@ -320,19 +334,6 @@ function Login() {
                         )}
                       </tbody>
                     </table>
-                  </div>
-                  
-                  {/* Added informational text below the table */}
-                  <div className="mt-6 space-y-4">
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <Info className="h-5 w-5 text-indigo-500" />
-                        <h3 className="text-sm font-medium text-gray-900">Contact Information</h3>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        Need assistance? Contact the person in charge for your area. For technical issues, please reach out to dvsaudit@gmail.com.
-                      </p>
-                    </div>
                   </div>
                 </>
               )}
