@@ -422,6 +422,18 @@ function AnomalyProcessing() {
               <p className="text-gray-600 flex-grow">Analisa ini bertujuan untuk mengetahui fokus pemeriksaan kantor cabang, antara pinjaman dan simpanan.</p>
             </div>
           </a>
+
+          <a 
+            href="https://top-up.streamlit.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="no-underline h-full"
+          >
+            <div className="p-4 border rounded-lg hover:shadow-lg transition-shadow h-full flex flex-col">
+              <h3 className="text-lg font-semibold mb-2">Analisa Top Up</h3>
+              <p className="text-gray-600 flex-grow">Analisa ini bertujuan untuk mengetahui anomali top up.</p>
+            </div>
+          </a>
           
         </div>
       </div>
