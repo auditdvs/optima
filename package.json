@@ -42,7 +42,8 @@
     "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-toast": "^1.1.5",
     "class-variance-authority": "^0.7.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
-import { RefreshCw, Trash2, UserPen, UserPlus, X } from 'lucide-react';
+import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
+import { Database, RefreshCw, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -145,7 +147,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, on
     }
   };
 
-  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -314,6 +315,7 @@ function UserControlPanel() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
   const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
@@ -339,7 +341,7 @@ function UserControlPanel() {
                 : 'OFFLINE'
       }));
     },
-    refetchInterval: 30000 // Auto refresh every 30 seconds
+    refetchInterval: 30000
   });
 
   const { data: pics, isLoading: isLoadingPics } = useQuery({
@@ -405,13 +407,8 @@ function UserControlPanel() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Delete user roles first
       await supabase.from('user_roles').delete().eq('user_id', userId);
-      
-      // Delete user profile
       await supabase.from('profiles').delete().eq('id', userId);
-      
-      // Delete the user from auth
       await supabaseService.auth.admin.deleteUser(userId);
     },
     onSuccess: () => {
@@ -461,6 +458,62 @@ function UserControlPanel() {
     await updatePICMutation.mutateAsync({ id, nama, posisi, pic_area, status });
   };
 
+  const handleBackupData = async () => {
+    try {
+      setLoading(true);
+      const zip = new JSZip();
+      
+      // Backup all tables
+      const tables = [
+        'audit_fraud',
+        'audit_regular',
+        'auditor_assignments',
+        'auditors',
+        'audits',
+        'branches',
+        'fraud_cases',
+        'fraud_payments',
+        'pic',
+        'profiles',
+        'rpm_letters',
+        'user_roles',
+        'user_status',
+        'work_paper_auditors',
+        'work_papers'
+      ];
+
+      for (const table of tables) {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*');
+        
+        if (error) {
+          console.error(`Error fetching ${table}:`, error);
+          continue;
+        }
+
+        zip.file(`${table}.json`, JSON.stringify(data, null, 2));
+      }
+
+      // Get users from auth
+      const { data: { users }, error: usersError } = await supabaseService.auth.admin.listUsers();
+      if (!usersError) {
+        zip.file('auth_users.json', JSON.stringify(users, null, 2));
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      saveAs(content, `optima_full_backup_${timestamp}.zip`);
+
+      toast.success('Full backup completed successfully');
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      toast.error('Failed to create backup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-0">
       <Toaster position="top-right" />
@@ -471,6 +524,14 @@ function UserControlPanel() {
           <p className="text-sm text-gray-500">Manage users within the application, including viewing active status, adding new users, editing user information, and deleting unnecessary accounts.</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleBackupData}
+            disabled={loading}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <Database className="h-5 w-5" />
+            {loading ? 'Backing up...' : 'Backup All Data'}
+          </button>
           <button
             onClick={() => refetch()}
             className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -574,7 +635,7 @@ function UserControlPanel() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="max-h-[630px] overflow-y-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thea className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</th>
@@ -582,7 +643,7 @@ function UserControlPanel() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              </thead>
+              </thea>
               <tbody className="bg-white divide-y divide-gray-200">
                 {pics?.map((pic) => (
                   <tr key={pic.id}>
