@@ -15,6 +15,7 @@ interface DashboardStats {
   totalFraud: number;
   fraudRecovery: number;
   outstandingFraud: number;
+  specialAudits: number;
 }
 
 interface AuditTrend {
@@ -89,8 +90,10 @@ const ManagerDashboard = () => {
     totalAuditors: 0,
     totalFraud: 0,
     fraudRecovery: 0,
-    outstandingFraud: 0
+    outstandingFraud: 0,
+    specialAudits: 0
   });
+
   const [auditTrends, setAuditTrends] = useState<AuditTrend[]>([]);
   const [regularAudits, setRegularAudits] = useState<RegularAudit[]>([]);
   const [fraudAudits, setFraudAudits] = useState<FraudAudit[]>([]);
@@ -131,6 +134,13 @@ const ManagerDashboard = () => {
         .from('fraud_payments')
         .select('amount');
 
+      // Fetch special audits count (just count all rows in audit_fraud)
+      const { data: specialAuditsData, error: specialAuditsError } = await supabase
+        .from('audit_fraud')
+        .select('branch_name');
+
+      if (specialAuditsError) throw specialAuditsError;
+
       // Calculate totals
       const totalFraud = fraudAuditsData?.reduce((sum, audit) => sum + (audit.fraud_amount || 0), 0) || 0;
       const fraudRecovery = fraudPaymentsData?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
@@ -138,6 +148,7 @@ const ManagerDashboard = () => {
       setStats({
         totalBranches: branchesData?.length || 0,
         regularAudits: regularAuditsData?.length || 0,
+        specialAudits: specialAuditsData?.length || 0,
         fraudAudits: fraudAuditsData?.length || 0,
         totalAuditors: auditorsData?.length || 0,
         totalFraud,
@@ -375,7 +386,8 @@ const ManagerDashboard = () => {
                 <p className="text-x text-gray-600">Total Audit</p>
                 <div className="flex flex-col">
                   <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
-                  <p className="text-xs text-red-600">{stats.fraudAudits} Fraud</p>
+                  <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
+                  <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
                 </div>
               </div>
             </div>
