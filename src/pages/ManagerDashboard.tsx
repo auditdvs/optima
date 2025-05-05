@@ -1,4 +1,10 @@
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format, parseISO } from 'date-fns';
 import { saveAs } from 'file-saver';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Download, Search, TrendingUp, Users, Wallet } from 'lucide-react';
@@ -22,6 +28,11 @@ interface AuditTrend {
   month: string;
   regular: number;
   fraud: number;
+}
+
+interface Auditor {
+  name: string;
+  auditor_id: string;
 }
 
 interface RegularAudit {
@@ -100,10 +111,13 @@ const ManagerDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'regular' | 'fraud'>('regular');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
+  const [auditors, setAuditors] = useState<Auditor[]>([]);
+  const [isAuditorListOpen, setIsAuditorListOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
     fetchAuditRecapData();
+    fetchAuditors();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -222,6 +236,19 @@ const ManagerDashboard = () => {
     }
   };
 
+  const fetchAuditors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('auditors')
+        .select('name, auditor_id');
+      
+      if (error) throw error;
+      setAuditors(data || []);
+    } catch (error) {
+      console.error('Error fetching auditors:', error);
+    }
+  };
+
   const processAuditTrends = (workPapers: any[]) => {
     const monthlyAudits: { [key: string]: { regular: number; fraud: number } } = {};
 
@@ -302,6 +329,21 @@ const ManagerDashboard = () => {
       saveAs(dataBlob, fileName);
     } catch (error) {
       console.error('Error downloading report:', error);
+    }
+  };
+
+  const handleDownloadAuditors = () => {
+    try {
+      const fileName = 'auditors_list.xlsx';
+      const worksheet = XLSX.utils.json_to_sheet(auditors);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Auditors');
+      
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(dataBlob, fileName);
+    } catch (error) {
+      console.error('Error downloading auditors list:', error);
     }
   };
 
@@ -394,7 +436,13 @@ const ManagerDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
+        <Card 
+          className="col-span-3 cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => {
+            setIsAuditorListOpen(true);
+            fetchAuditors();
+          }}
+        >
           <CardContent className="p-4 flex justify-center items-center h-full">
             <div className="flex mt-4 items-center justify-start space-x-2 w-full">
               <div className="p-4 bg-green-100 rounded-lg">
@@ -490,7 +538,7 @@ const ManagerDashboard = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search..."
-                  className="pl-9 pr-4 py-2 border rounded-md w-64"
+                  className="pl-7 pr-2 py-1 border rounded-md w-44 text-xs"
                 />
               </div>
               <button
@@ -531,7 +579,7 @@ const ManagerDashboard = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => requestSort('branch_name')}
                   >
                     <div className="flex items-center">
@@ -540,7 +588,7 @@ const ManagerDashboard = () => {
                     </div>
                   </th>
                   <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => requestSort('region')}
                   >
                     <div className="flex items-center">
@@ -551,7 +599,7 @@ const ManagerDashboard = () => {
                   {activeTab === 'regular' ? (
                     <>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => requestSort('monitoring')}
                       >
                         <div className="flex items-center">
@@ -560,14 +608,14 @@ const ManagerDashboard = () => {
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
                           Failed Checks
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
                           PIC
@@ -577,14 +625,14 @@ const ManagerDashboard = () => {
                   ) : (
                     <>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
                           Failed Checks
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => requestSort('review')}
                       >
                         <div className="flex items-center">
@@ -593,7 +641,7 @@ const ManagerDashboard = () => {
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
                           PIC
@@ -606,16 +654,16 @@ const ManagerDashboard = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedAudits.map((audit, index) => (
                   <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                       {audit.branch_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                       {audit.region}
                     </td>
                     {activeTab === 'regular' ? (
                       <>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        <td className="px-3 py-2 whitespace-nowrap text-xs">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
                             audit.monitoring === 'Adequate' 
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
@@ -623,22 +671,22 @@ const ManagerDashboard = () => {
                             {audit.monitoring}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                           {getFailedChecksWithAliases(audit, true)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                           {audit.pic || 'N/A'}
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                           {getFailedChecksWithAliases(audit, false)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                           {(audit as FraudAudit).review}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                           {audit.pic || 'N/A'}
                         </td>
                       </>
@@ -650,6 +698,52 @@ const ManagerDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Auditor List Dialog */}
+      <Dialog open={isAuditorListOpen} onOpenChange={setIsAuditorListOpen}>
+        <DialogContent className="max-w-md max-h-[70vh]">
+          <DialogHeader className="pr-6">
+            <div className="flex items-center justify-between mb-2">
+              <DialogTitle className="text-lg">List of Auditors</DialogTitle>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadAuditors}
+                  className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Excel</span>
+                </button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[50vh]">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Auditor ID
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Name
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {auditors.map((auditor, index) => (
+                  <tr key={index}>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {auditor.auditor_id}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {auditor.name}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

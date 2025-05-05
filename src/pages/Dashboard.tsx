@@ -58,6 +58,7 @@ const Dashboard = () => {
     fraudAudits: number;
     annualAudits: number;
   }>>([]);
+  const [fraudAuditCount, setFraudAuditCount] = useState(0);
 
   const fetchData = async () => {
     try {
@@ -80,6 +81,13 @@ const Dashboard = () => {
         .gte('audit_start_date', startOfYear)
         .lte('audit_start_date', endOfYear);
 
+      const { count: auditFraudCount, error: auditFraudError } = await supabase
+        .from('audit_fraud')
+        .select('branch_name', { count: 'exact', head: true });
+
+      if (auditFraudError) throw auditFraudError;
+      setFraudAuditCount(auditFraudCount || 0);
+
       if (workPapersError) throw workPapersError;
       if (workPapersData) {
         setWorkPapers(workPapersData);
@@ -96,15 +104,23 @@ const Dashboard = () => {
   }, []);
 
   // Calculate statistics
+  const regularAuditedBranches = new Set(
+    workPapers.filter(wp => wp.audit_type === 'regular').map(wp => wp.branch_name)
+  );
+
   const stats = {
     totalBranches: branches.length,
-    auditedBranches: new Set(workPapers.map(wp => wp.branch_name)).size,
-    unauditedBranches: branches.length - new Set(workPapers.map(wp => wp.branch_name)).size,
-    fraudAudits: workPapers.filter(wp => wp.audit_type === 'fraud').length,
+    auditedBranches: regularAuditedBranches.size,
+    unauditedBranches: branches.length - regularAuditedBranches.size,
+    fraudAudits: fraudAuditCount,
     annualAudits: workPapers.filter(wp => wp.audit_type === 'regular').length,
     totalAudits: workPapers.length,
     totalFraud: workPapers.reduce((sum, wp) => sum + (wp.fraud_amount || 0), 0),
-    totalFraudCases: workPapers.filter(wp => wp.audit_type === 'fraud').length,
+    totalFraudCases: new Set(
+      workPapers
+        .filter(wp => wp.audit_type === 'fraud' && wp.fraud_staff)
+        .map(wp => wp.fraud_staff)
+    ).size,
     totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size
   };
 
