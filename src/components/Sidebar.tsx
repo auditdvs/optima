@@ -2,11 +2,11 @@ import {
   ChartPie,
   FilePenLine,
   FileVideo,
+  KeyRound,
   LayoutDashboard,
   Library,
   MapPinPlus,
   Table2,
-  UserCog,
   Users,
   Wrench
 } from 'lucide-react';
@@ -26,8 +26,7 @@ function Sidebar() {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
-  ];
-  
+  ];  
   // super admin, qa, manager dan dvs
   if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs' || userRole === 'manager') { 
     menuItems.push(
@@ -50,12 +49,6 @@ function Sidebar() {
     );
   }
 
-  // superadmin only
-  if (userRole === 'superadmin') {
-    menuItems.push(
-      { path: '/add-user', icon: UserCog, label: 'User Management' }
-    );
-  }
 
   // manager dashboard
   if (userRole === 'superadmin' || userRole === 'manager') {
@@ -71,6 +64,14 @@ function Sidebar() {
       { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
     );
   }
+
+  // superadmin only
+  if (userRole === 'superadmin') {
+     menuItems.push(
+      { path: '/add-user', icon:KeyRound, label: 'Admin' }
+     );
+   }
+  
   
  return (
     <div className="flex flex-col h-screen bg-white border-r w-64">
