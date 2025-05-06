@@ -1,12 +1,13 @@
 import {
+  Bell,
   ChartPie,
   FilePenLine,
   FileVideo,
-  KeyRound,
   LayoutDashboard,
   Library,
   MapPinPlus,
   Table2,
+  UserCog,
   Users,
   Wrench
 } from 'lucide-react';
@@ -26,12 +27,14 @@ function Sidebar() {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
-  ];  
+  ];
+  
   // super admin, qa, manager dan dvs
   if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs' || userRole === 'manager') { 
     menuItems.push(
       { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
-      { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' }
+      { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' },
+      { path: '/broadcast', icon: Bell, label: 'Broadcast Message' }
     );
   }
 
@@ -49,6 +52,12 @@ function Sidebar() {
     );
   }
 
+  // superadmin only
+  if (userRole === 'superadmin') {
+    menuItems.push(
+      { path: '/add-user', icon: UserCog, label: 'Admin Menu' }
+    );
+  }
 
   // manager dashboard
   if (userRole === 'superadmin' || userRole === 'manager') {
@@ -64,14 +73,6 @@ function Sidebar() {
       { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
     );
   }
-
-  // superadmin only
-  if (userRole === 'superadmin') {
-     menuItems.push(
-      { path: '/add-user', icon:KeyRound, label: 'Admin' }
-     );
-   }
-  
   
  return (
     <div className="flex flex-col h-screen bg-white border-r w-64">
