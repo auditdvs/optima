@@ -19,7 +19,7 @@ interface NotificationWithReaders {
   message: string;
   attachment_url?: string;
   attachment_name?: string;
-  readers: { name: string }[];
+  readers: string[]; // array of string
 }
 
 function Broadcast() {
@@ -31,6 +31,7 @@ function Broadcast() {
   const [uploading, setUploading] = useState(false);
   const [attachmentDetails, setAttachmentDetails] = useState<{ url: string; name: string } | null>(null);
   const [notifications, setNotifications] = useState<NotificationWithReaders[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -155,165 +156,195 @@ function Broadcast() {
     }
   };
 
-// Dalam useEffect untuk fetch notifications
-useEffect(() => {
-    async function fetchNotifications() {
-      try {
-        // 1. Ambil semua notifikasi
-        const { data: notifs, error } = await supabase
-          .from('notifications')
-          .select('id, title, message, attachment_url, attachment_name, created_at')
-          .order('created_at', { ascending: false });
-  
-        if (error) {
-          console.error('Error fetching notifications:', error);
-          return;
-        }
-  
-        // 2. Ambil semua notification_reads
-        const { data: reads, error: readsError } = await supabase
-          .from('notification_reads')
-          .select('notification_id, user_id');
-  
-        if (readsError) {
-          console.error('Error fetching notification reads:', readsError);
-        }
-  
-        // 3. Ambil semua auditors untuk mendapatkan nama
-        const { data: auditors, error: auditorsError } = await supabase
-          .from('auditors')
-          .select('id, name');
-  
-        if (auditorsError) {
-          console.error('Error fetching auditors:', auditorsError);
-        }
-  
-        // 4. Gabungkan data untuk setiap notifikasi
-        const notificationsWithReaders = notifs.map(notif => {
-          // Temukan semua read entries untuk notifikasi ini
-          const notifReads = reads ? reads.filter(read => read.notification_id === notif.id) : [];
-          
-          // Temukan nama auditor untuk setiap read
-          const readers = notifReads.map(read => {
-            const auditor = auditors ? auditors.find(a => a.id === read.user_id) : null;
-            return auditor || { name: 'Unknown' };
-          });
-  
-          return {
-            ...notif,
-            readers
-          };
-        });
-  
-        setNotifications(notificationsWithReaders);
-      } catch (err) {
-        console.error('Error in fetchNotifications:', err);
+  const fetchNotifications = async () => {
+    try {
+      setRefreshing(true);
+      // 1. Ambil semua notifikasi
+      const { data: notifs, error } = await supabase
+        .from('notifications')
+        .select('id, title, message, attachment_url, attachment_name, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        setRefreshing(false);
+        return;
       }
+
+      // 2. Ambil semua notification_reads
+      const { data: reads, error: readsError } = await supabase
+        .from('notification_reads')
+        .select('notification_id, user_id');
+
+      if (readsError) {
+        console.error('Error fetching notification reads:', readsError);
+      }
+
+      // 3. Ambil semua profiles untuk mendapatkan nama
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name');
+
+      // 4. Gabungkan data untuk setiap notifikasi
+      const notificationsWithReaders = notifs.map(notif => {
+        const notifReads = reads ? reads.filter(read => read.notification_id === notif.id) : [];
+        // Ubah jadi array string, bukan objek
+        const readers = notifReads.map(read => {
+          const foundUser = profiles.find(u => u.id === read.user_id);
+          return foundUser ? foundUser.full_name : 'Unknown';
+        });
+
+        return {
+          ...notif,
+          readers // array of string
+        };
+      });
+
+      setNotifications(notificationsWithReaders);
+      setRefreshing(false);
+    } catch (err) {
+      setRefreshing(false);
+      console.error('Error in fetchNotifications:', err);
     }
-    
+  };
+
+  useEffect(() => {
     fetchNotifications();
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Broadcast Message</h1>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Message
-          </label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Attachment (optional)
-          </label>
-          <div className="mt-1 flex items-center">
-            <label className="relative cursor-pointer bg-white px-4 py-2 border rounded-md hover:bg-gray-50">
-              <Upload className="h-5 w-5 text-gray-600" />
+    <div className="max-w-6xl ml-1 mr-2 p-1">
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Kiri: Broadcast Message */}
+        <div className="md:w-1/3 w-full">
+          <h1 className="text-2xl font-bold mb-6">Broadcast Message</h1>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Title
+              </label>
               <input
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-                accept=".pdf,.jpg,.jpeg,.png,.gif"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
               />
-            </label>
-            {file && (
-              <div className="ml-4 flex items-center">
-                <span className="text-sm text-gray-500">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFile(null);
-                    setAttachmentDetails(null);
-                  }}
-                  className="ml-2 text-gray-400 hover:text-gray-500"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Message
+              </label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Attachment (optional)
+              </label>
+              <div className="mt-1 flex items-center">
+                <label className="relative cursor-pointer bg-white px-4 py-2 border rounded-md hover:bg-gray-50">
+                  <Upload className="h-5 w-5 text-gray-600" />
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept=".pdf,.jpg,.jpeg,.png,.gif"
+                  />
+                </label>
+                {file && (
+                  <div className="ml-4 flex items-center">
+                    <span className="text-sm text-gray-500">{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFile(null);
+                        setAttachmentDetails(null);
+                      }}
+                      className="ml-2 text-gray-400 hover:text-gray-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <p className="mt-2 text-sm text-gray-500">
-            PDF, JPG, PNG or GIF up to 5MB
-          </p>
+              <p className="mt-2 text-sm text-gray-500">
+                PDF, JPG, PNG or GIF up to 5MB
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || uploading}
+              className="flex items-center justify-center w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Send className="h-5 w-5 mr-2" />
+              {uploading ? 'Uploading...' : loading ? 'Broadcasting...' : 'Broadcast Message'}
+            </button>
+          </form>
         </div>
 
-        <button
-          type="submit"
-          disabled={loading || uploading}
-          className="flex items-center justify-center w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-        >
-          <Send className="h-5 w-5 mr-2" />
-          {uploading ? 'Uploading...' : loading ? 'Broadcasting...' : 'Broadcast Message'}
-        </button>
-      </form>
-
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold mb-4">Broadcast History</h2>
-        {notifications.map((notif) => (
-          <div key={notif.id} className="mb-6 p-4 border rounded">
-            <div className="font-bold">{notif.title}</div>
-            <div className="mb-2">{notif.message}</div>
-            {notif.attachment_url && (
-              <a
-                href={notif.attachment_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                {notif.attachment_name || 'Attachment'}
-              </a>
-            )}
-            <div className="mt-2 text-sm text-gray-600">
-              <span className="font-semibold">Sudah dibaca oleh:</span>{' '}
-              {notif.readers.length > 0
-                ? notif.readers.map((r) => r.name).join(', ')
-                : <span className="italic text-gray-400">Belum ada</span>}
-            </div>
+        {/* Kanan: Broadcast History */}
+        <div className="md:w-2/3 w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Broadcast History</h2>
+            <button
+              onClick={fetchNotifications}
+              disabled={refreshing}
+              className="flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm text-gray-700 disabled:opacity-50"
+              title="Refresh"
+            >
+              <svg className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.582 9A7.003 7.003 0 0112 5c3.314 0 6.127 2.163 6.816 5M18.418 15A7.003 7.003 0 0112 19c-3.314 0-6.127-2.163-6.816-5" />
+              </svg>
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
           </div>
-        ))}
+          <div className="overflow-x-auto overflow-y-visible max-h-[500px] border rounded">
+            <table className="w-full text-sm table-fixed">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  <th className="p-2 text-left w-32">Title</th>
+                  <th className="p-2 text-left">Message</th>
+                  <th className="p-2 text-left w-36">Attachment</th>
+                  <th className="p-2 text-left w-32">Read by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notifications.map((notif) => (
+                  <tr key={notif.id} className="border-b align-top">
+                    <td className="p-2 font-medium break-words">{notif.title}</td>
+                    <td className="p-2 break-words">{notif.message}</td>
+                    <td className="p-2">
+                      {notif.attachment_url && (
+                        <a
+                          href={notif.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline"
+                        >
+                          {notif.attachment_name || 'Attachment'}
+                        </a>
+                      )}
+                    </td>
+                    <td className="p-2 break-words">
+                      {notif.readers.length > 0
+                        ? notif.readers.join(', ')
+                        : <span className="italic text-gray-400">Belum ada</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

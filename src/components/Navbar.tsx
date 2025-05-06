@@ -13,15 +13,21 @@ interface Notification {
   attachment_name?: string;
   created_at: string;
   read_by: string[];
+  readers?: string[];
+  sender_name?: string;
 }
 
 function Navbar() {
-  const { signOut, user, auditor } = useAuth();
+  const { signOut, user } = useAuth();
   const [fullName, setFullName] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasNewNotification, setHasNewNotification] = useState(false);
+  const [showFullMessage, setShowFullMessage] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+
+  console.log("Navbar user:", user);
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -42,11 +48,9 @@ function Navbar() {
   }, [user]);
 
   useEffect(() => {
-    if (user && auditor) {
-      // Initial fetch
+    if (user && user.id) {
       fetchNotifications();
 
-      // Subscribe to new notifications
       const channel = supabase
         .channel('public:notifications')
         .on(
@@ -56,151 +60,95 @@ function Navbar() {
             schema: 'public',
             table: 'notifications'
           },
-          async (payload) => {
-            console.log('New notification received:', payload);
-            
-            // Fetch the complete notification data
-            const { data: newNotif, error } = await supabase
-              .from('notifications')
-              .select('id, title, message, attachment_url, attachment_name, created_at')
-              .eq('id', payload.new.id)
-              .single();
-
-            if (error) {
-              console.error('Error fetching new notification:', error);
-              return;
-            }
-
-            // Add to notifications state with empty read_by array
-            const newNotification = {
-              ...newNotif,
-              read_by: []
-            };
-            
-            setNotifications(prev => [newNotification, ...prev]);
+          async () => {
+            await fetchNotifications();
             setHasNewNotification(true);
-            setUnreadCount(prev => prev + 1);
             toast.success('New notification received!');
           }
         )
         .subscribe();
 
       return () => {
-        console.log('Unsubscribing from notifications channel');
         supabase.removeChannel(channel);
       };
     }
-  }, [user, auditor]);
+  }, [user]);
 
   useEffect(() => {
-    if (notifications.length > 0 && auditor) {
-      const count = notifications.filter(n => !n.read_by.includes(auditor.id)).length;
+    if (notifications.length > 0 && user) {
+      const count = notifications.filter(n => !n.read_by.includes(user.id)).length;
       setUnreadCount(count);
     }
-  }, [notifications, auditor]);
+  }, [notifications, user]);
 
   const fetchNotifications = async () => {
-    if (!user || !auditor) return;
+    if (!user) return;
 
-    console.log("Fetching notifications for auditor:", auditor.id);
-    
-    try {
-      // 1. Fetch notifications
-      const { data: notifs } = await supabase
-        .from('notifications')
-        .select('id, title, message, attachment_url, attachment_name, created_at')
-        .order('created_at', { ascending: false });
+    const { data: notifs } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false }); // Notif terbaru di atas
 
-      console.log("Fetched notifications:", notifs);
+    const { data: reads } = await supabase
+      .from('notification_reads')
+      .select('notification_id, user_id');
 
-      // 2. Fetch notification reads
-      const { data: reads, error: readsError } = await supabase
-        .from('notification_reads')
-        .select('notification_id, user_id');
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name');
 
-      if (readsError) {
-        console.error('Error fetching notification reads:', readsError);
-        return;
-      }
+    const notificationsWithSender = notifs.map(notif => {
+      const sender = profiles.find(p => p.id === notif.sender_id);
+      const notifReads = reads.filter(read => read.notification_id === notif.id);
+      return {
+        ...notif, // pastikan notif sudah mengandung attachment_url & attachment_name
+        sender_name: sender ? sender.full_name : 'Unknown',
+        read_by: notifReads.map(read => read.user_id)
+      };
+    });
 
-      // 3. Process notifications with read status
-      const processedNotifications = notifs.map(notif => ({
-        ...notif,
-        read_by: reads
-          ? reads
-              .filter(read => read.notification_id === notif.id)
-              .map(read => read.user_id)
-          : []
-      }));
-
-      console.log('Processed notifications:', processedNotifications);
-      setNotifications(processedNotifications);
-
-      // 4. Update unread count
-      const unreadCount = processedNotifications.filter(
-        n => !n.read_by.includes(auditor.id)
-      ).length;
-      setUnreadCount(unreadCount);
-
-    } catch (error) {
-      console.error("Error in fetchNotifications:", error);
-    }
+    setNotifications(notificationsWithSender);
   };
 
   const markNotificationAsRead = async (notificationId: string) => {
-    if (!auditor) {
-      console.error("Cannot mark as read: No auditor data available");
+    if (!user) {
+      console.error("Cannot mark as read: No user data available");
       return;
     }
 
-    console.log("Marking notification as read:", notificationId, "by auditor:", auditor.id);
-
     try {
-      // First verify this specific notification exists
       const { data: notifCheck } = await supabase
         .from('notifications')
         .select('id')
         .eq('id', notificationId)
         .single();
-        
+
       if (!notifCheck) {
         console.error('Notification not found:', notificationId);
         return;
       }
 
-      // 1. Add record to notification_reads
-      const { data, error: readError } = await supabase
+      const { error: readError } = await supabase
         .from('notification_reads')
         .insert({
           notification_id: notificationId,
-          user_id: auditor.id
-        })
-        .select();
+          user_id: user.id
+        });
 
-      if (readError) {
-        if (readError.code === '23505') {
-          console.log('Notification already marked as read (unique constraint)');
-        } else {
-          console.error('Error marking notification as read:', readError);
-          toast.error('Failed to mark notification as read');
-          return;
-        }
-      } else {
-        console.log('Successfully marked as read:', data);
+      if (readError && readError.code !== '23505') {
+        console.error('Error marking notification as read:', readError);
+        toast.error('Failed to mark notification as read');
+        return;
       }
 
-      // 2. Update UI
       setNotifications(prev =>
         prev.map(n =>
           n.id === notificationId
-            ? { ...n, read_by: [...(n.read_by || []), auditor.id] }
+            ? { ...n, read_by: [...(n.read_by || []), user.id] }
             : n
         )
       );
-      
-      // 3. Update unread count
       setUnreadCount(prev => Math.max(0, prev - 1));
-
     } catch (error) {
       console.error('Error in markNotificationAsRead:', error);
       toast.error('An error occurred');
@@ -208,31 +156,27 @@ function Navbar() {
   };
 
   const markAllAsRead = async () => {
-    if (!auditor) {
-      console.error("Cannot mark all as read: No auditor data available");
+    if (!user) {
+      console.error("Cannot mark all as read: No user data available");
       return;
     }
 
     try {
-      const unreadNotifications = notifications.filter(n => !n.read_by.includes(auditor.id));
+      const unreadNotifications = notifications.filter(n => !n.read_by.includes(user.id));
       
       if (unreadNotifications.length === 0) {
         console.log("No unread notifications to mark");
         return;
       }
       
-      console.log("Marking all notifications as read for auditor:", auditor.id);
-      
-      // Insert all unread notifications into notification_reads
       const readRecords = unreadNotifications.map(notification => ({
         notification_id: notification.id,
-        user_id: auditor.id
+        user_id: user.id
       }));
 
       const { error } = await supabase
         .from('notification_reads')
-        .insert(readRecords)
-        .select();
+        .insert(readRecords);
 
       if (error && error.code !== '23505') {
         console.error('Error marking all as read:', error);
@@ -240,15 +184,13 @@ function Navbar() {
         return;
       }
 
-      // Update UI
       setNotifications(prev =>
         prev.map(n => ({
           ...n,
-          read_by: n.read_by.includes(auditor.id) ? n.read_by : [...n.read_by, auditor.id]
+          read_by: n.read_by.includes(user.id) ? n.read_by : [...n.read_by, user.id]
         }))
       );
       
-      // Reset unread count
       setUnreadCount(0);
       toast.success('All notifications marked as read');
 
@@ -256,6 +198,16 @@ function Navbar() {
       console.error('Error in markAllAsRead:', error);
       toast.error('An error occurred');
     }
+  };
+
+  const handleShowFullMessage = (notif: Notification) => {
+    setSelectedNotification(notif);
+    setShowFullMessage(true);
+  };
+
+  const handleCloseFullMessage = () => {
+    setShowFullMessage(false);
+    setSelectedNotification(null);
   };
 
   return (
@@ -326,49 +278,60 @@ function Navbar() {
                 </div>
               </div>
               <div className="max-h-96 overflow-y-auto">
-                {notifications.length === 0 ? (
+                {notifications.filter(n => !n.read_by.includes(user?.id || '')).length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 border-b hover:bg-gray-50 ${
-                        !notification.read_by.includes(auditor?.id || '') ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{notification.title}</h4>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {notification.message}
-                          </p>
-                          {notification.attachment_url && (
-                            <a
-                              href={notification.attachment_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
-                            >
-                              {notification.attachment_name || 'View attachment'}
-                            </a>
-                          )}
-                          <p className="text-xs text-gray-400 mt-2">
-                            {new Date(notification.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        {!notification.read_by.includes(auditor?.id || '') && (
+                  notifications
+                    .filter(n => !n.read_by.includes(user?.id || ''))
+                    .map((notification) => (
+                      <div
+                        key={notification.id}
+                        className="p-4 border-b hover:bg-gray-50 bg-blue-50"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{notification.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {notification.message.length > 80
+                                ? `${notification.message.slice(0, 80)}...`
+                                : notification.message}
+                            </p>
+                            {notification.message.length > 80 && (
+                              <button
+                                onClick={() => handleShowFullMessage(notification)}
+                                className="text-xs text-indigo-600 hover:underline mt-1"
+                              >
+                                See full message
+                              </button>
+                            )}
+                            {notification.attachment_url && (
+                              <a
+                                href={notification.attachment_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+                              >
+
+                              </a>
+                            )}
+                            <p className="text-xs text-gray-400 mt-2">
+                              {new Date(notification.created_at).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Sent by: {notification.sender_name}
+                            </p>
+                          </div>
                           <button
                             onClick={() => markNotificationAsRead(notification.id)}
                             className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 ml-4"
                           >
                             Mark as read
                           </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
             </div>
@@ -384,6 +347,33 @@ function Navbar() {
           <LogOut className="w-6 h-6 mr-4" />
         </button>
       </div>
+
+      {showFullMessage && selectedNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+            <button
+              onClick={handleCloseFullMessage}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h4 className="font-semibold text-lg mb-2">{selectedNotification.title}</h4>
+            <div className="overflow-y-auto max-h-[400px]">
+              <p className="text-sm text-gray-700 whitespace-pre-line">{selectedNotification.message}</p>
+              {selectedNotification.attachment_url && (
+                <a
+                  href={selectedNotification.attachment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block mt-4 text-indigo-600 hover:underline"
+                >
+                  {selectedNotification.attachment_name || 'View attachment'}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
