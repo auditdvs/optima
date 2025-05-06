@@ -216,7 +216,7 @@ function Broadcast() {
     <div className="max-w-6xl ml-1 mr-2 p-1">
       <div className="flex flex-col md:flex-row gap-8">
         {/* Kiri: Broadcast Message */}
-        <div className="md:w-1/3 w-full">
+        <div className="md:w-2/3 w-full">
           <h1 className="text-2xl font-bold mb-6">Broadcast Message</h1>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
