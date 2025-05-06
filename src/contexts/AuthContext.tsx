@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: auditor, error } = await supabase
         .from('auditors')
         .select('id, name')
-        .eq('user_id', userId) // Use user_id to find the auditor record
+        .eq('id', userId) // Use user_id to find the auditor record
         .single();
 
       if (error) {
