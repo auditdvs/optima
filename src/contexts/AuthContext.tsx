@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
   user: any;
   userRole: string;
+  auditor: { id: string; name: string } | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -13,6 +14,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('user');
+  const [auditor, setAuditor] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserRole(session.user.id);
+        fetchAuditor(session.user.id);
       }
     });
 
@@ -27,8 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserRole(session.user.id);
+        fetchAuditor(session.user.id);
       } else {
         setUserRole('user'); // Reset role when user logs out
+        setAuditor(null); // Reset auditor when user logs out
       }
     });
 
@@ -55,6 +60,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function fetchAuditor(userId: string) {
+    try {
+      const { data: auditor, error } = await supabase
+        .from('auditors')
+        .select('id, name')
+        .eq('user_id', userId) // Use user_id to find the auditor record
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') { // "No rows returned" error
+          console.log('User is not an auditor');
+        } else {
+          console.error('Error fetching auditor:', error);
+        }
+        setAuditor(null);
+        return;
+      }
+
+      console.log('Found auditor:', auditor);
+      setAuditor(auditor);
+    } catch (error) {
+      console.error('Error in fetchAuditor:', error);
+      setAuditor(null);
+    }
+  }
+
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -68,11 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setUserRole('user'); // Reset role on sign out
+    setAuditor(null); // Reset auditor on sign out
   }
 
   const value = {
     user,
     userRole,
+    auditor,
     signIn,
     signOut,
   };

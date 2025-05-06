@@ -4,6 +4,7 @@ import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-d
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AddUser from './pages/AddUser';
+import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -63,6 +64,11 @@ function App() {
               <Route path="tutorials" element={
                 <PrivateRoute requiredRoles={['user', 'qa', 'superadmin','dvs','manager']}>
                   <Tutorials />
+                </PrivateRoute>
+              } />
+              <Route path="broadcast" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs']}>
+                  <Broadcast />
                 </PrivateRoute>
               } />
               <Route path="companyRegulations" element={<CompanyRegulations />} />

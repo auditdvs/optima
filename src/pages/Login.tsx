@@ -1,4 +1,4 @@
-import { Info, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,7 +93,7 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-6 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className={`rounded-full bg-indigo-100 p-3 transition-all duration-700 ${fadeIn ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
@@ -281,38 +281,47 @@ function Login() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-100">
+                  <div 
+                    className="relative overflow-x-auto shadow-md sm:rounded-lg max-h-[400px] overflow-y-auto"
+                    style={{
+                      msOverflowStyle: 'none',  /* IE and Edge */
+                      scrollbarWidth: 'none',   /* Firefox */
+                      '&::-webkit-scrollbar': {
+                        display: 'none'         /* Chrome, Safari and Opera */
+                      }
+                    }}
+                  >
+                    <table className="w-full text-sm text-left text-gray-500">
+                      <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
                         <tr>
-                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3">
                             Nama
                           </th>
-                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3">
                             Posisi
                           </th>
-                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3">
                             PIC Area
                           </th>
-                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3">
                             Status
-                            </th>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody>
                         {picData.length > 0 ? (
                           picData.map((person, index) => (
-                            <tr key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors duration-150`}>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <tr key={index} className="bg-white border-b border-gray-200 hover:bg-gray-50">
+                              <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                                 {person.nama}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                              </th>
+                              <td className="px-6 py-4">
                                 {person.posisi}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-500">
+                              <td className="px-6 py-4">
                                 {person.pic_area}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                   person.status === 'Active' ? 'bg-green-100 text-green-800' : 
                                   person.status === 'Sick' ? 'bg-red-100 text-red-800' : 
@@ -326,15 +335,15 @@ function Login() {
                             </tr>
                           ))
                         ) : (
-                          <tr>
-                            <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
+                          <tr className="bg-white">
+                            <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
                               No PIC data available
                             </td>
                           </tr>
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </div>               
                 </>
               )}
             </div>
