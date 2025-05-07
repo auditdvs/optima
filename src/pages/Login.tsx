@@ -412,4 +412,5 @@ const globalStyles = `
 }
 `;
 
-export { Login, ResetPassword };
+export default Login;
+export { ResetPassword };
