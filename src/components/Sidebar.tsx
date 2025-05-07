@@ -1,16 +1,16 @@
 import {
-  Megaphone,
   ChartPie,
   FilePenLine,
   FileVideo,
+  History,
   LayoutDashboard,
   Library,
   MapPinPlus,
+  Megaphone,
   Table2,
   UserCog,
   Users,
-  Wrench,
-  History
+  Wrench
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';

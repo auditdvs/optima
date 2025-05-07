@@ -1,10 +1,17 @@
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Pie, PieChart,  XAxis, Bar, BarChart, CartesianGrid } from 'recharts';
 import DashboardStats from '../components/dashboard/DashboardStats';
 import { Card, CardContent } from '../components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { supabase } from '../lib/supabaseClient';
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "../components/ui/chart";
+import { TopFraudTable, FraudRow } from "../components/dashboard/TopFraudTable";
+import { BranchLocationTable, BranchRow } from "../components/dashboard/BranchLocationTable";
 
 interface WorkPaper {
   id: string;
@@ -48,6 +55,17 @@ const getMonthlyAuditData = (workPapers: WorkPaper[]) => {
 
   return monthlyData;
 };
+
+const barChartConfig = {
+  annualAudits: {
+    label: "Annual Audits",
+    color: "#2563eb", // biru
+  },
+  fraudAudits: {
+    label: "Fraud Audits",
+    color: "#ef4444", // merah
+  },
+} satisfies ChartConfig;
 
 const Dashboard = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -130,12 +148,6 @@ const Dashboard = () => {
     branch.region.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Get top 5 fraud cases
-  const topFraudCases = workPapers
-    .filter(wp => wp.audit_type === 'fraud' && wp.fraud_amount && wp.fraud_staff)
-    .sort((a, b) => (b.fraud_amount || 0) - (a.fraud_amount || 0))
-    .slice(0, 5);
-
   // Format coordinates for Google Maps link
   const getCoordinatesText = (coordinates: any) => {
     if (!coordinates) return '';
@@ -154,28 +166,62 @@ const Dashboard = () => {
     }
   };
 
+  // Siapkan data untuk BranchLocationTable
+  const branchTableData: BranchRow[] = filteredBranches.map(branch => ({
+    name: branch.name,
+    region: branch.region,
+    location: (
+      <a
+        href={`https://www.google.com/maps?q=${getCoordinatesText(branch.coordinates)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800"
+      >
+        View on Maps
+      </a>
+    ),
+  }));
+
+  // Get top 5 fraud cases
+  const topFraudCases = workPapers
+    .filter(wp => wp.audit_type === 'fraud' && wp.fraud_amount && wp.fraud_staff)
+    .sort((a, b) => (b.fraud_amount || 0) - (a.fraud_amount || 0))
+    .slice(0, 5);
+
+  // Siapkan data untuk TopFraudTable
+  const topFraudTableData: FraudRow[] = topFraudCases.map(fraud => ({
+    branch_name: fraud.branch_name,
+    fraud_staff: fraud.fraud_staff,
+    fraud_amount: fraud.fraud_amount || 0,
+    auditors: fraud.work_paper_auditors?.map(a => a.auditor_name).join(', ') || '',
+  }));
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return `Rp ${amount.toLocaleString('id-ID')}`;
   };
 
-  // Pie chart data
+  // Pie chart data & config
   const pieData = [
-    { name: 'Annual Audits', value: stats.annualAudits },
-    { name: 'Fraud Audits', value: stats.fraudAudits }
+    { name: "Annual Audits", value: stats.annualAudits, fill: "#2563eb" }, // biru
+    { name: "Fraud Audits", value: stats.fraudAudits, fill: "#ef4444" },   // merah
   ];
 
-  const COLORS = ['#4F46E5', '#EF4444'];
+  const chartConfig = {
+    value: { label: "Audits" },
+    "Annual Audits": { label: "Annual Audits", color: "#2563eb" },
+    "Fraud Audits": { label: "Fraud Audits", color: "#ef4444" },
+  } satisfies ChartConfig;
 
    return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-2 p-0">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard Summary Audits Branches</h1>
       
       {/* Ganti bagian stats cards dengan DashboardStats */}
       <DashboardStats stats={stats} />
 
       {/* Main Content - 2 columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-11 lg:grid-cols-[0.8fr_1.2fr] gap-2">
         {/* Left Column - Branch Locations */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
@@ -192,35 +238,8 @@ const Dashboard = () => {
                 />
               </div>
             </div>
-            
-            <div className="max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="text-xs font-medium py-2">Branch Name</TableHead>
-                    <TableHead className="text-xs font-medium py-2">Region</TableHead>
-                    <TableHead className="text-xs font-medium py-2">Location</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBranches.map((branch) => (
-                    <TableRow key={branch.id}>
-                      <TableCell className="text-xs py-1.5">{branch.name}</TableCell>
-                      <TableCell className="text-xs py-1.5">{branch.region}</TableCell>
-                      <TableCell className="text-xs py-1.5">
-                        
-                        <a href={`https://www.google.com/maps?q=${getCoordinatesText(branch.coordinates)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          View on Maps
-                        </a>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="max-h-[600px] overflow-y-auto">
+              <BranchLocationTable data={branchTableData} />
             </div>
           </CardContent>
         </Card>
@@ -228,83 +247,61 @@ const Dashboard = () => {
         {/* Right Column - Performance Summary */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
-            <h2 className="text-sm font-semibold pt-2 mb-4">Audit Performance Summary</h2>
+            <h2 className="text-sm font-semibold pt-1 mb-4">Audit Performance Summary</h2>
             
             {/* Charts Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-0">
               {/* Pie Chart */}
-              <div className="h-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={70}
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend
-                      verticalAlign="bottom"
-                      height={30}
-                      content={({ payload }) => (
-                        <div className="flex justify-center gap-3">
-                          {payload.map((entry, index) => (
-                            <div key={`legend-${index}`} className="flex items-center gap-1.5">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                              <span className="text-xs">{entry.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <Card className="flex flex-col bg-white shadow-sm">
+                <CardContent className="flex-1 pb-0">
+                  <ChartContainer
+                    config={chartConfig}
+                    className="mx-auto aspect-square max-h-[250px]"
+                  >
+                    <PieChart>
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent hideLabel />}
+                      />
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        stroke="0"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
 
-              {/* Line Chart */}
-              <div className="h-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyData}>
-                    <XAxis dataKey="month" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="fraudAudits" stroke="#EF4444" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="annualAudits" stroke="#4F46E5" strokeWidth={1.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {/* Bar Chart */}
+              <Card>
+                <CardContent className="pb-0">
+                  <ChartContainer config={barChartConfig}>
+                    <BarChart data={monthlyData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="dashed" />}
+                      />
+                      <Bar dataKey="annualAudits" fill="#2563eb" radius={4} />
+                      <Bar dataKey="fraudAudits" fill="#ef4444" radius={4} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Fraud Cases Table */}
-            <div>
+            <div className="mt-2">
               <h3 className="text-sm font-semibold mb-2">Top 5 Fraud Branches</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="text-xs font-medium py-1.5">Branch</TableHead>
-                    <TableHead className="text-xs font-medium py-1.5">Fraud Staff Name</TableHead>
-                    <TableHead className="text-xs font-medium py-1.5">Fraud Amount</TableHead>
-                    <TableHead className="text-xs font-medium py-1.5">Auditors</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topFraudCases.map((fraud) => (
-                    <TableRow key={fraud.id}>
-                      <TableCell className="text-xs py-1">{fraud.branch_name}</TableCell>
-                      <TableCell className="text-xs py-1">{fraud.fraud_staff}</TableCell>
-                      <TableCell className="text-xs py-1">{formatCurrency(fraud.fraud_amount || 0)}</TableCell>
-                      <TableCell className="text-xs py-1">
-                        {fraud.work_paper_auditors?.map(a => a.auditor_name).join(', ')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <TopFraudTable data={topFraudTableData} />
             </div>
           </CardContent>
         </Card>
