@@ -1,11 +1,11 @@
-import { ArrowUpDown, Search, Trash2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '../lib/supabaseClient';
 import { format } from 'date-fns';
+import { ArrowUpDown, Search, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 const ALLOWED_ROLES = ['superadmin', 'qa', 'dvs', 'manager'];
 
@@ -217,14 +217,20 @@ const NotificationHistory = () => {
               </TableHeader>
               <TableBody>
                 {filteredAndSortedNotifications.map((notification) => (
-                  <TableRow key={notification.id}>
-                    <TableCell>{formatDate(notification.created_at)}</TableCell>
-                    <TableCell>{notification.title}</TableCell>
-                    <TableCell>
+                  <TableRow key={notification.id} className="align-top">
+                    <TableCell className="force-align-top w-36">
+                      {formatDate(notification.created_at)}
+                    </TableCell>
+                    <TableCell className="force-align-top w-48">
+                      {notification.title}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-pre-line">
                       {notification.message}
                     </TableCell>
-                    <TableCell>{notification.sender?.full_name || 'Unknown'}</TableCell>
-                    <TableCell>
+                    <TableCell className="force-align-top">
+                      {notification.sender?.full_name || 'Unknown'}
+                    </TableCell>
+                    <TableCell className="force-align-top">
                       {notification.attachment_url ? (
                         <button
                           onClick={() => handleDownload(
@@ -241,7 +247,7 @@ const NotificationHistory = () => {
                       )}
                     </TableCell>
                     {ALLOWED_ROLES.includes(userRole) && (
-                      <TableCell>
+                      <TableCell className="force-align-top">
                         <button
                           onClick={() => handleDelete(notification.id)}
                           className="text-red-500 hover:text-red-700"

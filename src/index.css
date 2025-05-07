@@ -46,5 +46,8 @@
   border-radius: 9999px;    
 }
 
+.force-align-top {
+  vertical-align: top !important;
+}
 
 }
