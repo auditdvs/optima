@@ -1,17 +1,25 @@
-import { Card, CardContent } from '@/components/ui/card';
+import { format, parseISO } from 'date-fns';
+import { saveAs } from 'file-saver';
+import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Download, Search, TrendingUp, Users, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
+import * as XLSX from 'xlsx';
+import { Card, CardContent } from '../components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  auditTrendsConfig,
+} from "../components/ui/chart";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { format, parseISO } from 'date-fns';
-import { saveAs } from 'file-saver';
-import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Download, Search, TrendingUp, Users, Wallet } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import * as XLSX from 'xlsx';
+} from "../components/ui/dialog";
 import { supabase } from '../lib/supabaseClient';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 interface DashboardStats {
   totalBranches: number;
@@ -250,6 +258,7 @@ const ManagerDashboard = () => {
   };
 
   const processAuditTrends = (workPapers: any[]) => {
+    // Hitung jumlah audit per bulan
     const monthlyAudits: { [key: string]: { regular: number; fraud: number } } = {};
 
     workPapers.forEach(paper => {
@@ -266,9 +275,11 @@ const ManagerDashboard = () => {
       }
     });
 
-    return Object.entries(monthlyAudits).map(([month, counts]) => ({
+    // Pastikan semua bulan ada, jika tidak ada data isi 0
+    return MONTHS.map(month => ({
       month,
-      ...counts
+      regular: monthlyAudits[month]?.regular || 0,
+      fraud: monthlyAudits[month]?.fraud || 0,
     }));
   };
 
@@ -404,102 +415,84 @@ const ManagerDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-9 gap-2">
-        <Card className="col-span-3">
-          <CardContent className="p-4 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-4 w-full">
-              <div className="p-4 bg-purple-100 rounded-lg">
-                <Building2 className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-x text-gray-500">Total Branch</p>
-                <p className="text-base font-bold">{stats.totalBranches}</p>
-              </div>
+        <Card className="col-span-3 min-h-[80px] flex items-center">
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Total Branch</p>
+              <p className="text-base font-bold">{stats.totalBranches}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
-          <CardContent className="p-4 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-2 w-full">
-              <div className="p-4 bg-blue-100 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-x text-gray-600">Total Audit</p>
-                <div className="flex flex-col">
-                  <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
-                  <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
-                  <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
-                </div>
+        <Card className="col-span-3 min-h-[80px] flex items-center">
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-blue-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Total Audit</p>
+              <div className="flex flex-col">
+                <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
+                <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
+                <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card 
-          className="col-span-3 cursor-pointer hover:shadow-lg transition-shadow"
+          className="col-span-3 min-h-[80px] flex items-center cursor-pointer hover:shadow-lg transition-shadow"
           onClick={() => {
             setIsAuditorListOpen(true);
             fetchAuditors();
           }}
         >
-          <CardContent className="p-4 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-2 w-full">
-              <div className="p-4 bg-green-100 rounded-lg">
-                <Users className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-x text-gray-500">Total Auditors</p>
-                <p className="text-base font-bold">{stats.totalAuditors}</p>
-              </div>
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-green-100 rounded-lg flex items-center justify-center">
+              <Users className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Total Auditors</p>
+              <p className="text-base font-bold">{stats.totalAuditors}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
-          <CardContent className="p-4 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-2 w-full">
-              <div className="p-4 bg-red-100 rounded-lg flex-shrink-0">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-x text-gray-600">Total Fraud</p>
-                <p className="text-x font-bold text-red-600 truncate">
-                  {formatCurrency(stats.totalFraud)}
-                </p>
-              </div>
+        <Card className="col-span-3 min-h-[80px] flex items-center">
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Total Fraud</p>
+              <p className="text-base font-bold text-red-600">{formatCurrency(stats.totalFraud)}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
-          <CardContent className="p-4 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-2 w-full">
-              <div className="p-4 bg-emerald-100 rounded-lg flex-shrink-0">
-                <Wallet className="h-4 w-4 text-emerald-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-x text-gray-600">Fraud Recovery</p>
-                <p className="text-x font-bold text-emerald-600 truncate">
-                  {formatCurrency(stats.fraudRecovery)}
-                </p>
-              </div>
+        <Card className="col-span-3 min-h-[80px] flex items-center">
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Wallet className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Fraud Recovery</p>
+              <p className="text-base font-bold text-emerald-600">{formatCurrency(stats.fraudRecovery)}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
-          <CardContent className="p-3 flex justify-center items-center h-full">
-            <div className="flex mt-4 items-center justify-start space-x-2 w-full">
-              <div className="p-4 bg-yellow-100 rounded-lg flex-shrink-0">
-                <ArrowDown className="h-4 w-4 text-yellow-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-x text-gray-600">Outstanding Fraud</p>
-                <p className="text-x font-bold text-yellow-600 truncate">
-                  {formatCurrency(stats.outstandingFraud)}
-                </p>
-              </div>
+        <Card className="col-span-3 min-h-[80px] flex items-center">
+          <CardContent className="p-3 flex items-center gap-x-3 h-full">
+            <div className="p-2 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <ArrowDown className="h-5 w-5 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-600">Outstanding Fraud</p>
+              <p className="text-base font-bold text-yellow-600">{formatCurrency(stats.outstandingFraud)}</p>
             </div>
           </CardContent>
         </Card>
@@ -509,19 +502,20 @@ const ManagerDashboard = () => {
       <Card>
         <CardContent className="p-6">
           <h2 className="text-lg font-semibold mb-4 mt-2">Audit Trends</h2>
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={auditTrends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="regular" name="Regular" fill="#50C878" />
-                <Bar dataKey="fraud" name="Fraud" fill="#e74c3c" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartContainer config={auditTrendsConfig} className="h-[400px] w-full">
+  <BarChart data={auditTrends} height={350} width={undefined}>
+    <CartesianGrid strokeDasharray="3 3" />
+    <XAxis dataKey="month" />
+    <YAxis />
+    <ChartTooltip
+      cursor={false}
+      content={<ChartTooltipContent indicator="dashed" />}
+    />
+    <Legend />
+    <Bar dataKey="regular" name="Regular" fill="#50C878" radius={4} />
+    <Bar dataKey="fraud" name="Fraud" fill="#e74c3c" radius={4} />
+  </BarChart>
+</ChartContainer>
         </CardContent>
       </Card>
 
