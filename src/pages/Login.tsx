@@ -1,6 +1,6 @@
 import { Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -358,6 +358,38 @@ function Login() {
   );
 }
 
+function ResetPassword() {
+  const [searchParams] = useSearchParams();
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const accessToken = searchParams.get('access_token');
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (!accessToken) {
+      setMessage('Invalid or missing token');
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) setMessage(error.message);
+    else setMessage('Password updated! You can now log in.');
+  };
+
+  return (
+    <form onSubmit={handleReset}>
+      <input
+        type="password"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        placeholder="New password"
+        required
+      />
+      <button type="submit">Set New Password</button>
+      {message && <div>{message}</div>}
+    </form>
+  );
+}
+
 // Add these animations to your global CSS file
 const globalStyles = `
 @keyframes fadeIn {
@@ -380,4 +412,4 @@ const globalStyles = `
 }
 `;
 
-export default Login;
+export { Login, ResetPassword };
