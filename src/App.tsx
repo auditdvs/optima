@@ -9,6 +9,7 @@ import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
+import NotificationHistory from './pages/NotificationHistory';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
@@ -95,6 +96,11 @@ function App() {
               <Route path="add-user" element={
                 <PrivateRoute requiredRoles={['superadmin']}>
                   <AddUser />
+                </PrivateRoute>
+              } />
+                <Route path="notification-history" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
+                  <NotificationHistory />
                 </PrivateRoute>
               } />
             </Route>

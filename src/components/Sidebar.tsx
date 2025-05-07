@@ -1,5 +1,5 @@
 import {
-  Bell,
+  Megaphone,
   ChartPie,
   FilePenLine,
   FileVideo,
@@ -9,7 +9,8 @@ import {
   Table2,
   UserCog,
   Users,
-  Wrench
+  Wrench,
+  History
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,7 +35,7 @@ function Sidebar() {
     menuItems.push(
       { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
       { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' },
-      { path: '/broadcast', icon: Bell, label: 'Broadcast Message' }
+      { path: '/broadcast', icon: Megaphone, label: 'Broadcast Message' }
     );
   }
 
@@ -52,13 +53,6 @@ function Sidebar() {
     );
   }
 
-  // superadmin only
-  if (userRole === 'superadmin') {
-    menuItems.push(
-      { path: '/add-user', icon: UserCog, label: 'Admin Menu' }
-    );
-  }
-
   // manager dashboard
   if (userRole === 'superadmin' || userRole === 'manager') {
     menuItems.push(
@@ -70,8 +64,16 @@ function Sidebar() {
   if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'user'|| userRole === 'dvs'|| userRole === 'manager') {
     menuItems.push(
       { path: '/tools', icon: Wrench, label: 'Tools' },
-      { path: '/tutorials', icon: FileVideo, label: 'Tutorials' }
+      { path: '/tutorials', icon: FileVideo, label: 'Tutorials' },
+      { path: '/notification-history', icon: History, label: 'Message History' }
     );
+  }
+  
+  // superadmin only
+  if (userRole === 'superadmin') {
+    menuItems.push(
+      { path: '/add-user', icon: UserCog, label: 'Admin Menu' }
+     );
   }
   
  return (
