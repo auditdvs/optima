@@ -59,11 +59,11 @@ const getMonthlyAuditData = (workPapers: WorkPaper[]) => {
 const barChartConfig = {
   annualAudits: {
     label: "Annual Audits",
-    color: "#2563eb", // biru
+    color: "#50C878",
   },
   fraudAudits: {
     label: "Fraud Audits",
-    color: "#ef4444", // merah
+    color: "#e74c3c",
   },
 } satisfies ChartConfig;
 
@@ -203,14 +203,14 @@ const Dashboard = () => {
 
   // Pie chart data & config
   const pieData = [
-    { name: "Annual Audits", value: stats.annualAudits, fill: "#2563eb" }, // biru
-    { name: "Fraud Audits", value: stats.fraudAudits, fill: "#ef4444" },   // merah
+    { name: "Annual Audits", value: stats.annualAudits, fill: "#50C878" }, // biru
+    { name: "Fraud Audits", value: stats.fraudAudits, fill: "#e74c3c" },   // merah
   ];
 
   const chartConfig = {
     value: { label: "Audits" },
-    "Annual Audits": { label: "Annual Audits", color: "#2563eb" },
-    "Fraud Audits": { label: "Fraud Audits", color: "#ef4444" },
+    "Annual Audits": { label: "Annual Audits", color: "#50C878" },
+    "Fraud Audits": { label: "Fraud Audits", color: "#e74c3c" },
   } satisfies ChartConfig;
 
    return (
@@ -221,7 +221,7 @@ const Dashboard = () => {
       <DashboardStats stats={stats} />
 
       {/* Main Content - 2 columns */}
-      <div className="grid grid-cols-11 lg:grid-cols-[0.8fr_1.2fr] gap-2">
+      <div className="grid grid-cols-11 lg:grid-cols-[0.8fr_1.2fr] gap-1">
         {/* Left Column - Branch Locations */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
@@ -247,16 +247,16 @@ const Dashboard = () => {
         {/* Right Column - Performance Summary */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
-            <h2 className="text-sm font-semibold pt-1 mb-4">Audit Performance Summary</h2>
+            <h2 className="text-sm font-semibold pt-1 mb-2">Audit Performance Summary</h2>
             
             {/* Charts Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-0">
+            <div className="grid grid-cols-2 gap-2 mb-0 lg:grid-cols-[0.8fr_1.2fr]">
               {/* Pie Chart */}
               <Card className="flex flex-col bg-white shadow-sm">
                 <CardContent className="flex-1 pb-0">
                   <ChartContainer
                     config={chartConfig}
-                    className="mx-auto aspect-square max-h-[250px]"
+                    className="mx-auto aspect-square max-h-[300px]"
                   >
                     <PieChart>
                       <ChartTooltip
@@ -276,7 +276,7 @@ const Dashboard = () => {
 
               {/* Bar Chart */}
               <Card>
-                <CardContent className="pb-0">
+                <CardContent className="pb-2 mt-5">
                   <ChartContainer config={barChartConfig}>
                     <BarChart data={monthlyData}>
                       <CartesianGrid vertical={false} />
@@ -290,8 +290,8 @@ const Dashboard = () => {
                         cursor={false}
                         content={<ChartTooltipContent indicator="dashed" />}
                       />
-                      <Bar dataKey="annualAudits" fill="#2563eb" radius={4} />
-                      <Bar dataKey="fraudAudits" fill="#ef4444" radius={4} />
+                      <Bar dataKey="annualAudits" fill="#50C878" radius={3} />
+                      <Bar dataKey="fraudAudits" fill="#e74c3c" radius={3} />
                     </BarChart>
                   </ChartContainer>
                 </CardContent>

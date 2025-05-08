@@ -73,26 +73,42 @@ const NotificationHistory = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this notification?')) return;
-
+  
     try {
+      console.log("Attempting to delete notification with ID:", id);
+      
       // First delete related notification reads
-      const { error: readsError } = await supabase
+      const { error: readsError, data: readsData } = await supabase
         .from('notification_reads')
         .delete()
         .eq('notification_id', id);
-
-      if (readsError) throw readsError;
-
+  
+      if (readsError) {
+        console.error("Error deleting notification_reads:", readsError);
+        throw readsError;
+      }
+      console.log("Delete notification_reads result:", readsData);
+  
       // Then delete the notification
-      const { error } = await supabase
+      const { error, data: deleteData } = await supabase
         .from('notifications')
         .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setNotifications(notifications.filter(n => n.id !== id));
-      toast.success('Notification deleted successfully');
+        .eq('id', id)
+        .select(); // Tambahkan .select() untuk mendapatkan data yang dihapus
+  
+      if (error) {
+        console.error("Error deleting notification:", error);
+        throw error;
+      }
+      console.log("Delete notification result:", deleteData);
+  
+      // Pastikan item benar-benar terhapus
+      if (deleteData && deleteData.length > 0) {
+        setNotifications(notifications.filter(n => n.id !== id));
+        toast.success('Notification deleted successfully');
+      } else {
+        toast.error('No notification was deleted');
+      }
     } catch (error) {
       console.error('Error deleting notification:', error);
       toast.error('Failed to delete notification');
