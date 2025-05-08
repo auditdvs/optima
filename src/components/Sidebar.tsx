@@ -77,19 +77,19 @@ function Sidebar() {
   }
   
  return (
-    <div className="flex flex-col h-screen bg-white border-r w-64">
-      <div className="flex items-center justify-center h-10 border-b">
-        <h1 className="text-xl font-bold text-indigo-600">OPTIMA</h1>
+    <div className="flex flex-col h-screen bg-white border-r-2 w-64">
+      <div className="flex items-center justify-center h-16 border-b">
+        <h1 className="text-4xl font-bold text-indigo-600">OPTIMA</h1>
       </div>
       
-      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-1 ">
         {menuItems.map(({ path, icon: Icon, label }) => (
           <Link
             key={path}
             to={path}
-            className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               isActive(path)
-                ? 'bg-indigo-50 text-indigo-600'
+                ? 'bg-indigo-100 text-indigo-700'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}
           >
