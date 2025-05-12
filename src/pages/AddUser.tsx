@@ -8,6 +8,18 @@ import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { supabaseService } from '../lib/supabaseService';
 
+// Add this at the top of your file for a reusable info toast
+const toastInfo = (message: string) => {
+  toast(message, {
+    icon: '🔔',
+    style: {
+      borderRadius: '10px',
+      background: '#3498db',
+      color: '#fff',
+    },
+  });
+};
+
 interface User {
   id: string;
   email: string;
@@ -461,6 +473,7 @@ function UserControlPanel() {
   const handleBackupData = async () => {
     try {
       setLoading(true);
+      toastInfo('Starting backup process. This may take a while...');
       const zip = new JSZip();
       
       // Backup all tables
@@ -473,6 +486,10 @@ function UserControlPanel() {
         'branches',
         'fraud_cases',
         'fraud_payments',
+        'fraud_payments_auditors',
+        'fraud_payments_audits',
+        'notifications_reads',
+        'notifications',
         'pic',
         'profiles',
         'rpm_letters',
@@ -482,6 +499,10 @@ function UserControlPanel() {
         'work_papers'
       ];
 
+      // Create a folder for database data
+      toast('Backing up database tables...');
+      const dbFolder = zip.folder("database");
+      
       for (const table of tables) {
         const { data, error } = await supabase
           .from(table)
@@ -492,16 +513,80 @@ function UserControlPanel() {
           continue;
         }
 
-        zip.file(`${table}.json`, JSON.stringify(data, null, 2));
+        dbFolder.file(`${table}.json`, JSON.stringify(data, null, 2));
       }
 
       // Get users from auth
       const { data: { users }, error: usersError } = await supabaseService.auth.admin.listUsers();
       if (!usersError) {
-        zip.file('auth_users.json', JSON.stringify(users, null, 2));
+        dbFolder.file('auth_users.json', JSON.stringify(users, null, 2));
+      }
+      
+      // Backup storage files
+      toast('Backing up storage files...');
+      const storageFolder = zip.folder("storage");
+      
+      // Get all buckets
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      
+      if (bucketsError) {
+        console.error('Error fetching storage buckets:', bucketsError);
+      } else {
+        // Process each bucket
+        for (const bucket of buckets) {
+          toast(`Processing bucket: ${bucket.name}`);
+          const bucketFolder = storageFolder.folder(bucket.name);
+          
+          // List all files in the bucket
+          const { data: files, error: filesError } = await supabase.storage.from(bucket.name).list();
+          
+          if (filesError) {
+            console.error(`Error listing files in bucket ${bucket.name}:`, filesError);
+            continue;
+          }
+          
+          // Download each file and add to zip
+          let processedFiles = 0;
+          const totalFiles = files?.length || 0;
+          
+          for (const file of files) {
+            if (!file.id) { // It's a folder
+              await processFolder(supabase, bucket.name, file.name, bucketFolder);
+            } else { // It's a file
+              try {
+                // Download file
+                const { data: fileData, error: downloadError } = await supabase.storage
+                  .from(bucket.name)
+                  .download(file.name);
+                  
+                if (downloadError) {
+                  console.error(`Error downloading file ${file.name}:`, downloadError);
+                  continue;
+                }
+                
+                // Add file to zip
+                bucketFolder.file(file.name, fileData);
+                processedFiles++;
+                
+                // Show progress every 5 files
+                if (processedFiles % 5 === 0) {
+                  toast(`Progress: ${processedFiles}/${totalFiles} files in ${bucket.name}`);
+                }
+              } catch (error) {
+                console.error(`Error processing file ${file.name}:`, error);
+              }
+            }
+          }
+        }
       }
 
-      const content = await zip.generateAsync({ type: 'blob' });
+      toast('Generating zip file...');
+      const content = await zip.generateAsync({ 
+        type: 'blob',
+        compression: "DEFLATE",
+        compressionOptions: { level: 5 } // Balance between size and speed
+      });
+      
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       saveAs(content, `optima_full_backup_${timestamp}.zip`);
 
@@ -513,6 +598,43 @@ function UserControlPanel() {
       setLoading(false);
     }
   };
+
+  async function processFolder(supabase, bucketName, path, parentFolder) {
+    const { data: files, error } = await supabase.storage.from(bucketName).list(path);
+    
+    if (error) {
+      console.error(`Error listing files in path ${path}:`, error);
+      return;
+    }
+    
+    if (!files || files.length === 0) return;
+    
+    const folderName = path.split('/').pop();
+    const folder = parentFolder.folder(folderName);
+    
+    for (const file of files) {
+      const filePath = `${path}/${file.name}`;
+      
+      if (!file.id) { // It's a subfolder
+        await processFolder(supabase, bucketName, filePath, folder);
+      } else { // It's a file
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from(bucketName)
+            .download(filePath);
+            
+          if (downloadError) {
+            console.error(`Error downloading file ${filePath}:`, downloadError);
+            continue;
+          }
+          
+          folder.file(file.name, fileData);
+        } catch (error) {
+          console.error(`Error processing file ${filePath}:`, error);
+        }
+      }
+    }
+  }
 
   return (
     <div className="p-0">

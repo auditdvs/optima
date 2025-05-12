@@ -1,12 +1,13 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Edit2, Table2, UserPlus } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import AuditTable from '../components/AuditTable';
 import { AuditFraudTable } from '../components/AuditFraudTable';
+import AuditTable from '../components/AuditTable';
+import { MatriksSection } from '../components/MatriksSection';
 import { RegularAuditRecap } from '../components/RegularAuditRecap';
 import { RPMLetterTable } from '../components/RPMLetterTable';
+import { Card, CardContent } from '../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
@@ -153,7 +154,7 @@ const QAManagement: React.FC = () => {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedAuditor, setSelectedAuditor] = useState<AuditorWithAssignments | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm'>('auditors');
+  const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks'>('auditors');
   const [formData, setFormData] = useState<AddAuditorForm>({
     name: '',
     auditor_id: '',
@@ -438,6 +439,17 @@ const QAManagement: React.FC = () => {
             <Table2 className="h-5 w-5" />
             RPM Letter
           </button>
+          <button
+            onClick={() => setActiveTab('matriks')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+              activeTab === 'matriks'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Table2 className="h-5 w-5" />
+            Matriks
+          </button>
         </div>
       </div>
 
@@ -547,6 +559,12 @@ const QAManagement: React.FC = () => {
                 <RPMLetterTable />
               </div>
             </div>
+          </CardContent>
+        </Card>
+      ) : activeTab === 'matriks' ? (
+        <Card>
+          <CardContent className="p-6">
+            <MatriksSection />
           </CardContent>
         </Card>
       ) : (

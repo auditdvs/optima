@@ -17,7 +17,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { supabase } from '../lib/supabaseClient';
+
+const checkUserAccess = async (supabase: any) => {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!userRoles || !['manager', 'superadmin'].includes(userRoles.role)) {
+      throw new Error('Unauthorized access');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Access check failed:', error);
+    return false;
+  }
+};
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -71,6 +99,31 @@ interface FraudAudit {
   review: string;
 }
 
+interface FraudCase {
+  id: string;
+  branch_name: string;
+  fraud_amount: number;
+  fraud_staff: string;
+  fraud_payments_audits?: {
+    hkp_amount: number;
+  }[];
+}
+
+interface FraudPayment {
+  id: string;
+  work_paper_id: string;
+  hkp_amount: number;
+  payment_date: string;
+  notes?: string;
+}
+
+interface PaymentFormData {
+  amount: number;
+  payment_type: 'payment_amount' | 'hkp_amount';
+  payment_date: string;
+  notes?: string;
+}
+
 // Field name to display name mapping
 const regularAuditAliases = {
   dapa: "DAPA",
@@ -121,11 +174,28 @@ const ManagerDashboard = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
   const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [isAuditorListOpen, setIsAuditorListOpen] = useState(false);
+  const [fraudCases, setFraudCases] = useState<FraudCase[]>([]);
+  const [selectedFraud, setSelectedFraud] = useState<FraudCase | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [fraudSearchTerm, setFraudSearchTerm] = useState('');
+  const [fraudSortConfig, setFraudSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
 
   useEffect(() => {
-    fetchDashboardData();
-    fetchAuditRecapData();
-    fetchAuditors();
+    const initializeDashboard = async () => {
+      const hasAccess = await checkUserAccess(supabase);
+      if (!hasAccess) {
+        // Handle unauthorized access (e.g., redirect to login or show error)
+        console.error('Unauthorized access to manager dashboard');
+        return;
+      }
+
+      fetchDashboardData();
+      fetchAuditRecapData();
+      fetchAuditors();
+      fetchFraudCases();
+    };
+
+    initializeDashboard();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -135,54 +205,68 @@ const ManagerDashboard = () => {
         .from('branches')
         .select('name', { count: 'exact' });
 
-      // Fetch regular audits
-      const { data: regularAuditsData } = await supabase
-        .from('audit_regular')
-        .select('branch_name', { count: 'exact' });
-
-      // Fetch fraud audits and total fraud amount
-      const { data: fraudAuditsData } = await supabase
+      // Fetch all work papers for counting
+      const { data: workPapersData } = await supabase
         .from('work_papers')
-        .select('*')
-        .eq('audit_type', 'fraud');
+        .select(`
+          id,
+          branch_name,
+          audit_start_date,
+          audit_end_date,
+          audit_type,
+          fraud_amount,
+          fraud_payments_audits (
+            hkp_amount
+          )
+        `);
+
+      // Count regular audits
+      const regularAudits = workPapersData?.filter(wp => wp.audit_type === 'regular').length || 0;
+
+      // Count fraud cases from work_papers
+      const fraudCases = workPapersData?.filter(wp => wp.audit_type === 'fraud').length || 0;
+
+      // Fetch special audits from audit_fraud table where pic is not empty
+      const { data: specialAuditsData } = await supabase
+        .from('audit_fraud')
+        .select('id')
+        .not('pic', 'is', null)
+        .neq('pic', '');
+
+      const specialAudits = specialAuditsData?.length || 0;
 
       // Fetch total auditors
       const { data: auditorsData } = await supabase
         .from('auditors')
         .select('name', { count: 'exact' });
 
-      // Fetch fraud recovery payments
-      const { data: fraudPaymentsData } = await supabase
-        .from('fraud_payments')
-        .select('amount');
+      // Calculate fraud amounts
+      const totalFraud = workPapersData?.reduce((sum, wp) => 
+        wp.audit_type === 'fraud' ? sum + (wp.fraud_amount || 0) : sum, 0
+      ) || 0;
 
-      // Fetch special audits count (just count all rows in audit_fraud)
-      const { data: specialAuditsData, error: specialAuditsError } = await supabase
-        .from('audit_fraud')
-        .select('branch_name');
+      const fraudRecovery = workPapersData?.reduce((sum, wp) => {
+        if (wp.audit_type === 'fraud') {
+          const hkpAmount = wp.fraud_payments_audits?.[0]?.hkp_amount || 0;
+          return sum + hkpAmount;
+        }
+        return sum;
+      }, 0) || 0;
 
-      if (specialAuditsError) throw specialAuditsError;
-
-      // Calculate totals
-      const totalFraud = fraudAuditsData?.reduce((sum, audit) => sum + (audit.fraud_amount || 0), 0) || 0;
-      const fraudRecovery = fraudPaymentsData?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const outstandingFraud = totalFraud - fraudRecovery;
 
       setStats({
         totalBranches: branchesData?.length || 0,
-        regularAudits: regularAuditsData?.length || 0,
-        specialAudits: specialAuditsData?.length || 0,
-        fraudAudits: fraudAuditsData?.length || 0,
+        regularAudits,
+        specialAudits,
+        fraudAudits: fraudCases,
         totalAuditors: auditorsData?.length || 0,
         totalFraud,
         fraudRecovery,
-        outstandingFraud: totalFraud - fraudRecovery
+        outstandingFraud
       });
 
       // Fetch and process audit trends
-      const { data: workPapersData } = await supabase
-        .from('work_papers')
-        .select('audit_end_date, audit_type');
-
       if (workPapersData) {
         const monthlyData = processAuditTrends(workPapersData);
         setAuditTrends(monthlyData);
@@ -250,36 +334,70 @@ const ManagerDashboard = () => {
         .from('auditors')
         .select('name, auditor_id');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching auditors:', error);
+        return;
+      }
+      
       setAuditors(data || []);
     } catch (error) {
       console.error('Error fetching auditors:', error);
+      setAuditors([]);
+    }
+  };
+
+  const fetchFraudCases = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('work_papers')
+        .select(`
+          id,
+          branch_name,
+          fraud_amount,
+          fraud_staff,
+          fraud_payments_audits (
+            hkp_amount
+          )
+        `)
+        .eq('audit_type', 'fraud');
+
+      if (error) throw error;
+
+      setFraudCases(data || []);
+    } catch (error) {
+      console.error('Error fetching fraud cases:', error);
     }
   };
 
   const processAuditTrends = (workPapers: any[]) => {
-    // Hitung jumlah audit per bulan
+    // Initialize monthly audits counter
     const monthlyAudits: { [key: string]: { regular: number; fraud: number } } = {};
+    
+    // Initialize all months with zero counts
+    MONTHS.forEach(month => {
+      monthlyAudits[month] = { regular: 0, fraud: 0 };
+    });
 
+    // Process work papers
     workPapers.forEach(paper => {
       if (paper.audit_end_date) {
         const month = format(parseISO(paper.audit_end_date), 'MMM');
-        if (!monthlyAudits[month]) {
-          monthlyAudits[month] = { regular: 0, fraud: 0 };
-        }
-        if (paper.audit_type === 'regular') {
-          monthlyAudits[month].regular++;
-        } else {
-          monthlyAudits[month].fraud++;
+        
+        if (monthlyAudits[month]) {
+          if (paper.audit_type === 'regular') {
+            monthlyAudits[month].regular++;
+          } else if (paper.audit_type === 'fraud') {
+            monthlyAudits[month].fraud++;
+          }
         }
       }
     });
 
-    // Pastikan semua bulan ada, jika tidak ada data isi 0
+    // Convert to array format for chart
     return MONTHS.map(month => ({
       month,
-      regular: monthlyAudits[month]?.regular || 0,
-      fraud: monthlyAudits[month]?.fraud || 0,
+      regular: monthlyAudits[month].regular,
+      fraud: monthlyAudits[month].fraud,
     }));
   };
 
@@ -367,6 +485,14 @@ const ManagerDashboard = () => {
     setSortConfig({ key, direction });
   };
 
+  const requestFraudSort = (key: string) => {
+    let direction: SortOrder = 'asc';
+    if (fraudSortConfig.key === key && fraudSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setFraudSortConfig({ key, direction });
+  };
+
   // Function to get sorted data
   const getSortedData = (data: any[]) => {
     if (!sortConfig.key) return data;
@@ -377,6 +503,20 @@ const ManagerDashboard = () => {
       }
       if (a[sortConfig.key] > b[sortConfig.key]) {
         return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  const getSortedFraudData = (data: FraudCase[]) => {
+    if (!fraudSortConfig.key) return data;
+
+    return [...data].sort((a, b) => {
+      if (a[fraudSortConfig.key] < b[fraudSortConfig.key]) {
+        return fraudSortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (a[fraudSortConfig.key] > b[fraudSortConfig.key]) {
+        return fraudSortConfig.direction === 'asc' ? 1 : -1;
       }
       return 0;
     });
@@ -396,6 +536,54 @@ const ManagerDashboard = () => {
       .join(', ');
   };
 
+  const isPaymentComplete = (fraud: FraudCase) => {
+    const payment = fraud.fraud_payments_audits?.[0];
+    if (!payment) return false;
+    return payment.hkp_amount === fraud.fraud_amount;
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFraud) return;
+
+    try {
+      const formData = new FormData(e.target as HTMLFormElement);
+      const paymentData = {
+        work_paper_id: selectedFraud.id,
+        hkp_amount: Number(formData.get('amount')),
+        payment_date: formData.get('payment_date'),
+        notes: formData.get('notes')
+      };
+
+      const { error } = await supabase
+        .from('fraud_payments_audits')
+        .insert([paymentData]);
+
+      if (error) throw error;
+
+      setIsPaymentDialogOpen(false);
+      fetchFraudCases();
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+    }
+  };
+
+  const handleDeletePayment = async (fraudId: string) => {
+    if (!confirm('Are you sure you want to delete this payment record?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('fraud_payments_audits')
+        .delete()
+        .eq('work_paper_id', fraudId);
+
+      if (error) throw error;
+      fetchFraudCases();
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+    }
+  };
+
   // Apply filtering and sorting
   const filteredAudits = activeTab === 'regular' 
     ? regularAudits.filter(audit => 
@@ -408,6 +596,13 @@ const ManagerDashboard = () => {
       );
 
   const sortedAudits = getSortedData(filteredAudits);
+
+  const filteredFraudCases = fraudCases.filter(fraud =>
+    fraud.branch_name.toLowerCase().includes(fraudSearchTerm.toLowerCase()) ||
+    fraud.fraud_staff.toLowerCase().includes(fraudSearchTerm.toLowerCase())
+  );
+
+  const sortedFraudCases = getSortedFraudData(filteredFraudCases);
 
   return (
     <div className="p-0 space-y-3">
@@ -692,6 +887,152 @@ const ManagerDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Fraud Data Section */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Fraud Data</h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                value={fraudSearchTerm}
+                onChange={(e) => setFraudSearchTerm(e.target.value)}
+                placeholder="Search branch or staff..."
+                className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => requestFraudSort('fraud_staff')}
+                  >
+                    <div className="flex items-center">
+                      Fraud Staff
+                      <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => requestFraudSort('branch_name')}
+                  >
+                    <div className="flex items-center">
+                      Branch Name
+                      <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => requestFraudSort('fraud_amount')}
+                  >
+                    <div className="flex items-center">
+                      Fraud Amount
+                      <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </div>
+                  </TableHead>
+                  <TableHead>HKP Amount</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedFraudCases.map((fraud) => (
+                  <TableRow
+                    key={fraud.id}
+                    className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
+                  >
+                    <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
+                    <TableCell className="text-xs">{fraud.branch_name}</TableCell>
+                    <TableCell className="text-xs">
+                      {formatCurrency(fraud.fraud_amount)}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {fraud.fraud_payments_audits?.[0]?.hkp_amount 
+                        ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
+                        : 'No HKP'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedFraud(fraud);
+                            setIsPaymentDialogOpen(true);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          Edit Payment
+                        </button>
+                        <button
+                          onClick={() => handleDeletePayment(fraud.id)}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update HKP Amount</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-700">HKP Amount</label>
+              <input
+                type="number"
+                name="amount"
+                className="w-full mt-1 text-sm border rounded-md p-2"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-700">Payment Date</label>
+              <input
+                type="date"
+                name="payment_date"
+                className="w-full mt-1 text-sm border rounded-md p-2"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-700">Notes</label>
+              <textarea
+                name="notes"
+                className="w-full mt-1 text-sm border rounded-md p-2"
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsPaymentDialogOpen(false)}
+                className="px-4 py-2 text-sm text-gray-600 border rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Auditor List Dialog */}
       <Dialog open={isAuditorListOpen} onOpenChange={setIsAuditorListOpen}>
