@@ -1,9 +1,9 @@
 import { AlignStartVertical, Bell, ChartNoAxesColumn, LogOut, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import AuditRatingCalculator from './AuditRatingCalculator';
 
 interface Notification {
   id: string;
@@ -26,6 +26,14 @@ function Navbar() {
   const [hasNewNotification, setHasNewNotification] = useState(false);
   const [showFullMessage, setShowFullMessage] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+
+  const [showRCMSearch, setShowRCMSearch] = useState(false);
+  const [rcmQuery, setRcmQuery] = useState('');
+  const [rcmResults, setRcmResults] = useState<any[]>([]);
+  const [rcmLoading, setRcmLoading] = useState(false);
+  const rcmInputRef = useRef<HTMLInputElement>(null);
+
+  const [showAuditRating, setShowAuditRating] = useState(false);
 
   console.log("Navbar user:", user);
 
@@ -210,6 +218,31 @@ function Navbar() {
     setSelectedNotification(null);
   };
 
+  const handleRCMSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRcmLoading(true);
+    setRcmResults([]);
+    try {
+      const { data, error } = await supabase
+        .from('matriks')
+        .select('*')
+        .or([
+          `judul_temuan.ilike.%${rcmQuery}%`,
+          `kode_risk_issue.ilike.%${rcmQuery}%`,
+          `judul_risk_issue.ilike.%${rcmQuery}%`,
+          `penyebab.ilike.%${rcmQuery}%`,
+          `dampak.ilike.%${rcmQuery}%`,
+          `kelemahan.ilike.%${rcmQuery}%`,
+          `rekomendasi.ilike.%${rcmQuery}%`,
+          `branch_name.ilike.%${rcmQuery}%`
+        ].join(','));
+      if (error) toast.error('Search failed');
+      setRcmResults(data || []);
+    } finally {
+      setRcmLoading(false);
+    }
+  };
+
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
       <div className="group">
@@ -222,22 +255,27 @@ function Navbar() {
 
       <div className="flex items-center space-x-6">
         {/* Audit Rating */}
-        <Link
-          to="https://risk-issue.streamlit.app/"
+        <button
+          type="button"
+          onClick={() => setShowAuditRating(true)}
           className="flex items-center text-sm text-gray-600 hover:text-gray-900"
         >
           <AlignStartVertical className="w-5 h-5 mr-2" />
           <span>Audit Rating</span>
-        </Link>
+        </button>
 
         {/* RCM */}
-        <Link
-          to="https://risk-control-matriks.streamlit.app/"
+        <button
+          type="button"
+          onClick={() => {
+            setShowRCMSearch(true);
+            setTimeout(() => rcmInputRef.current?.focus(), 100);
+          }}
           className="flex items-center text-sm text-gray-600 hover:text-gray-900"
         >
           <ChartNoAxesColumn className="w-5 h-5 mr-2" />
           <span>RCM</span>
-        </Link>
+        </button>
 
         {/* Notifications */}
         <div className="relative">
@@ -371,6 +409,68 @@ function Navbar() {
                 </a>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showRCMSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
+            <button
+              onClick={() => setShowRCMSearch(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h4 className="font-semibold text-lg mb-4">Search Matriks</h4>
+            <form onSubmit={handleRCMSearch} className="flex gap-2 mb-4">
+              <input
+                ref={rcmInputRef}
+                type="text"
+                value={rcmQuery}
+                onChange={e => setRcmQuery(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+                placeholder="Cari apa saja di matriks..."
+              />
+              <button
+                type="submit"
+                className="bg-indigo-600 text-white px-4 py-2 rounded"
+                disabled={rcmLoading}
+              >
+                {rcmLoading ? 'Searching...' : 'Search'}
+              </button>
+            </form>
+            <div className="max-h-96 overflow-y-auto">
+              {rcmResults.length === 0 && !rcmLoading && (
+                <div className="text-gray-500 text-center">Tidak ada hasil</div>
+              )}
+              {rcmResults.map((row, idx) => (
+                <div key={row.id} className="border-b py-2 px-1">
+                  <div className="font-semibold">{row.judul_temuan}</div>
+                  <div className="text-xs text-gray-500 mb-1">
+                    {row.branch_name} | {row.jatuh_tempo}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-1">
+                    <span className="font-semibold">Kode Risk Issue:</span> {row.kode_risk_issue}
+                  </div>
+                  <div className="text-sm">{row.rekomendasi}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAuditRating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
+            <button
+              onClick={() => setShowAuditRating(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <AuditRatingCalculator />
           </div>
         </div>
       )}
