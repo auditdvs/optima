@@ -320,6 +320,53 @@ const EditPICModal: React.FC<EditPICModalProps> = ({ isOpen, onClose, pic, onSub
   );
 };
 
+// Add this component after your existing modal components and before UserControlPanel
+
+const BackupLoader = () => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-50">
+      <div className="loader"></div>
+      <p className="text-white mt-4 font-medium">Creating Backup...</p>
+      <style jsx>{`
+        .loader {
+          height: 15px;
+          aspect-ratio: 4;
+          --_g: no-repeat radial-gradient(farthest-side, #4319ec 90%, #3604ff);
+          background:
+            var(--_g) left,
+            var(--_g) right;
+          background-size: 25% 100%;
+          display: grid;
+        }
+        .loader:before,
+        .loader:after {
+          content: "";
+          height: inherit;
+          aspect-ratio: 1;
+          grid-area: 1/1;
+          margin: auto;
+          border-radius: 50%;
+          transform-origin: -100% 50%;
+          background: #2600fff8;
+          animation: l49 1s infinite linear;
+        }
+        .loader:after {
+          transform-origin: 200% 50%;
+          --s: -1;
+          animation-delay: -0.5s;
+        }
+
+        @keyframes l49 {
+          58%,
+          100% {
+            transform: rotate(calc(var(--s, 1) * 1turn));
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 function UserControlPanel() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -473,13 +520,15 @@ function UserControlPanel() {
   const handleBackupData = async () => {
     try {
       setLoading(true);
-      toastInfo('Starting backup process. This may take a while...');
+      // We won't show toasts during the process since we have the visual loader now
+      
       const zip = new JSZip();
       
       // Backup all tables
       const tables = [
         'audit_fraud',
         'audit_regular',
+        'audit_schedule',
         'auditor_assignments',
         'auditors',
         'audits',
@@ -488,7 +537,9 @@ function UserControlPanel() {
         'fraud_payments',
         'fraud_payments_auditors',
         'fraud_payments_audits',
-        'notifications_reads',
+        'matriks',
+        'matriks_table_names',
+        'notification_reads',
         'notifications',
         'pic',
         'profiles',
@@ -499,9 +550,9 @@ function UserControlPanel() {
         'work_papers'
       ];
 
-      // Create a folder for database data
-      toast('Backing up database tables...');
-      const dbFolder = zip.folder("database");
+      // Create folders for database data
+      const dbJsonFolder = zip.folder("database/json");
+      const dbCsvFolder = zip.folder("database/csv");
       
       for (const table of tables) {
         const { data, error } = await supabase
@@ -513,17 +564,30 @@ function UserControlPanel() {
           continue;
         }
 
-        dbFolder.file(`${table}.json`, JSON.stringify(data, null, 2));
+        if (!data || data.length === 0) {
+          // Create empty files for empty tables
+          dbJsonFolder.file(`${table}.json`, JSON.stringify([], null, 2));
+          dbCsvFolder.file(`${table}.csv`, '');
+          continue;
+        }
+
+        // Save as JSON
+        dbJsonFolder.file(`${table}.json`, JSON.stringify(data, null, 2));
+        
+        // Convert to CSV and save
+        const csvContent = convertJsonToCsv(data);
+        dbCsvFolder.file(`${table}.csv`, csvContent);
       }
 
       // Get users from auth
       const { data: { users }, error: usersError } = await supabaseService.auth.admin.listUsers();
-      if (!usersError) {
-        dbFolder.file('auth_users.json', JSON.stringify(users, null, 2));
+      if (!usersError && users) {
+        dbJsonFolder.file('auth_users.json', JSON.stringify(users, null, 2));
+        const csvContent = convertJsonToCsv(users);
+        dbCsvFolder.file('auth_users.csv', csvContent);
       }
       
       // Backup storage files
-      toast('Backing up storage files...');
       const storageFolder = zip.folder("storage");
       
       // Get all buckets
@@ -534,7 +598,6 @@ function UserControlPanel() {
       } else {
         // Process each bucket
         for (const bucket of buckets) {
-          toast(`Processing bucket: ${bucket.name}`);
           const bucketFolder = storageFolder.folder(bucket.name);
           
           // List all files in the bucket
@@ -546,9 +609,6 @@ function UserControlPanel() {
           }
           
           // Download each file and add to zip
-          let processedFiles = 0;
-          const totalFiles = files?.length || 0;
-          
           for (const file of files) {
             if (!file.id) { // It's a folder
               await processFolder(supabase, bucket.name, file.name, bucketFolder);
@@ -566,12 +626,6 @@ function UserControlPanel() {
                 
                 // Add file to zip
                 bucketFolder.file(file.name, fileData);
-                processedFiles++;
-                
-                // Show progress every 5 files
-                if (processedFiles % 5 === 0) {
-                  toast(`Progress: ${processedFiles}/${totalFiles} files in ${bucket.name}`);
-                }
               } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);
               }
@@ -580,17 +634,16 @@ function UserControlPanel() {
         }
       }
 
-      toast('Generating zip file...');
       const content = await zip.generateAsync({ 
         type: 'blob',
         compression: "DEFLATE",
-        compressionOptions: { level: 5 } // Balance between size and speed
+        compressionOptions: { level: 5 }
       });
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       saveAs(content, `optima_full_backup_${timestamp}.zip`);
 
-      toast.success('Full backup completed successfully');
+      toast.success('Backup completed! Data has been downloaded.');
     } catch (error) {
       console.error('Error creating backup:', error);
       toast.error('Failed to create backup');
@@ -598,6 +651,49 @@ function UserControlPanel() {
       setLoading(false);
     }
   };
+
+  // Add this helper function to convert JSON to CSV
+  function convertJsonToCsv(jsonData) {
+    if (!jsonData || jsonData.length === 0) {
+      return '';
+    }
+
+    // Get headers from the first object
+    const headers = Object.keys(jsonData[0]);
+    
+    // Create CSV header row
+    const headerRow = headers.join(',');
+    
+    // Create content rows
+    const rows = jsonData.map(item => {
+      return headers.map(header => {
+        const value = item[header];
+        
+        // Handle null, undefined, or empty values
+        if (value === null || value === undefined) {
+          return '';
+        }
+        
+        // Handle objects and arrays by stringifying them
+        if (typeof value === 'object') {
+          // Escape quotes and format as a proper CSV string
+          return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+        }
+        
+        // Handle strings with commas or quotes
+        if (typeof value === 'string') {
+          // Escape quotes and wrap in quotes
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        
+        // Return other values as-is
+        return value;
+      }).join(',');
+    });
+    
+    // Combine header and rows
+    return [headerRow, ...rows].join('\n');
+  }
 
   async function processFolder(supabase, bucketName, path, parentFolder) {
     const { data: files, error } = await supabase.storage.from(bucketName).list(path);
@@ -639,6 +735,11 @@ function UserControlPanel() {
   return (
     <div className="p-0">
       <Toaster position="top-right" />
+      
+      {/* Existing code... */}
+      
+      {/* Add this line to show the loader when backup is in progress */}
+      {loading && <BackupLoader />}
       
       <div className="flex justify-between items-center mb-6">
         <div>
