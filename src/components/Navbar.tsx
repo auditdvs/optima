@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import '../styles/loaders.css';
 import AuditRatingCalculator from './AuditRatingCalculator';
 
 interface Notification {
@@ -222,7 +223,9 @@ function Navbar() {
     e.preventDefault();
     setRcmLoading(true);
     setRcmResults([]);
+    
     try {
+      // Get search results from Supabase
       const { data, error } = await supabase
         .from('matriks')
         .select('*')
@@ -236,7 +239,18 @@ function Navbar() {
           `rekomendasi.ilike.%${rcmQuery}%`,
           `branch_name.ilike.%${rcmQuery}%`
         ].join(','));
+        
       if (error) toast.error('Search failed');
+      
+      // Add a minimum 2-second delay for loader to be visible
+      const minLoadTime = 2000; // 2 seconds
+      const startTime = Date.now();
+      const elapsedTime = Date.now() - startTime;
+      
+      if (elapsedTime < minLoadTime) {
+        await new Promise(resolve => setTimeout(resolve, minLoadTime - elapsedTime));
+      }
+      
       setRcmResults(data || []);
     } finally {
       setRcmLoading(false);
@@ -423,39 +437,79 @@ function Navbar() {
               <X className="h-5 w-5" />
             </button>
             <h4 className="font-semibold text-lg mb-4">Search Matriks</h4>
-            <form onSubmit={handleRCMSearch} className="flex gap-2 mb-4">
-              <input
-                ref={rcmInputRef}
-                type="text"
-                value={rcmQuery}
-                onChange={e => setRcmQuery(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="Cari apa saja di matriks..."
-              />
-              <button
-                type="submit"
-                className="bg-indigo-600 text-white px-4 py-2 rounded"
-                disabled={rcmLoading}
-              >
-                {rcmLoading ? 'Searching...' : 'Search'}
-              </button>
+            <form onSubmit={handleRCMSearch} className="mb-4">
+              <div className="relative">
+                <input
+                  ref={rcmInputRef}
+                  type="search"
+                  value={rcmQuery}
+                  onChange={e => setRcmQuery(e.target.value)}
+                  className="input shadow-lg focus:border-2 border-gray-300 px-5 py-3 rounded-xl w-full md:w-96 transition-all focus:w-full md:focus:w-[28rem] outline-none"
+                  placeholder="Search..."
+                  name="search"
+                />
+                <button
+                  type="submit"
+                  className="absolute top-3 right-3 text-gray-500"
+                  disabled={rcmLoading}
+                >
+                  {rcmLoading ? (
+                    <span className="sr-only">Loading...</span>
+                  ) : (
+                    <svg
+                      className="size-6"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      ></path>
+                    </svg>
+                  )}
+                </button>
+              </div>
             </form>
             <div className="max-h-96 overflow-y-auto">
-              {rcmResults.length === 0 && !rcmLoading && (
-                <div className="text-gray-500 text-center">Tidak ada hasil</div>
-              )}
-              {rcmResults.map((row, idx) => (
-                <div key={row.id} className="border-b py-2 px-1">
-                  <div className="font-semibold">{row.judul_temuan}</div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    {row.branch_name} | {row.jatuh_tempo}
+              {rcmLoading ? (
+                <div className="flex justify-center items-center py-10">
+                  <div id="wifi-loader">
+                    <svg className="circle-outer" viewBox="0 0 86 86">
+                      <circle className="back" cx="43" cy="43" r="40"></circle>
+                      <circle className="front" cx="43" cy="43" r="40"></circle>
+                      <circle className="new" cx="43" cy="43" r="40"></circle>
+                    </svg>
+                    <svg className="circle-middle" viewBox="0 0 60 60">
+                      <circle className="back" cx="30" cy="30" r="27"></circle>
+                      <circle className="front" cx="30" cy="30" r="27"></circle>
+                    </svg>
+                    <svg className="circle-inner" viewBox="0 0 34 34">
+                      <circle className="back" cx="17" cy="17" r="14"></circle>
+                      <circle className="front" cx="17" cy="17" r="14"></circle>
+                    </svg>
+                    <div className="text" data-text="Searching"></div>
                   </div>
-                  <div className="text-xs text-gray-600 mb-1">
-                    <span className="font-semibold">Kode Risk Issue:</span> {row.kode_risk_issue}
-                  </div>
-                  <div className="text-sm">{row.rekomendasi}</div>
                 </div>
-              ))}
+              ) : rcmResults.length === 0 ? (
+                <div className="text-gray-500 text-center">Tidak ada hasil</div>
+              ) : (
+                rcmResults.map((row, idx) => (
+                  <div key={row.id} className="border-b py-2 px-1">
+                    <div className="font-semibold">{row.judul_temuan}</div>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {row.branch_name} | {row.jatuh_tempo}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      <span className="font-semibold">Kode Risk Issue:</span> {row.kode_risk_issue}
+                    </div>
+                    <div className="text-sm">{row.rekomendasi}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
