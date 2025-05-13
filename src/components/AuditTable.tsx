@@ -323,7 +323,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
         'Revised DAPA': item.revisedDapa ? '✓' : '✗',
         'DAPA Supporting Data': item.dapaSupportingData ? '✓' : '✗',
         'Assignment Letter': item.assignmentLetter ? '✓' : '✗',
-        'Entrance Agenda': item.entrance_agenda ? '✓' : '✗',
+        'Entrance Agenda': item.entranceAgenda ? '✓' : '✗',
         'Entrance Attendance': item.entranceAttendance ? '✓' : '✗',
         'Audit Working Papers': item.auditWorkingPapers ? '✓' : '✗',
         'Exit Meeting Minutes': item.exitMeetingMinutes ? '✓' : '✗',
@@ -583,8 +583,13 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   };
 
   const columns = [
-    columnHelper.accessor('no', {
+    columnHelper.accessor('regNo', {
       header: 'No',
+      cell: info => info.row.original.no, // Pakai nilai 'no' per region
+    }),
+
+    columnHelper.accessor('no', {
+      header: 'Overall No',
       cell: info => info.row.index + 1,
     }),
 
@@ -961,30 +966,18 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
                 ))}
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {table.getRowModel().rows.map(row => {
-                  const branch = branches.find(b => b.name === row.original.branchName);
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`
-                        ${row.original.monitoring === 'Adequate' ? 'bg-indigo-300' : ''}
-                        ${row.original.monitoring === 'Inadequate' ? 'bg-rose-300' : ''}
-                        ${row.original.monitoring === '' ? 'bg-stone' : ''}
-                      `}
-                    >
-                      {row.getVisibleCells().map(cell => {
-                        return (
-                          <td
-                            key={cell.id}
-                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                {table.getRowModel().rows.map(row => (
+                  <tr key={row.id} className="bg-white hover:bg-gray-50">
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

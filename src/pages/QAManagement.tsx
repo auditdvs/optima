@@ -2,7 +2,9 @@ import { Edit2, Table2, UserPlus } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { AuditFraudTable } from '../components/AuditFraudTable';
+import AuditScheduleViewer from '../components/AuditScheduleViewer';
 import AuditTable from '../components/AuditTable';
+import { LoadingAnimation } from '../components/LoadingAnimation';
 import { MatriksSection } from '../components/MatriksSection';
 import { RegularAuditRecap } from '../components/RegularAuditRecap';
 import { RPMLetterTable } from '../components/RPMLetterTable';
@@ -43,6 +45,40 @@ interface Assignment {
 
 interface AuditorWithAssignments extends Auditor {
   assignments: Assignment[];
+}
+
+// Add these interfaces to help with typing
+interface Branch {
+  id: string;
+  name: string;
+  region: string;
+  // other branch fields as needed
+}
+
+// Update the audit data interface to reference a branch
+interface AuditEntry {
+  no: string;
+  region: string;
+  branchId: string;  // Add this to store the selected branch ID
+  branchName: string;
+  auditPeriodStart: string;
+  auditPeriodEnd: string;
+  pic: string;
+  dapa: boolean;
+  revisedDapa: boolean;
+  dapaSupportingData: boolean;
+  assignmentLetter: boolean;
+  entranceAgenda: boolean;
+  entranceAttendance: boolean;
+  auditWorkingPapers: boolean;
+  cashCount: boolean;
+  auditReporting: boolean;
+  exitMeetingMinutes: boolean;
+  exitAttendanceList: boolean;
+  auditResultLetter: boolean;
+  rta: boolean;
+  monitoring: 'Adequate' | 'Inadequate';
+  comment: string;
 }
 
 const AddAuditorModal: React.FC<AddAuditorModalProps> = ({
@@ -150,10 +186,17 @@ const AddAuditorModal: React.FC<AddAuditorModalProps> = ({
 const QAManagement: React.FC = () => {
   const { user } = useAuth();
   const [auditors, setAuditors] = useState<AuditorWithAssignments[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [auditSchedules, setAuditSchedules] = useState<{ branch_name: string; region: string; no: string }[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedAuditor, setSelectedAuditor] = useState<AuditorWithAssignments | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingRegularTable, setLoadingRegularTable] = useState(false);
+  const [loadingFraudTable, setLoadingFraudTable] = useState(false);
+  const [loadingRecapTable, setLoadingRecapTable] = useState(false);
+  const [loadingRPMTable, setLoadingRPMTable] = useState(false);
+  const [loadingMatriksTable, setLoadingMatriksTable] = useState(false);
   const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks'>('auditors');
   const [formData, setFormData] = useState<AddAuditorForm>({
     name: '',
@@ -165,6 +208,8 @@ const QAManagement: React.FC = () => {
   const [auditData, setAuditData] = useState([
     {
       no: '',
+      region: '',
+      branchId: '',  // Add this field
       branchName: '',
       auditPeriodStart: '',
       auditPeriodEnd: '',
@@ -189,23 +234,38 @@ const QAManagement: React.FC = () => {
 
   useEffect(() => {
     fetchAuditors();
+    fetchBranches();
+    fetchAuditSchedules();
   }, []);
 
   const fetchAuditors = async () => {
     try {
+      setLoading(true);
+      console.log("Fetching auditors data...");
+      
       const { data: auditorsData, error: auditorsError } = await supabase
         .from('auditors')
         .select('*')
         .order('name');
 
-      if (auditorsError) throw auditorsError;
+      if (auditorsError) {
+        console.error("Error fetching auditors:", auditorsError);
+        throw auditorsError;
+      }
+      
+      console.log("Auditors data received:", auditorsData);
 
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('auditor_assignments')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error("Error fetching assignments:", assignmentsError);
+        throw assignmentsError;
+      }
+      
+      console.log("Assignments data received:", assignmentsData);
 
       const auditorsWithAssignments = auditorsData.map(auditor => ({
         ...auditor,
@@ -213,11 +273,48 @@ const QAManagement: React.FC = () => {
       }));
 
       setAuditors(auditorsWithAssignments);
+      console.log("Processed data:", auditorsWithAssignments);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to fetch auditors data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error("Error fetching branches:", error);
+        throw error;
+      }
+
+      setBranches(data || []);
+      console.log("Branches data received:", data);
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      toast.error('Failed to fetch branches data');
+    }
+  };
+
+  const fetchAuditSchedules = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_schedule')
+        .select('branch_name, region, no');
+      
+      if (error) throw error;
+      
+      setAuditSchedules(data || []);
+      console.log('Fetched audit schedules:', data);
+    } catch (error) {
+      console.error('Error fetching audit schedules:', error);
+      toast.error('Failed to fetch audit schedule');
     }
   };
 
@@ -298,6 +395,115 @@ const QAManagement: React.FC = () => {
     }
   };
 
+  const handleRowChange = (idx: number, updatedRow: AuditEntry) => {
+    const newData = [...auditData];
+    newData[idx] = updatedRow;
+    setAuditData(newData);
+  };
+
+  const findMatchingBranch = (branchName: string) => {
+    if (!branchName) return null;
+    
+    // Normalize input
+    const normalizedInput = branchName.trim().toLowerCase();
+    
+    // Coba pencocokan langsung
+    let match = auditSchedules.find(
+      s => s.branch_name.trim().toLowerCase() === normalizedInput
+    );
+    
+    // Jika tidak ketemu, coba pencocokan dengan menghapus karakter khusus
+    if (!match) {
+      const simplifiedInput = normalizedInput.replace(/[^a-z0-9]/g, '');
+      match = auditSchedules.find(
+        s => s.branch_name.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === simplifiedInput
+      );
+    }
+    
+    return match;
+  };
+
+  const getRegionFromSchedule = (branchName: string) => {
+    if (!branchName) return '';
+    
+    const match = findMatchingBranch(branchName);
+    if (!match) {
+      console.warn(`Branch not found in audit_schedule: "${branchName}"`);
+      return '';
+    }
+    
+    return match.region;
+  };
+
+  const getNumberedAuditData = () => {
+    // Sort auditData by region dari audit_schedule
+    const sortedData = [...auditData].sort((a, b) => {
+      const regionA = getRegionFromSchedule(a.branchName) || '';
+      const regionB = getRegionFromSchedule(b.branchName) || '';
+      
+      // Jika region sama, sort berdasarkan nama cabang
+      if (regionA === regionB) {
+        return a.branchName.localeCompare(b.branchName);
+      }
+      
+      return regionA.localeCompare(regionB);
+    });
+
+    // Counter untuk setiap region
+    const regionCounters: Record<string, number> = {};
+
+    return sortedData.map(entry => {
+      // Ambil region dari audit_schedule
+      const match = findMatchingBranch(entry.branchName);
+      const region = match ? match.region : 'Unassigned';
+      const overallNo = match ? match.no : ''; // Ambil no dari audit_schedule
+
+      // Inisialisasi counter jika belum ada
+      if (!regionCounters[region]) {
+        regionCounters[region] = 1;
+      }
+
+      // Ambil nomor sekarang, lalu increment
+      const no = regionCounters[region];
+      regionCounters[region] += 1;
+
+      return {
+        ...entry,
+        region,
+        no: no.toString(),
+        overallNo: overallNo, // Tambahkan overallNo dari audit_schedule
+      };
+    });
+  };
+
+  const switchTab = (tab: 'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks') => {
+    setActiveTab(tab);
+    
+    // Set appropriate loading state based on selected tab
+    switch(tab) {
+      case 'excel':
+        setLoadingRegularTable(true);
+        setTimeout(() => setLoadingRegularTable(false), 800); // Simulate loading delay
+        break;
+      case 'fraud':
+        setLoadingFraudTable(true);
+        setTimeout(() => setLoadingFraudTable(false), 800);
+        break;
+      case 'recap':
+        setLoadingRecapTable(true);
+        setTimeout(() => setLoadingRecapTable(false), 800);
+        break;
+      case 'rpm':
+        setLoadingRPMTable(true);
+        setTimeout(() => setLoadingRPMTable(false), 800);
+        break;
+      case 'matriks':
+        setLoadingMatriksTable(true);
+        setTimeout(() => setLoadingMatriksTable(false), 800);
+        break;
+    }
+  };
+
   const UpdateAssignmentModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -362,18 +568,7 @@ const QAManagement: React.FC = () => {
   );
 
   if (loading && auditors.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingAnimation />;
   }
 
   return (
@@ -385,7 +580,7 @@ const QAManagement: React.FC = () => {
         </div>
         <div className="flex gap-4">
           <button
-            onClick={() => setActiveTab('auditors')}
+            onClick={() => switchTab('auditors')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'auditors'
                 ? 'bg-indigo-600 text-white'
@@ -396,7 +591,7 @@ const QAManagement: React.FC = () => {
             Auditors
           </button>
           <button
-            onClick={() => setActiveTab('excel')}
+            onClick={() => switchTab('excel')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'excel'
                 ? 'bg-indigo-600 text-white'
@@ -407,7 +602,7 @@ const QAManagement: React.FC = () => {
             Audit Table Regular
           </button>
           <button
-            onClick={() => setActiveTab('fraud')}
+            onClick={() => switchTab('fraud')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'fraud'
                 ? 'bg-indigo-600 text-white'
@@ -418,7 +613,7 @@ const QAManagement: React.FC = () => {
             Audit Table Fraud
           </button>
           <button
-            onClick={() => setActiveTab('recap')}
+            onClick={() => switchTab('recap')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'recap'
                 ? 'bg-indigo-600 text-white'
@@ -429,7 +624,7 @@ const QAManagement: React.FC = () => {
             Regular Audit Recap
           </button>
           <button
-            onClick={() => setActiveTab('rpm')}
+            onClick={() => switchTab('rpm')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'rpm'
                 ? 'bg-indigo-600 text-white'
@@ -440,7 +635,7 @@ const QAManagement: React.FC = () => {
             RPM Letter
           </button>
           <button
-            onClick={() => setActiveTab('matriks')}
+            onClick={() => switchTab('matriks')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
               activeTab === 'matriks'
                 ? 'bg-indigo-600 text-white'
@@ -534,10 +729,98 @@ const QAManagement: React.FC = () => {
       ) : activeTab === 'excel' ? (
         <Card>
           <CardContent className="p-6">
+            <AuditScheduleViewer className="mb-6" />
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
-                <AuditTable data={auditData} onDataChange={setAuditData} />
+                {loadingRegularTable ? (
+                  <LoadingAnimation />
+                ) : (
+                  <AuditTable
+                    data={getNumberedAuditData()}
+                    onDataChange={(newData) => {
+                      console.log("Data yang akan diupdate:", newData);
+                      const dataWithoutNumbers = newData.map(({ no, region, ...rest }) => ({
+                        ...rest,
+                        no: '',
+                        region: '',
+                      }));
+                      setAuditData(dataWithoutNumbers);
+                    }}
+                    renderRow={(row, idx) => (
+                      <div className="flex items-center gap-4">
+                        <span className="font-medium w-8">{row.no}</span>
+                        <div className="flex-1">
+                          <select
+                            value={row.branchId || ''}
+                            onChange={(e) => {
+                              const branchId = e.target.value;
+                              const selectedBranch = branches.find(b => b.id === branchId);
+                              const branchName = selectedBranch ? selectedBranch.name : '';
+                              handleRowChange(idx, { 
+                                ...row, 
+                                branchId: branchId,
+                                branchName: branchName,
+                              });
+                            }}
+                            className="border rounded px-2 py-1 w-full"
+                          >
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} ({branch.region})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  />
+                )}
               </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button 
+                onClick={fetchAuditSchedules}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              >
+                Refresh Audit Schedule
+              </button>
+              <button 
+                onClick={() => {
+                  console.log("Audit Schedules:", auditSchedules);
+                  auditData.forEach(entry => {
+                    if (entry.branchName) {
+                      const match = findMatchingBranch(entry.branchName);
+                      if (!match) {
+                        console.warn(`No match found for branch: "${entry.branchName}"`);
+                      } else {
+                        console.log(`Match found for "${entry.branchName}": region=${match.region}`);
+                      }
+                    }
+                  });
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md"
+              >
+                Debug Branch Matching
+              </button>
+              <button 
+                onClick={() => {
+                  const numberedData = getNumberedAuditData();
+                  const regions = [...new Set(numberedData.map(item => item.region))];
+                  console.log("Regions found:", regions);
+                  regions.forEach(region => {
+                    const itemsInRegion = numberedData.filter(item => item.region === region);
+                    console.log(`Region ${region}: ${itemsInRegion.length} items`);
+                    console.log("Items:", itemsInRegion.map(item => ({
+                      no: item.no,
+                      branch: item.branchName
+                    })));
+                  });
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md"
+              >
+                Debug Numbering
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -546,7 +829,11 @@ const QAManagement: React.FC = () => {
           <CardContent className="p-6">
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
-                <AuditFraudTable />
+                {loadingFraudTable ? (
+                  <LoadingAnimation />
+                ) : (
+                  <AuditFraudTable />
+                )}
               </div>
             </div>
           </CardContent>
@@ -556,7 +843,11 @@ const QAManagement: React.FC = () => {
           <CardContent className="p-6">
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
-                <RPMLetterTable />
+                {loadingRPMTable ? (
+                  <LoadingAnimation />
+                ) : (
+                  <RPMLetterTable />
+                )}
               </div>
             </div>
           </CardContent>
@@ -564,7 +855,11 @@ const QAManagement: React.FC = () => {
       ) : activeTab === 'matriks' ? (
         <Card>
           <CardContent className="p-6">
-            <MatriksSection />
+            {loadingMatriksTable ? (
+              <LoadingAnimation />
+            ) : (
+              <MatriksSection />
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -572,7 +867,11 @@ const QAManagement: React.FC = () => {
           <CardContent className="p-6">
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
-                <RegularAuditRecap />
+                {loadingRecapTable ? (
+                  <LoadingAnimation />
+                ) : (
+                  <RegularAuditRecap />
+                )}
               </div>
             </div>
           </CardContent>
@@ -588,6 +887,7 @@ const QAManagement: React.FC = () => {
       )}
       {showAssignmentModal && selectedAuditor && <UpdateAssignmentModal />}
       <Toaster />
+      {loading && <LoadingAnimation />}
     </div>
   );
 };

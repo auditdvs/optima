@@ -1,11 +1,11 @@
 import {
-    createColumnHelper,
-    flexRender,
-    getCoreRowModel,
-    getFilteredRowModel,
-    getSortedRowModel,
-    SortingState,
-    useReactTable
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable
 } from '@tanstack/react-table';
 import { saveAs } from 'file-saver';
 import { ArrowUpDown, Download, Search } from 'lucide-react';
@@ -13,6 +13,7 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabaseClient';
+import { LoadingAnimation } from './LoadingAnimation'; // Import the new component
 
 interface RecapData {
   id?: string;
@@ -187,11 +188,7 @@ export const RegularAuditRecap: React.FC = () => {
   });
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <LoadingAnimation />;  // Replace the default spinner with our custom animation
   }
 
   return (

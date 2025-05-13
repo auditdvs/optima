@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabaseClient';
 import { CustomCheckbox } from './CustomCheckbox';
+import { LoadingAnimation } from './LoadingAnimation'; // Import the new component
 
 interface AuditFraudData {
   id?: string;
@@ -130,12 +131,14 @@ export const AuditFraudTable: React.FC = () => {
   const [auditData, setAuditData] = useState<AuditFraudData[]>([]);
   const [selectedAudit, setSelectedAudit] = useState<AuditFraudData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true); // Add loading state
 
   useEffect(() => {
     fetchAuditData();
   }, []);
 
   const fetchAuditData = async () => {
+    setLoading(true); // Set loading to true when fetching
     try {
       const { data, error } = await supabase
         .from('audit_fraud')
@@ -147,6 +150,8 @@ export const AuditFraudTable: React.FC = () => {
     } catch (error) {
       console.error('Error fetching audit data:', error);
       toast.error('Failed to fetch audit data');
+    } finally {
+      setLoading(false); // Set loading to false when done
     }
   };
 
@@ -412,6 +417,11 @@ export const AuditFraudTable: React.FC = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+
+  // Add conditional rendering for loading state
+  if (loading) {
+    return <LoadingAnimation />;
+  }
 
   return (
     <div className="space-y-4 mt-4">
