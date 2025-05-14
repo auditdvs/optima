@@ -14,14 +14,30 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string>('user');
+  const [user, setUser] = useState<any>(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [userRole, setUserRole] = useState<string>(() => {
+    return localStorage.getItem('userRole') || 'user';
+  });
   const [auditor, setAuditor] = useState<{ id: string; name: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start with loading state true
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
+
+  useEffect(() => {
+    // Simpan user dan userRole ke localStorage setiap kali berubah
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user');
+    }
+    localStorage.setItem('userRole', userRole || 'user');
+  }, [user, userRole]);
 
   useEffect(() => {
     // Check active sessions and sets the user
-    setIsLoading(true); // Ensure loading state is true at start
+    setIsLoading(true); // Initial load should show loading
     
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -30,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchUserRole(session.user.id),
           fetchAuditor(session.user.id)
         ]).finally(() => {
-          // Delay setting loading to false slightly for better user experience
           setTimeout(() => {
             setIsLoading(false);
           }, 500);
@@ -40,8 +55,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Listen for visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible, set background refresh to true
+        // This prevents showing loading screen on tab switches
+        setIsBackgroundRefresh(true);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoading(true);
+      // Only show loading if not a background refresh from tab change
+      if (!isBackgroundRefresh) {
+        setIsLoading(true);
+      }
+      
       setUser(session?.user ?? null);
       
       if (session?.user) {
@@ -51,16 +81,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]).finally(() => {
           setTimeout(() => {
             setIsLoading(false);
+            setIsBackgroundRefresh(false); // Reset background refresh flag
           }, 500);
         });
       } else {
-        setUserRole('user'); // Reset role when user logs out
-        setAuditor(null); // Reset auditor when user logs out
+        setUserRole(''); // Empty string instead of 'user' when logged out
+        setAuditor(null); 
         setIsLoading(false);
+        setIsBackgroundRefresh(false); // Reset background refresh flag
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   async function fetchUserRole(userId: string) {
@@ -151,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {isLoading ? <LoadingPage /> : children}
+      {isLoading && !isBackgroundRefresh ? <LoadingPage /> : children}
     </AuthContext.Provider>
   );
 }
