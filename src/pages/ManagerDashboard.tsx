@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { saveAs } from 'file-saver';
-import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Download, Search, TrendingUp, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Clock, Download, Pencil, Search, TrendingUp, Users, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -102,10 +102,14 @@ interface FraudAudit {
 interface FraudCase {
   id: string;
   branch_name: string;
+  region: string; // Added region field
   fraud_amount: number;
   fraud_staff: string;
   fraud_payments_audits?: {
+    id: string;
     hkp_amount: number;
+    payment_date: string;
+    notes?: string;
   }[];
 }
 
@@ -114,6 +118,7 @@ interface FraudPayment {
   work_paper_id: string;
   hkp_amount: number;
   payment_date: string;
+  from_salary?: boolean;
   notes?: string;
 }
 
@@ -177,8 +182,12 @@ const ManagerDashboard = () => {
   const [fraudCases, setFraudCases] = useState<FraudCase[]>([]);
   const [selectedFraud, setSelectedFraud] = useState<FraudCase | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [fraudSearchTerm, setFraudSearchTerm] = useState('');
   const [fraudSortConfig, setFraudSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
+  const [paymentHistory, setPaymentHistory] = useState<FraudPayment[]>([]);
+  const [hkpAmountInput, setHkpAmountInput] = useState<number>(0);
+  const [fromSalaryChecked, setFromSalaryChecked] = useState<boolean>(false);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -198,9 +207,16 @@ const ManagerDashboard = () => {
     initializeDashboard();
   }, []);
 
+  // Tambahkan useEffect ini untuk reset input saat dialog dibuka
+  useEffect(() => {
+    if (isPaymentDialogOpen) {
+      setHkpAmountInput(0);
+      setFromSalaryChecked(false);
+    }
+  }, [isPaymentDialogOpen]);
+
   const fetchDashboardData = async () => {
     try {
-      // Fetch total branches
       const { data: branchesData } = await supabase
         .from('branches')
         .select('name', { count: 'exact' });
@@ -348,7 +364,7 @@ const ManagerDashboard = () => {
 
   const fetchFraudCases = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: fraudData, error: fraudError } = await supabase
         .from('work_papers')
         .select(`
           id,
@@ -356,16 +372,56 @@ const ManagerDashboard = () => {
           fraud_amount,
           fraud_staff,
           fraud_payments_audits (
-            hkp_amount
+            id,
+            hkp_amount,
+            payment_date,
+            notes,
+            from_salary
           )
         `)
         .eq('audit_type', 'fraud');
 
-      if (error) throw error;
+      if (fraudError) throw fraudError;
 
-      setFraudCases(data || []);
+      // Get all branches to map regions
+      const { data: branchesData, error: branchesError } = await supabase
+        .from('branches')
+        .select('name, region');
+      
+      if (branchesError) throw branchesError;
+      
+      // Create a lookup map for regions by branch name
+      const branchRegionMap = {};
+      branchesData?.forEach(branch => {
+        branchRegionMap[branch.name] = branch.region;
+      });
+
+      // Add region to each fraud case
+      const fraudCasesWithRegion = fraudData?.map(fraud => ({
+        ...fraud,
+        region: branchRegionMap[fraud.branch_name] || 'Unknown'
+      })) || [];
+
+      setFraudCases(fraudCasesWithRegion);
     } catch (error) {
       console.error('Error fetching fraud cases:', error);
+    }
+  };
+
+  const fetchPaymentHistory = async (fraudId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('fraud_payments_audits')
+        .select('*')
+        .eq('work_paper_id', fraudId)
+        .order('payment_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      setPaymentHistory(data || []);
+      setIsHistoryDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
     }
   };
 
@@ -539,7 +595,10 @@ const ManagerDashboard = () => {
   const isPaymentComplete = (fraud: FraudCase) => {
     const payment = fraud.fraud_payments_audits?.[0];
     if (!payment) return false;
-    return payment.hkp_amount === fraud.fraud_amount;
+    return (
+      (payment.hkp_amount > 0 && payment.hkp_amount === fraud.fraud_amount) ||
+      payment.from_salary === true
+    );
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
@@ -547,12 +606,22 @@ const ManagerDashboard = () => {
     if (!selectedFraud) return;
 
     try {
-      const formData = new FormData(e.target as HTMLFormElement);
+      const formElement = e.target as HTMLFormElement;
+      const formData = new FormData(formElement);
+
+      const paymentDate = formData.get('payment_date') as string;
+      const fromSalary = formData.get('from_salary') === 'on';
+      const notes = formData.get('notes') as string || '';
+
+      // Gunakan nilai dari state - ini akan tetap 0 kecuali user mengubahnya secara manual
+      const hkpAmount = hkpAmountInput;
+
       const paymentData = {
         work_paper_id: selectedFraud.id,
-        hkp_amount: Number(formData.get('amount')),
-        payment_date: formData.get('payment_date'),
-        notes: formData.get('notes')
+        hkp_amount: hkpAmount,
+        payment_date: paymentDate,
+        from_salary: fromSalary,
+        notes: notes
       };
 
       const { error } = await supabase
@@ -599,7 +668,8 @@ const ManagerDashboard = () => {
 
   const filteredFraudCases = fraudCases.filter(fraud =>
     fraud.branch_name.toLowerCase().includes(fraudSearchTerm.toLowerCase()) ||
-    fraud.fraud_staff.toLowerCase().includes(fraudSearchTerm.toLowerCase())
+    fraud.fraud_staff.toLowerCase().includes(fraudSearchTerm.toLowerCase()) ||
+    fraud.region.toLowerCase().includes(fraudSearchTerm.toLowerCase())
   );
 
   const sortedFraudCases = getSortedFraudData(filteredFraudCases);
@@ -908,12 +978,13 @@ const ManagerDashboard = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">No.</TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => requestFraudSort('fraud_staff')}
+                    onClick={() => requestFraudSort('region')}
                   >
                     <div className="flex items-center">
-                      Fraud Staff
+                      Region
                       <ArrowUpDown className="ml-1 h-4 w-4" />
                     </div>
                   </TableHead>
@@ -928,6 +999,15 @@ const ManagerDashboard = () => {
                   </TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => requestFraudSort('fraud_staff')}
+                  >
+                    <div className="flex items-center">
+                      Fraud Staff
+                      <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-50"
                     onClick={() => requestFraudSort('fraud_amount')}
                   >
                     <div className="flex items-center">
@@ -936,17 +1016,20 @@ const ManagerDashboard = () => {
                     </div>
                   </TableHead>
                   <TableHead>HKP Amount</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedFraudCases.map((fraud) => (
+                {sortedFraudCases.map((fraud, index) => (
                   <TableRow
                     key={fraud.id}
                     className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
                   >
-                    <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
+                    <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
+                    <TableCell className="text-xs">{fraud.region}</TableCell>
                     <TableCell className="text-xs">{fraud.branch_name}</TableCell>
+                    <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
                     <TableCell className="text-xs">
                       {formatCurrency(fraud.fraud_amount)}
                     </TableCell>
@@ -954,23 +1037,34 @@ const ManagerDashboard = () => {
                       {fraud.fraud_payments_audits?.[0]?.hkp_amount 
                         ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
                         : 'No HKP'}
+                      {fraud.fraud_payments_audits?.[0]?.from_salary && (
+                        <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
+                      {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
+                      fraud.fraud_payments_audits?.[0]?.notes !== null
+                        ? fraud.fraud_payments_audits[0].notes
+                        : '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-3">
                         <button
                           onClick={() => {
                             setSelectedFraud(fraud);
                             setIsPaymentDialogOpen(true);
                           }}
-                          className="text-xs text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800"
+                          aria-label="Edit Payment"
                         >
-                          Edit Payment
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleDeletePayment(fraud.id)}
-                          className="text-xs text-red-600 hover:text-red-800"
+                          onClick={() => fetchPaymentHistory(fraud.id)}
+                          className="text-gray-600 hover:text-gray-800"
+                          aria-label="View Payment History"
                         >
-                          Delete
+                          <Clock className="h-4 w-4" />
                         </button>
                       </div>
                     </TableCell>
@@ -995,7 +1089,9 @@ const ManagerDashboard = () => {
                 type="number"
                 name="amount"
                 className="w-full mt-1 text-sm border rounded-md p-2"
-                required
+                min="0"
+                value={hkpAmountInput}
+                onChange={e => setHkpAmountInput(Number(e.target.value))}
               />
             </div>
             <div>
@@ -1004,8 +1100,22 @@ const ManagerDashboard = () => {
                 type="date"
                 name="payment_date"
                 className="w-full mt-1 text-sm border rounded-md p-2"
+                defaultValue={format(new Date(), 'yyyy-MM-dd')}
                 required
               />
+            </div>
+            <div className="flex items-center mt-2">
+              <input
+                type="checkbox"
+                name="from_salary"
+                id="from_salary"
+                className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                checked={fromSalaryChecked}
+                onChange={e => setFromSalaryChecked(e.target.checked)}
+              />
+              <label htmlFor="from_salary" className="ml-2 text-xs text-gray-700">
+                From Salary and Kopkada
+              </label>
             </div>
             <div>
               <label className="text-xs text-gray-700">Notes</label>
@@ -1031,6 +1141,53 @@ const ManagerDashboard = () => {
               </button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment History Dialog */}
+      <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Payment History</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {paymentHistory.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Type</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentHistory.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell className="text-xs">
+                        {payment.payment_date ? format(parseISO(payment.payment_date as string), 'dd MMM yyyy') : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatCurrency(payment.hkp_amount)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {payment.notes?.includes('[From Salary]') ? 'Salary Deduction' : 'Direct Payment'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-center py-4 text-sm text-gray-500">No payment history found</p>
+            )}
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => setIsHistoryDialogOpen(false)}
+              className="px-4 py-2 text-sm text-gray-600 border rounded-md hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 
