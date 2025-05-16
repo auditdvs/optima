@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import LoadingPage from '../components/LoadingPage';
 import { supabase } from '../lib/supabase';
 
@@ -6,12 +7,17 @@ interface AuthContextType {
   user: any;
   userRole: string;
   auditor: { id: string; name: string } | null;
-  isLoading: boolean; // Add loading state
+  isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  resetInactivityTimer: () => void; // Tambahkan fungsi reset timer
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 menit dalam milidetik
+const WARNING_BEFORE_TIMEOUT = 1 * 60 * 1000; // Peringatan 1 menit sebelum timeout
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(() => {
@@ -22,11 +28,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return localStorage.getItem('userRole') || 'user';
   });
   const [auditor, setAuditor] = useState<{ id: string; name: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading state true
-  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpiresIn, setSessionExpiresIn] = useState<number | null>(null);
+  const [ignoreAuthChanges, setIgnoreAuthChanges] = useState(false);
+  const [lastAuthEventTime, setLastAuthEventTime] = useState(Date.now());
+  
+  // Tambahkan state untuk inaktivitas
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [inactivityWarningShown, setInactivityWarningShown] = useState(false);
+  const [inactivityTimerId, setInactivityTimerId] = useState<number | null>(null);
+
+  // Fungsi untuk reset timer inaktivitas
+  const resetInactivityTimer = () => {
+    setLastActivity(Date.now());
+    setInactivityWarningShown(false);
+  };
+
+  // Effect untuk memonitor inaktivitas pengguna
+  useEffect(() => {
+    if (!user) return; // Hanya jalanan jika user sudah login
+
+    // Fungsi untuk memeriksa inaktivitas
+    const checkInactivity = () => {
+      const currentTime = Date.now();
+      const inactiveTime = currentTime - lastActivity;
+
+      // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT - WARNING_BEFORE_TIMEOUT
+      // dan peringatan belum ditampilkan
+      if (inactiveTime >= INACTIVITY_TIMEOUT - WARNING_BEFORE_TIMEOUT && !inactivityWarningShown) {
+        toast.warning('Weh, kalo gaada aktivitas log-out aja. Yang ada ngeberatin server, ini gue logout otomatis ya semenit lagi.', {
+          toastId: 'inactivity-warning',
+        });
+        setInactivityWarningShown(true);
+      }
+
+      // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT, lakukan logout
+      if (inactiveTime >= INACTIVITY_TIMEOUT) {
+        toast.info('Anda telah otomatis keluar karena tidak ada aktivitas', {
+          toastId: 'inactivity-logout',
+        });
+        signOut();
+      }
+    };
+
+    // Buat interval untuk memeriksa inaktivitas setiap 30 detik
+    const timerId = window.setInterval(checkInactivity, 30000);
+    setInactivityTimerId(timerId);
+
+    // Setup event listener untuk mendeteksi aktivitas pengguna
+    const activityEvents = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click',
+      'keydown', 'keyup', 'touchmove', 'touchend'
+    ];
+
+    const handleUserActivity = () => {
+      resetInactivityTimer();
+    };
+
+    // Tambahkan event listener untuk semua event aktivitas
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleUserActivity);
+    });
+
+    // Cleanup event listener saat unmount
+    return () => {
+      if (inactivityTimerId) {
+        clearInterval(inactivityTimerId);
+      }
+      
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleUserActivity);
+      });
+    };
+  }, [user, lastActivity, inactivityWarningShown]);
 
   useEffect(() => {
-    // Simpan user dan userRole ke localStorage setiap kali berubah
     if (user) {
       localStorage.setItem('user', JSON.stringify(user));
     } else {
@@ -37,8 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check active sessions and sets the user
-    setIsLoading(true); // Initial load should show loading
+    setIsLoading(true);
     
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -48,55 +125,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]).finally(() => {
           setTimeout(() => {
             setIsLoading(false);
-          }, 500);
+          }, 1000);
         });
       } else {
         setIsLoading(false);
       }
     });
+  }, []); 
 
-    // Listen for visibility changes
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // When tab becomes visible, set background refresh to true
-        // This prevents showing loading screen on tab switches
-        setIsBackgroundRefresh(true);
-      }
-    };
+  // Add this function to check if the session is expired
+  const isSessionExpired = (session) => {
+    if (!session) return true;
     
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Check if the session expires_at is in the past
+    const expiresAt = session.expires_at;
+    if (!expiresAt) return false;
+    
+    const expirationTime = expiresAt * 1000; // Convert to milliseconds
+    const currentTime = Date.now();
+    
+    return currentTime > expirationTime;
+  };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Only show loading if not a background refresh from tab change
-      if (!isBackgroundRefresh) {
-        setIsLoading(true);
-      }
-      
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        Promise.all([
-          fetchUserRole(session.user.id),
-          fetchAuditor(session.user.id)
-        ]).finally(() => {
-          setTimeout(() => {
-            setIsLoading(false);
-            setIsBackgroundRefresh(false); // Reset background refresh flag
-          }, 500);
-        });
-      } else {
-        setUserRole(''); // Empty string instead of 'user' when logged out
-        setAuditor(null); 
-        setIsLoading(false);
-        setIsBackgroundRefresh(false); // Reset background refresh flag
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
+  // Add a function to calculate time until expiration
+  const calculateTimeUntilExpiration = (session) => {
+    if (!session) return null;
+    
+    const expiresAt = session.expires_at;
+    if (!expiresAt) return null;
+    
+    const expirationTime = expiresAt * 1000; // Convert to milliseconds
+    const currentTime = Date.now();
+    
+    return Math.max(0, expirationTime - currentTime);
+  };
 
   async function fetchUserRole(userId: string) {
     try {
@@ -175,6 +237,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Add this function to your AuthContext
+  async function refreshSession() {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) throw error;
+      
+      setUser(data.user);
+      console.log('Session manually refreshed');
+    } catch (error) {
+      console.error('Failed to refresh session:', error);
+      // Handle session refresh failure
+      await signOut();
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Update expiration time periodically
+  useEffect(() => {
+    if (!user) {
+      setSessionExpiresIn(null);
+      return;
+    }
+    
+    const updateExpirationTimer = async () => {
+      const { data } = await supabase.auth.getSession();
+      const timeUntilExpiration = calculateTimeUntilExpiration(data.session);
+      setSessionExpiresIn(timeUntilExpiration);
+      
+      // Show warning when less than 5 minutes remain
+      if (timeUntilExpiration && timeUntilExpiration < 5 * 60 * 1000) {
+        // toast.warning('Your session will expire soon. Please save your work.');
+        console.warn('Your session will expire soon. Please save your work.');
+      }
+    };
+    
+    // Initial calculation
+    updateExpirationTimer();
+    
+    // Update every minute
+    const interval = setInterval(updateExpirationTimer, 60000);
+    
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        // Jika tab tidak aktif, abaikan event
+        if (ignoreAuthChanges) {
+          console.log('Ignoring auth event due to tab visibility:', event);
+          return;
+        }
+
+        // Abaikan event jika belum lewat 5 detik dari event terakhir
+        const now = Date.now();
+        if (now - lastAuthEventTime < 5000) {
+          console.log('Ignoring auth event, too soon after previous event:', event);
+          return;
+        }
+        setLastAuthEventTime(now);
+
+        // Hanya perbarui user jika terjadi sign-in atau sign-out
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          setIsLoading(true);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            Promise.all([
+              fetchUserRole(session.user.id),
+              fetchAuditor(session.user.id)
+            ]).finally(() => {
+              setTimeout(() => {
+                setIsLoading(false);
+              }, 1000);
+            });
+          } else {
+            setIsLoading(false);
+          }
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [ignoreAuthChanges, lastAuthEventTime]); // Tambahkan dependency
+
+  // Tambahkan listener untuk visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        setIgnoreAuthChanges(true);
+      } else {
+        // Beri delay sedikit sebelum kembali menerima event
+        setTimeout(() => setIgnoreAuthChanges(false), 300);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const value = {
     user,
     userRole,
@@ -182,11 +348,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     signIn,
     signOut,
+    refreshSession,
+    resetInactivityTimer, // Tambahkan fungsi ini ke context
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {isLoading && !isBackgroundRefresh ? <LoadingPage /> : children}
+      {isLoading ? <LoadingPage /> : children}
     </AuthContext.Provider>
   );
 }

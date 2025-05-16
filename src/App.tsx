@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AddUser from './pages/AddUser';
@@ -105,6 +106,7 @@ function App() {
               } />
             </Route>
           </Routes>
+          <ToastContainer position="top-right" autoClose={5000} />
         </Router>
       </AuthProvider>
     </QueryClientProvider>
