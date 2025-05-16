@@ -228,7 +228,7 @@ const RiskDashboard = () => {
         .from('fraud_cases')
         .select('*')
         .eq('work_paper_id', id)
-        .single();
+        .maybeSingle();
 
       if (existingCase) {
         // Update existing case

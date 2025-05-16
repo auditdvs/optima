@@ -45,7 +45,7 @@ function Navbar() {
           .from('profiles')
           .select('full_name')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setFullName(data.full_name);
@@ -130,7 +130,7 @@ function Navbar() {
         .from('notifications')
         .select('id')
         .eq('id', notificationId)
-        .single();
+        .maybeSingle();
 
       if (!notifCheck) {
         console.error('Notification not found:', notificationId);

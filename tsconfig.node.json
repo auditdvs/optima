@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "composite": true,
-    "noEmit": true,
+    "outDir": "./dist/node",
+    "emitDeclarationOnly": true,
+    "declaration": true,
     "target": "ES2022",
     "lib": ["ES2023"],
     "module": "ESNext",
