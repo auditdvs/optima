@@ -329,7 +329,7 @@ const QAManagement: React.FC = () => {
         .from('auditors')
         .insert([{ name: formData.name, auditor_id: formData.auditor_id, created_by: user.id }])
         .select()
-        .single();
+        .maybeSingle();
 
       if (auditorError) throw new Error(auditorError.message);
 

@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('auditors')
         .select('id, name')
         .eq('id', userId) // Use user_id to find the auditor record
-        .single();
+        .maybeSingle();
 
       if (error) {
         if (error.code === 'PGRST116') { // "No rows returned" error

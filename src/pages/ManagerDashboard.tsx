@@ -34,7 +34,7 @@ const checkUserAccess = async (supabase: any) => {
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!userRoles || !['manager', 'superadmin'].includes(userRoles.role)) {
       throw new Error('Unauthorized access');
