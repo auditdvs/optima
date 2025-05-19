@@ -211,8 +211,13 @@ export const AuditFraudTable: React.FC = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [auditToDelete, setAuditToDelete] = useState<AuditFraudData | null>(null);
 
+  // Add this to your component state declarations
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
   useEffect(() => {
     fetchAuditData();
+    getCurrentUserRole();
   }, []);
 
   // Update hasChanges whenever changedItems changes
@@ -237,6 +242,25 @@ export const AuditFraudTable: React.FC = () => {
       toast.error('Failed to fetch audit data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add this function to get the current user's role
+  const getCurrentUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Get role from user metadata (adjust path based on your auth setup)
+        const role = user.app_metadata?.role || null;
+        setUserRole(role);
+        
+        // Check if user has edit/delete permissions
+        const canEdit = role === 'qa' || role === 'superadmin';
+        setIsAuthorized(canEdit);
+      }
+    } catch (error) {
+      console.error('Error getting user role:', error);
     }
   };
 
@@ -271,21 +295,31 @@ export const AuditFraudTable: React.FC = () => {
 
     setIsSaving(true);
     try {
-      // Prepare updates with proper IDs
-      const updates = Object.entries(changedItems).map(([id, changes]) => ({
-        id,
-        ...changes
-      }));
+      // Process each update individually to avoid malformed requests
+      for (const [id, changes] of Object.entries(changedItems)) {
+        // Create a proper update object with ID
+        const updateData = {
+          id,
+          ...changes,
+          updated_at: new Date().toISOString()
+        };
 
-      const { error } = await supabase
-        .from('audit_fraud')
-        .upsert(updates);
+        const { error } = await supabase
+          .from('audit_fraud')
+          .update(updateData)
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) {
+          console.error(`Error updating item ${id}:`, error);
+          throw error;
+        }
+      }
       
       toast.success(`Saved ${Object.keys(changedItems).length} changes successfully`);
       // Clear tracked changes after successful save
       setChangedItems({});
+      // Refresh the data to ensure consistency
+      fetchAuditData();
     } catch (error) {
       console.error('Error saving changes:', error);
       toast.error('Failed to save changes');
@@ -485,6 +519,7 @@ export const AuditFraudTable: React.FC = () => {
             onClick={() => handleEdit(info.row.original)}
             className="p-1 text-blue-600 hover:text-blue-800"
             title="Edit"
+            disabled={!isAuthorized}
           >
             <Edit2 className="h-4 w-4" />
           </button>
@@ -495,6 +530,7 @@ export const AuditFraudTable: React.FC = () => {
             }}
             className="p-1 text-red-600 hover:text-red-800"
             title="Delete"
+            disabled={!isAuthorized}
           >
             <Trash2 className="h-4 w-4" />
           </button>
