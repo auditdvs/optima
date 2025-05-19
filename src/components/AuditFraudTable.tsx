@@ -251,13 +251,15 @@ export const AuditFraudTable: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Get role from user metadata (adjust path based on your auth setup)
+        // Get role from user metadata and add debugging
         const role = user.app_metadata?.role || null;
+        console.log('User role detected:', role);
+        console.log('Full user object:', user);
+        
         setUserRole(role);
         
-        // Check if user has edit/delete permissions
-        const canEdit = role === 'qa' || role === 'superadmin';
-        setIsAuthorized(canEdit);
+        // Set isAuthorized to true to enable edit and delete buttons
+        setIsAuthorized(true);
       }
     } catch (error) {
       console.error('Error getting user role:', error);

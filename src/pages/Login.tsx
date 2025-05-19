@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import LoadingPage from '../components/LoadingPage';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -14,8 +13,15 @@ function Login() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, isLoading: authLoading, user } = useAuth(); // Also get the user from context
 
+  // Add this effect to redirect to dashboard if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+  
   // PIC state
   const [picData, setPicData] = useState([]);
   const [loadingPic, setLoadingPic] = useState(true);
@@ -57,13 +63,15 @@ function Login() {
       setError('');
       setLoading(true);
       await signIn(email, password);
-      navigate('/dashboard');
+      // Don't navigate here - let the useEffect handle it
+      // When user is set in AuthContext, the useEffect above will redirect
     } catch (err) {
       setError('Failed to sign in');
       console.error(err);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only reset loading on error
     }
+    // Note: We intentionally don't set loading to false on success,
+    // as the page will navigate away
   }
 
   // Handle password reset
@@ -94,8 +102,18 @@ function Login() {
     }
   }
 
+  // Use combined loading state
+  const isPageLoading = loading || authLoading;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-6 sm:px-6 lg:px-8">
+      {/* Add a simple loading indicator at the top if needed */}
+      {isPageLoading && (
+        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200">
+          <div className="h-full bg-indigo-600 animate-pulse-slow" style={{ width: '30%' }}></div>
+        </div>
+      )}
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className={`rounded-full bg-indigo-100 p-3 transition-all duration-700 ${fadeIn ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
