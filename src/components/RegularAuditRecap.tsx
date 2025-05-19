@@ -165,7 +165,7 @@ export const RegularAuditRecap: React.FC = () => {
           className="w-full border rounded px-2 py-1"
         >
           <option value="">Select...</option>
-          <option value="High">High</option>
+          <option value="High">High</option>  {/* Perbaiki text jadi uppercase */}
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>

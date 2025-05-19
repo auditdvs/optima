@@ -36,8 +36,6 @@ function Navbar() {
 
   const [showAuditRating, setShowAuditRating] = useState(false);
 
-  console.log("Navbar user:", user);
-
   useEffect(() => {
     async function fetchUserProfile() {
       if (user) {

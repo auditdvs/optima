@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import LoadingPage from '../components/LoadingPage';
 import { supabase } from '../lib/supabase';
@@ -38,20 +38,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [inactivityWarningShown, setInactivityWarningShown] = useState(false);
   const [inactivityTimerId, setInactivityTimerId] = useState<number | null>(null);
 
+  // Add a throttling ref
+  const lastActivityUpdateRef = useRef(Date.now());
+
   // Fungsi untuk reset timer inaktivitas
-  const resetInactivityTimer = () => {
-    setLastActivity(Date.now());
-    setInactivityWarningShown(false);
-  };
+  const resetInactivityTimer = useCallback(() => {
+    // Only update state if at least 5 seconds have passed since last update
+    const now = Date.now();
+    if (now - lastActivityUpdateRef.current > 5000) {
+      lastActivityUpdateRef.current = now;
+      setLastActivity(now);
+      setInactivityWarningShown(false);
+    }
+  }, []);
 
   // Effect untuk memonitor inaktivitas pengguna
   useEffect(() => {
-    if (!user) return; // Hanya jalanan jika user sudah login
-
+    if (!user) return;
+    
     // Fungsi untuk memeriksa inaktivitas
     const checkInactivity = () => {
-      const currentTime = Date.now();
-      const inactiveTime = currentTime - lastActivity;
+      const inactiveTime = Date.now() - lastActivity;
 
       // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT - WARNING_BEFORE_TIMEOUT
       // dan peringatan belum ditampilkan
@@ -81,13 +88,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'keydown', 'keyup', 'touchmove', 'touchend'
     ];
 
+    // Use passive: true for better performance with touch events
     const handleUserActivity = () => {
       resetInactivityTimer();
     };
 
     // Tambahkan event listener untuk semua event aktivitas
     activityEvents.forEach(event => {
-      document.addEventListener(event, handleUserActivity);
+      document.addEventListener(event, handleUserActivity, { passive: true });
     });
 
     // Cleanup event listener saat unmount
@@ -100,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener(event, handleUserActivity);
       });
     };
-  }, [user, lastActivity, inactivityWarningShown]);
+  }, [user, resetInactivityTimer]);
 
   useEffect(() => {
     if (user) {

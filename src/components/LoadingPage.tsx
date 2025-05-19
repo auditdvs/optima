@@ -13,7 +13,7 @@ const LoadingPage: React.FC = () => {
         <div>L</div>
       </div>
       <p className="mt-8 text-lg font-medium text-indigo-600">Preparing Optima...</p>
-      <style jsx>{`
+      <style jsx="true">{`
         #load {
           position: relative;
           width: 600px;
