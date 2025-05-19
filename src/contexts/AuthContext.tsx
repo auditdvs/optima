@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import LoadingPage from '../components/LoadingPage';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
@@ -131,9 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchUserRole(session.user.id),
           fetchAuditor(session.user.id)
         ]).finally(() => {
-          setTimeout(() => {
-            setIsLoading(false);
-          }, 1000);
+          // Remove the artificial delay
+          setIsLoading(false);
         });
       } else {
         setIsLoading(false);
@@ -217,13 +215,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signIn(email: string, password: string) {
     setIsLoading(true); // Set loading when signing in
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
-      // Loading state will be handled by the auth state change
+      
+      // Immediately set the user to avoid double login
+      setUser(data.user);
+      
+      // Fetch the user role and auditor info
+      if (data.user) {
+        await Promise.all([
+          fetchUserRole(data.user.id),
+          fetchAuditor(data.user.id)
+        ]);
+      }
+      
+      // Then update loading state
+      setIsLoading(false);
     } catch (error) {
       setIsLoading(false); // Reset loading on error
       throw error;
@@ -318,9 +329,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               fetchUserRole(session.user.id),
               fetchAuditor(session.user.id)
             ]).finally(() => {
-              setTimeout(() => {
-                setIsLoading(false);
-              }, 1000);
+              // Remove the artificial delay
+              setIsLoading(false);
             });
           } else {
             setIsLoading(false);
@@ -362,7 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {isLoading ? <LoadingPage /> : children}
+      {children}
     </AuthContext.Provider>
   );
 }
