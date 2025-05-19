@@ -231,6 +231,9 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   const [editingData, setEditingData] = useState<AuditData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAudit, setEditingAudit] = useState<AuditData | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<{[key: string]: AuditData}>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBranches();
@@ -582,6 +585,43 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     }
   };
 
+  const handleSaveAllChanges = async () => {
+    try {
+      // Create a loading toast that we'll update with the result
+      const toastId = toast.loading(`Saving ${Object.keys(pendingChanges).length} changes...`);
+      
+      for (const id of Object.keys(pendingChanges)) {
+        await saveAuditData(pendingChanges[id]);
+      }
+      
+      // Clear pending changes after successful save
+      setPendingChanges({});
+      
+      // Update the toast to show success
+      toast.success(`${Object.keys(pendingChanges).length} changes saved successfully`, {
+        id: toastId
+      });
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast.error('Failed to save some changes');
+    }
+  };
+
+  const handleFieldChange = (rowIndex: number, field: keyof AuditData, value: any) => {
+    const item = data[rowIndex];
+    const newData = [...data];
+    newData[rowIndex] = { ...newData[rowIndex], [field]: value };
+    onDataChange(newData);
+    
+    // Store in pending changes
+    if (item.id) {
+      setPendingChanges(prev => ({
+        ...prev,
+        [item.id]: { ...newData[rowIndex] }
+      }));
+    }
+  };
+
   const columns = [
     columnHelper.accessor('regNo', {
       header: 'No',
@@ -660,10 +700,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`dapa-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].dapa = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'dapa', checked);
           }}
         />
       ),
@@ -675,10 +712,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`revisedDapa-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].revisedDapa = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'revisedDapa', checked);
           }}
         />
       ),
@@ -690,10 +724,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`dapaSupportingData-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].dapaSupportingData = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'dapaSupportingData', checked);
           }}
         />
       ),
@@ -705,10 +736,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`assignmentLetter-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].assignmentLetter = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'assignmentLetter', checked);
           }}
         />
       ),
@@ -720,10 +748,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`entranceAgenda-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].entranceAgenda = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'entranceAgenda', checked);
           }}
         />
       ),
@@ -735,10 +760,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`entranceAttendance-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].entranceAttendance = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'entranceAttendance', checked);
           }}
         />
       ),
@@ -750,10 +772,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`auditWorkingPapers-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].auditWorkingPapers = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'auditWorkingPapers', checked);
           }}
         />
       ),
@@ -765,10 +784,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`exitMeetingMinutes-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].exitMeetingMinutes = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'exitMeetingMinutes', checked);
           }}
         />
       ),
@@ -780,10 +796,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`exitAttendanceList-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].exitAttendanceList = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'exitAttendanceList', checked);
           }}
         />
       ),
@@ -795,10 +808,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`auditResultLetter-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].auditResultLetter = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'auditResultLetter', checked);
           }}
         />
       ),
@@ -810,10 +820,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           id={`rta-${info.row.original.id}`}
           checked={info.getValue()}
           onChange={(checked) => {
-            const newData = [...data];
-            newData[info.row.index].rta = checked;
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'rta', checked);
           }}
         />
       ),
@@ -824,10 +831,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
         <select
           value={info.getValue()}
           onChange={e => {
-            const newData = [...data];
-            newData[info.row.index].monitoring = e.target.value as 'Adequate' | 'Inadequate' | '';
-            onDataChange(newData);
-            saveAuditData(newData[info.row.index]);
+            handleFieldChange(info.row.index, 'monitoring', e.target.value as 'Adequate' | 'Inadequate' | '');
           }}
           className="w-full border rounded px-2 py-1"
         >
@@ -845,10 +849,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
             onClick={() => {
               const comment = prompt('Enter comment:', info.getValue());
               if (comment !== null) {
-                const newData = [...data];
-                newData[info.row.index].comment = comment;
-                onDataChange(newData);
-                saveAuditData(newData[info.row.index]);
+                handleFieldChange(info.row.index, 'comment', comment);
               }
             }}
             className="text-gray-500 hover:text-gray-700"
@@ -879,7 +880,8 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           <button
             onClick={() => {
               if (info.row.original.id) {
-                deleteAuditData(info.row.original.id);
+                setDeletingId(info.row.original.id);
+                setShowDeleteConfirm(true);
               }
             }}
             className="text-red-500 hover:text-red-700"
@@ -935,6 +937,16 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           >
             <Plus className="h-4 w-4" />
             Add Branch
+          </button>
+          <button
+            onClick={handleSaveAllChanges}
+            disabled={Object.keys(pendingChanges).length === 0}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            Save All Changes {Object.keys(pendingChanges).length > 0 && `(${Object.keys(pendingChanges).length})`}
           </button>
         </div>
       </div>
@@ -1007,6 +1019,52 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           auditors={auditors}
         />
       )}
+
+      <DeleteConfirmationModal 
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeletingId(null);
+        }}
+        onConfirm={() => {
+          if (deletingId) {
+            deleteAuditData(deletingId);
+            setShowDeleteConfirm(false);
+            setDeletingId(null);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96">
+        <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
+        <p className="mb-4">Are you sure you want to delete this audit record? This action cannot be undone.</p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
