@@ -504,7 +504,7 @@ function Navbar() {
                     <div className="text-xs text-gray-600 mb-1">
                       <span className="font-semibold">Kode Risk Issue:</span> {row.kode_risk_issue}
                     </div>
-                    <div className="text-sm">{row.rekomendasi}</div>
+                    <div className="text-sm">{row.kelemahan}</div>
                   </div>
                 ))
               )}
