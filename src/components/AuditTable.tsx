@@ -227,13 +227,12 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
-  const [showEditBranchModal, setShowEditBranchModal] = useState(false);
-  const [editingData, setEditingData] = useState<AuditData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingAudit, setEditingAudit] = useState<AuditData | null>(null);
+  const [editingData, setEditingData] = useState<AuditData | null>(null);
   const [pendingChanges, setPendingChanges] = useState<{[key: string]: AuditData}>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [regionFilter, setRegionFilter] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -353,13 +352,107 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   };
 
   const EditBranchModal: React.FC<EditBranchModalProps> = ({ isOpen, onClose, onSave, data, branches, auditors }) => {
-    const [branchName, setBranchName] = useState(data.branchName);
-    const [region, setRegion] = useState(data.region);
-    const [periodStart, setPeriodStart] = useState(data.auditPeriodStart || '');
-    const [periodEnd, setPeriodEnd] = useState(data.auditPeriodEnd || '');
+    // IMPROVED date format conversion - handles more formats
+    const formatDateForInput = (dateString: string | undefined) => {
+      if (!dateString) return '';
+      
+      // Handle common date formats
+      try {
+        // First try direct parsing (if already in YYYY-MM format)
+        if (/^\d{4}-\d{2}$/.test(dateString)) {
+          return dateString;
+        }
+        
+        // Try parsing as full ISO date
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          return `${year}-${month}`;
+        }
+        
+        // Try parsing MM/YYYY or MM-YYYY formats
+        const parts = dateString.split(/[\/\-\,\s]+/);
+        if (parts.length >= 2) {
+          // Try to identify which part is month vs year
+          const possibleYear = parts.find(p => p.length === 4 && !isNaN(Number(p)));
+          if (possibleYear) {
+            // Find a part that looks like a month (1-12)
+            const monthPart = parts.find(p => {
+              const num = parseInt(p);
+              return !isNaN(num) && num >= 1 && num <= 12;
+            });
+            
+            if (monthPart) {
+              const month = String(parseInt(monthPart)).padStart(2, '0');
+              return `${possibleYear}-${month}`;
+            }
+          }
+        }
+        
+        // If all else fails, log and return empty
+        console.log("Unparseable date format:", dateString);
+        return '';
+      } catch (error) {
+        console.error("Error formatting date for input:", dateString, error);
+        return '';
+      }
+    };
+
+    // Add logging to help diagnose
+    console.log("Initial date values:", {
+      start: data.auditPeriodStart,
+      end: data.auditPeriodEnd
+    });
+    
+    // Initialize state ONCE when the modal opens
+    const [branchName, setBranchName] = useState(data.branchName || '');
+    const [region, setRegion] = useState(data.region || '');
+    const [periodStart, setPeriodStart] = useState(() => formatDateForInput(data.auditPeriodStart));
+    const [periodEnd, setPeriodEnd] = useState(() => formatDateForInput(data.auditPeriodEnd));
     const [selectedPICs, setSelectedPICs] = useState<string[]>(data.pic ? data.pic.split(', ') : []);
     
+    // Track if this is the first render of the modal
+    const [isInitialized, setIsInitialized] = useState(false);
+    
+    // Only update state when data.id changes (a different record)
+    // or when modal first opens - prevents unwanted resets
+    useEffect(() => {
+      if (isOpen && (!isInitialized || data.id)) {
+        console.log("Initializing modal fields", data.id);
+        setBranchName(data.branchName || '');
+        setRegion(data.region || '');
+        
+        const formattedStart = formatDateForInput(data.auditPeriodStart);
+        const formattedEnd = formatDateForInput(data.auditPeriodEnd);
+        
+        console.log("Setting date values:", formattedStart, formattedEnd);
+        
+        setPeriodStart(formattedStart);
+        setPeriodEnd(formattedEnd);
+        setSelectedPICs(data.pic ? data.pic.split(', ') : []);
+        setIsInitialized(true);
+      }
+    }, [data.id, isOpen]); // Only depend on record ID and modal state
+    
+    // Reset initialization when modal closes
+    useEffect(() => {
+      if (!isOpen) {
+        setIsInitialized(false);
+      }
+    }, [isOpen]);
+    
     if (!isOpen) return null;
+    
+    // Log current state values to help debug
+    console.log("Current state values:", {
+      periodStart,
+      periodEnd,
+      formatted: {
+        start: formatDateForInput(data.auditPeriodStart),
+        end: formatDateForInput(data.auditPeriodEnd),
+      }
+    });
     
     const handlePICChange = (auditorName: string) => {
       setSelectedPICs(prev => {
@@ -372,17 +465,22 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     };
     
     const handleSave = () => {
+      console.log("Saving values:", {
+        periodStart,
+        periodEnd
+      });
+      
       const updatedData: AuditData = {
         ...data,
         branchName,
         region,
-        auditPeriodStart: periodStart,
+        auditPeriodStart: periodStart, 
         auditPeriodEnd: periodEnd,
         pic: selectedPICs.join(', ')
       };
       
       onSave(updatedData);
-      onClose();
+      // Don't reset any values here - let onClose handle it
     };
     
     return (
@@ -415,7 +513,10 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
               <input
                 type="month"
                 value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
+                onChange={(e) => {
+                  console.log("Period start changed:", e.target.value);
+                  setPeriodStart(e.target.value);
+                }}
                 className="w-full p-2 border rounded"
               />
             </div>
@@ -425,7 +526,10 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
               <input
                 type="month"
                 value={periodEnd}
-                onChange={(e) => setPeriodEnd(e.target.value)}
+                onChange={(e) => {
+                  console.log("Period end changed:", e.target.value);
+                  setPeriodEnd(e.target.value);
+                }}
                 className="w-full p-2 border rounded"
               />
             </div>
@@ -564,13 +668,8 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     }
   };
 
-  const handleEditBranch = (data: AuditData) => {
+  const handleEdit = (data: AuditData) => {
     setEditingData(data);
-    setShowEditBranchModal(true);
-  };
-
-  const handleEdit = (audit: AuditData) => {
-    setEditingAudit(audit);
     setShowEditModal(true);
   };
 
@@ -578,7 +677,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
     try {
       await saveAuditData(updatedData);
       setShowEditModal(false);
-      setEditingAudit(null);
+      setEditingData(null);
     } catch (error) {
       console.error('Error updating audit:', error);
       toast.error('Failed to update audit');
@@ -621,6 +720,19 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       }));
     }
   };
+
+  const uniqueRegions = React.useMemo(() => {
+    // Extract unique regions and sort them alphabetically
+    const regions = Array.from(new Set(data.map(item => item.region)))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    return regions;
+  }, [data]);
+
+  const filteredData = React.useMemo(() => {
+    if (!regionFilter) return data;
+    return data.filter(item => item.region === regionFilter);
+  }, [data, regionFilter]);
 
   const columns = [
     columnHelper.accessor('regNo', {
@@ -869,7 +981,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       cell: info => (
         <div className="flex gap-2">
           <button
-            onClick={() => handleEditBranch(info.row.original)}
+            onClick={() => handleEdit(info.row.original)}
             className="text-blue-500 hover:text-blue-700"
             title="Edit row"
           >
@@ -897,7 +1009,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   ];
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -913,27 +1025,45 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div className="relative mt-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <input
-            type="text"
-            value={globalFilter}
-            onChange={e => setGlobalFilter(e.target.value)}
-            placeholder="Search..."
-            className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={globalFilter}
+              onChange={e => setGlobalFilter(e.target.value)}
+              placeholder="Search..."
+              className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          
+          {/* Region filter moved here */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Region:</label>
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className="border rounded px-2 py-1.5 min-w-[120px]"
+            >
+              <option value="">All Regions</option>
+              {uniqueRegions.map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+          </div>
         </div>
+        
         <div className="flex gap-2">
           <button
             onClick={handleDownload}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-green-700"
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
           >
             <Download className="h-4 w-4" />
             Download Report
           </button>
           <button
             onClick={() => setShowAddBranchModal(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-indigo-700"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4" />
             Add Branch
@@ -941,7 +1071,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           <button
             onClick={handleSaveAllChanges}
             disabled={Object.keys(pendingChanges).length === 0}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 mt-3 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -1004,17 +1134,15 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
         auditors={auditors}
       />
 
-      {(editingData || editingAudit) && (
-        <EditBranchModal
-          isOpen={showEditBranchModal || showEditModal}
+      {showEditModal && editingData && (
+        <IsolatedEditModal
+          isOpen={showEditModal}
           onClose={() => {
-            setShowEditBranchModal(false);
             setShowEditModal(false);
             setEditingData(null);
-            setEditingAudit(null);
           }}
-          onSave={saveAuditData}
-          data={editingData || editingAudit!}
+          onSave={handleSaveEdit}
+          data={editingData}
           branches={branches}
           auditors={auditors}
         />
@@ -1062,6 +1190,142 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: {
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Add this component outside the AuditTable component
+const IsolatedEditModal: React.FC<EditBranchModalProps> = (props) => {
+  const { isOpen, onClose, onSave, data: initialData, branches, auditors } = props;
+
+  // Helper untuk format tanggal
+  const formatDateForInput = (dateString: string | undefined | null) => {
+    if (!dateString) return '';
+    if (/^\d{4}-\d{2}$/.test(dateString)) return dateString;
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return '';
+  };
+
+  // State per field
+  const [branchName, setBranchName] = React.useState('');
+  const [region, setRegion] = React.useState('');
+  const [periodStart, setPeriodStart] = React.useState('');
+  const [periodEnd, setPeriodEnd] = React.useState('');
+  const [selectedPICs, setSelectedPICs] = React.useState<string[]>([]);
+
+  // Inisialisasi hanya saat modal dibuka ATAU initialData.id berubah
+  React.useEffect(() => {
+    if (isOpen && initialData) {
+      setBranchName(initialData.branchName || '');
+      setRegion(initialData.region || '');
+      setPeriodStart(formatDateForInput(initialData.auditPeriodStart));
+      setPeriodEnd(formatDateForInput(initialData.auditPeriodEnd));
+      setSelectedPICs(initialData.pic ? initialData.pic.split(', ') : []);
+    }
+    // eslint-disable-next-line
+  }, [isOpen, initialData?.id]);
+
+  const handlePICChange = (auditorName: string) => {
+    setSelectedPICs(prev =>
+      prev.includes(auditorName)
+        ? prev.filter(name => name !== auditorName)
+        : [...prev, auditorName]
+    );
+  };
+
+  const handleSave = () => {
+    const updatedData = {
+      ...initialData,
+      branchName,
+      region,
+      auditPeriodStart: periodStart,
+      auditPeriodEnd: periodEnd,
+      pic: selectedPICs.join(', ')
+    };
+    onSave(updatedData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96">
+        <h2 className="text-xl font-semibold mb-4">Edit Branch</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name</label>
+            <input
+              type="text"
+              value={branchName}
+              onChange={e => setBranchName(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+            <input
+              type="text"
+              value={region}
+              onChange={e => setRegion(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Audit Period Start</label>
+            <input
+              type="month"
+              value={periodStart}
+              onChange={e => setPeriodStart(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Audit Period End</label>
+            <input
+              type="month"
+              value={periodEnd}
+              onChange={e => setPeriodEnd(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">PIC (Select Auditors)</label>
+            <div className="max-h-40 overflow-y-auto border rounded p-2">
+              {auditors.map((auditor) => (
+                <div key={auditor.id} className="flex items-center mb-1">
+                  <input
+                    type="checkbox"
+                    id={`edit-auditor-${auditor.id}`}
+                    checked={selectedPICs.includes(auditor.name)}
+                    onChange={() => handlePICChange(auditor.name)}
+                    className="mr-2"
+                  />
+                  <label htmlFor={`edit-auditor-${auditor.id}`}>
+                    {auditor.name} ({auditor.auditor_id})
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          >
+            Save
           </button>
         </div>
       </div>

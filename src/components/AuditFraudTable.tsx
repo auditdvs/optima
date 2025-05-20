@@ -1,5 +1,6 @@
 import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, SortingState, useReactTable } from '@tanstack/react-table';
 import { saveAs } from 'file-saver';
+import { debounce } from 'lodash';
 import { AlertTriangle, Download, Edit2, Plus, Save, Search, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -206,7 +207,11 @@ export const AuditFraudTable: React.FC = () => {
   const [changedItems, setChangedItems] = useState<ChangedItems>({});
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
+  
+  // Add this missing state variable
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editingReviewValue, setEditingReviewValue] = useState<string>(''); // Tambahkan baris ini
+  
   // Add these new states to your component
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [auditToDelete, setAuditToDelete] = useState<AuditFraudData | null>(null);
@@ -214,6 +219,14 @@ export const AuditFraudTable: React.FC = () => {
   // Add this to your component state declarations
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  
+  // Also add the debounced update review function
+  const debouncedUpdateReview = React.useCallback(
+    debounce((id: string, value: string) => {
+      updateLocalAuditData(id, 'review', value);
+    }, 300),
+    []
+  );
 
   useEffect(() => {
     fetchAuditData();
@@ -224,6 +237,26 @@ export const AuditFraudTable: React.FC = () => {
   useEffect(() => {
     setHasChanges(Object.keys(changedItems).length > 0);
   }, [changedItems]);
+
+  useEffect(() => {
+    // Hapus rtl dari semua textarea di halaman ini
+    const fixTextareas = () => {
+      const textareas = document.querySelectorAll('textarea');
+      textareas.forEach(textarea => {
+        textarea.style.direction = 'ltr';
+        textarea.style.textAlign = 'left';
+      });
+    };
+    
+    // Jalankan setiap kali textarea dibuat/diupdate
+    fixTextareas();
+    
+    // Observer untuk mendeteksi perubahan DOM
+    const observer = new MutationObserver(fixTextareas);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const fetchAuditData = async () => {
     setLoading(true);
@@ -357,7 +390,8 @@ export const AuditFraudTable: React.FC = () => {
             assignment_letter: false,
             audit_working_papers: false,
             audit_report: false,
-            detailed_findings: false
+            detailed_findings: false,
+            review: '' // Add an empty string for review
           }]);
   
         if (error) throw error;
@@ -405,7 +439,7 @@ export const AuditFraudTable: React.FC = () => {
         'Audit Working Papers': item.audit_working_papers ? 'Yes' : 'No',
         'Audit Report': item.audit_report ? 'Yes' : 'No',
         'Detailed Findings': item.detailed_findings ? 'Yes' : 'No',
-        'Review': item.review || '',
+        'Review': item.review || '', // Make sure this is included
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
@@ -512,6 +546,47 @@ export const AuditFraudTable: React.FC = () => {
         />
       ),
     }),
+    columnHelper.accessor('review', {
+      header: 'Review',
+      cell: info => {
+        const rowId = info.row.original.id || '';
+        const currentValue = info.getValue() || '';
+        const isEditing = editingReviewId === rowId;
+
+        return (
+          <div className="max-w-xs">
+            {isEditing ? (
+              <input
+                type="text"
+                dir="ltr"
+                autoFocus
+                value={editingReviewValue}
+                onChange={e => setEditingReviewValue(e.target.value)}
+                onBlur={() => {
+                  debouncedUpdateReview(rowId, editingReviewValue);
+                  setEditingReviewId(null);
+                }}
+                className="w-full p-2 border rounded-md text-sm review-input-field"
+                placeholder="Add review notes..."
+                style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
+              />
+            ) : (
+              <div
+                dir="ltr"
+                onClick={() => {
+                  setEditingReviewId(rowId);
+                  setEditingReviewValue(currentValue);
+                }}
+                className="p-2 border border-transparent hover:border-gray-300 rounded-md cursor-text min-h-[40px]"
+                style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
+              >
+                {currentValue || <span className="text-gray-400">Add review notes...</span>}
+              </div>
+            )}
+          </div>
+        );
+      },
+    }),
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
@@ -551,6 +626,8 @@ export const AuditFraudTable: React.FC = () => {
           item.detailed_findings))
     : auditData;
 
+  // Update your React Table configuration to use virtualization for large datasets
+
   const table = useReactTable({
     data: filteredAuditData,
     columns,
@@ -563,7 +640,50 @@ export const AuditFraudTable: React.FC = () => {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    // Add these options for better performance:
+    enableColumnResizing: false,
+    debugTable: false, // Turn off debug in production
+    // To completely separate input state from table state:
+    autoResetPageIndex: false,
+    // Add this for improved rendering
+    getRowId: (row) => row.id?.toString() || Math.random().toString(),
   });
+
+  useEffect(() => {
+    // Log untuk debugging
+    console.log('HTML dir:', document.documentElement.dir);
+    console.log('Body dir:', document.body.dir);
+    
+    // Force LTR pada level DOM
+    document.documentElement.dir = 'ltr';
+    document.body.dir = 'ltr';
+    
+    // Cari semua elemen yang sudah ada dan terapkan LTR
+    const fixAllElements = () => {
+      const elements = document.querySelectorAll('.review-input-field');
+      elements.forEach(el => {
+        el.setAttribute('dir', 'ltr');
+        (el as HTMLElement).style.direction = 'ltr';
+        (el as HTMLElement).style.textAlign = 'left';
+      });
+    };
+    
+    fixAllElements();
+    
+    // Observer yang lebih spesifik - hanya memantau elemen tabel
+    const tableElement = document.querySelector('table');
+    if (tableElement) {
+      const observer = new MutationObserver(fixAllElements);
+      observer.observe(tableElement, { 
+        childList: true, 
+        subtree: true,
+        attributes: false, // Tidak perlu memantau perubahan atribut
+        characterData: false // Tidak perlu memantau perubahan teks
+      });
+      
+      return () => observer.disconnect();
+    }
+  }, []);
 
   if (loading) {
     return <LoadingAnimation />;
@@ -666,6 +786,13 @@ export const AuditFraudTable: React.FC = () => {
                   <td
                     key={cell.id}
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                    dir={cell.column.id === 'review' ? 'ltr' : undefined}
+                    data-column={cell.column.id}
+                    style={cell.column.id === 'review' ? { 
+                      direction: 'ltr', 
+                      textAlign: 'left', 
+                      unicodeBidi: 'isolate' 
+                    } : {}}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
@@ -708,3 +835,28 @@ export const AuditFraudTable: React.FC = () => {
     </div>
   );
 };
+
+// Create a separate memoized component for the review input
+
+const MemoizedReviewInput = React.memo(({ 
+  value, 
+  onChange, 
+  rowId 
+}: { 
+  value: string, 
+  onChange: (id: string, value: string) => void,
+  rowId: string
+}) => {
+  return (
+    <input
+      type="text"
+      defaultValue={value || ''}
+      onChange={(e) => onChange(rowId, e.target.value)}
+      className="w-full p-2 border rounded-md text-sm"
+      placeholder="Add review notes..."
+    />
+  );
+});
+
+console.log(document.documentElement.dir); // Periksa html tag
+console.log(document.body.dir); // Periksa body tag

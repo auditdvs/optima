@@ -98,6 +98,10 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
   }
+  .review-textarea, .review-input-field {
+  direction: ltr !important;
+  text-align: left !important;
+}
 
 }
  
@@ -113,4 +117,27 @@
 
   }
 
+}
+
+/* Tambahkan di bawah kode yang sudah ada, di luar @layer base */
+
+/* Override khusus untuk semua elemen input di aplikasi */
+input, textarea, [contenteditable="true"], .review-textarea, .review-input-field {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Khusus untuk elemen td dengan class review */
+td[data-column="review"], 
+td[data-column-id="review"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Khusus untuk reparasi Toastify RTL issue */
+.Toastify, .Toastify__toast-container, .Toastify__toast {
+  direction: ltr !important;
+  text-align: left !important;
 }
