@@ -233,6 +233,7 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState<string>('');
+  const [commentPopup, setCommentPopup] = useState<{rowIndex: number, value: string} | null>(null);
 
   useEffect(() => {
     fetchBranches();
@@ -958,18 +959,13 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       cell: info => (
         <div className="relative">
           <button
-            onClick={() => {
-              const comment = prompt('Enter comment:', info.getValue());
-              if (comment !== null) {
-                handleFieldChange(info.row.index, 'comment', comment);
-              }
-            }}
+            onClick={() => setCommentPopup({ rowIndex: info.row.index, value: info.getValue() || '' })}
             className="text-gray-500 hover:text-gray-700"
           >
             <MessageSquare className="h-4 w-4" />
           </button>
           {info.getValue() && (
-            <div className="absolute bottom-full mb-2 left-0 bg-white p-2 rounded shadow-lg border text-sm">
+            <div className="absolute bottom-full mb-2 left-0 bg-white p-2 rounded shadow-lg border text-sm z-10">
               {info.getValue()}
             </div>
           )}
@@ -1162,6 +1158,16 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
           }
         }}
       />
+
+      {commentPopup && (
+        <CommentPopup
+          initial={commentPopup.value}
+          onSave={val => {
+            handleFieldChange(commentPopup.rowIndex, 'comment', val);
+          }}
+          onClose={() => setCommentPopup(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1329,6 +1335,74 @@ const IsolatedEditModal: React.FC<EditBranchModalProps> = (props) => {
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Tambahkan di atas AuditTable
+const CommentPopup: React.FC<{
+  initial: string;
+  onSave: (val: string) => void;
+  onClose: () => void;
+}> = ({ initial, onSave, onClose }) => {
+  const [val, setVal] = useState(initial);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-4 w-80 shadow-lg">
+        <div className="mb-2 font-semibold">Edit Comment</div>
+        <textarea
+          className="w-full border rounded px-2 py-1 mb-3 focus:ring-2 focus:ring-indigo-500"
+          value={val}
+          autoFocus
+          rows={3}
+          onChange={e => setVal(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onSave(val); onClose(); }}
+            className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CommentCell: React.FC<{
+  value: string;
+  onSave: (val: string) => void;
+}> = ({ value, onSave }) => {
+  const [show, setShow] = React.useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShow(true)}
+        className="text-gray-500 hover:text-gray-700"
+      >
+        <MessageSquare className="h-4 w-4" />
+      </button>
+      {value && (
+        <div className="absolute bottom-full mb-2 left-0 bg-white p-2 rounded shadow-lg border text-sm z-10">
+          {value}
+        </div>
+      )}
+      {show && (
+        <CommentPopup
+          initial={value || ''}
+          onSave={onSave}
+          onClose={() => setShow(false)}
+        />
+      )}
     </div>
   );
 };
