@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AddUser from './pages/AddUser';
@@ -99,7 +100,7 @@ function App() {
                   <AddUser />
                 </PrivateRoute>
               } />
-                <Route path="notification-history" element={
+              <Route path="notification-history" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
                   <NotificationHistory />
                 </PrivateRoute>
@@ -107,6 +108,15 @@ function App() {
             </Route>
           </Routes>
           <ToastContainer position="top-right" autoClose={5000} />
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              style: {
+                direction: 'ltr',
+                textAlign: 'left',
+              },
+            }}
+          />
         </Router>
       </AuthProvider>
     </QueryClientProvider>
