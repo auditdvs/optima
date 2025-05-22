@@ -287,7 +287,7 @@ const Dashboard = () => {
       />
 
       {/* Main Content - Stack on mobile, 2 columns on larger screens */}
-      <div className="grid grid-cols-1 lg:grid-cols-[0.7fr_1.4fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[0.5fr_1.1fr] gap-4">
         {/* Branch Locations */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
@@ -342,7 +342,7 @@ const Dashboard = () => {
 
               {/* Bar Chart */}
               <Card>
-                <CardContent className="pb-2">
+                <CardContent className="pt-10 pb-2">
                   <ChartContainer config={barChartConfig}>
                     <BarChart data={monthlyData}>
                       <CartesianGrid vertical={false} />
