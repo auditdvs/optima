@@ -1,17 +1,18 @@
 import { Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Pie, PieChart,  XAxis, Bar, BarChart, CartesianGrid } from 'recharts';
+import React, { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis } from 'recharts';
+import { BranchLocationTable, BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
+import { FraudRow } from "../components/dashboard/TopFraudTable";
 import { Card, CardContent } from '../components/ui/card';
-import { supabase } from '../lib/supabaseClient';
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "../components/ui/chart";
-import { TopFraudTable, FraudRow } from "../components/dashboard/TopFraudTable";
-import { BranchLocationTable, BranchRow } from "../components/dashboard/BranchLocationTable";
+import PasswordModal from '../components/ui/PasswordModal';
+import { supabase } from '../lib/supabaseClient';
 
 interface WorkPaper {
   id: string;
@@ -77,7 +78,11 @@ const Dashboard = () => {
     annualAudits: number;
   }>>([]);
   const [fraudAuditCount, setFraudAuditCount] = useState(0);
-
+  const [isFraudAmountCensored, setIsFraudAmountCensored] = useState(true);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  
   const fetchData = async () => {
     try {
       const { data: branchesData, error: branchesError } = await supabase
@@ -120,6 +125,18 @@ const Dashboard = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Add function to handle password verification
+  const handleUncensorFraud = () => {
+    if (passwordInput === 'optima') {
+      setIsFraudAmountCensored(false);
+      setPasswordError(false);
+      setIsPasswordModalOpen(false);
+    } else {
+      setPasswordError(true);
+    }
+    setPasswordInput('');
+  };
 
   // Calculate statistics
   const regularAuditedBranches = new Set(
@@ -213,15 +230,64 @@ const Dashboard = () => {
     "Fraud Audits": { label: "Fraud Audits", color: "#e74c3c" },
   } satisfies ChartConfig;
 
+  // Add this function to process region audit data
+  const getRegionAuditData = () => {
+    const regionData: Record<string, { regular: number, fraud: number }> = {};
+    
+    // Count regular and fraud audits per region
+    workPapers.forEach(wp => {
+      // Find the branch to get its region
+      const branch = branches.find(b => b.name === wp.branch_name);
+      if (!branch) return;
+      
+      const region = branch.region;
+      
+      // Initialize region data if not exists
+      if (!regionData[region]) {
+        regionData[region] = { regular: 0, fraud: 0 };
+      }
+      
+      // Increment the appropriate counter
+      if (wp.audit_type === 'regular') {
+        regionData[region].regular++;
+      } else if (wp.audit_type === 'fraud') {
+        regionData[region].fraud++;
+      }
+    });
+    
+    // Convert to array and sort alphabetically by region name
+    return Object.entries(regionData)
+      .map(([region, counts]) => ({ region, ...counts }))
+      .sort((a, b) => a.region.localeCompare(b.region));
+  };
+
    return (
     <div className="space-y-2 p-0">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard Summary Audits Branches</h1>
       
-      {/* Ganti bagian stats cards dengan DashboardStats */}
-      <DashboardStats stats={stats} />
+      {/* Pass the censored state and functions to DashboardStats */}
+      <DashboardStats 
+        stats={stats} 
+        isFraudAmountCensored={isFraudAmountCensored}
+        onFraudSectionClick={() => setIsPasswordModalOpen(true)}
+      />
+      
+      {/* Password Modal */}
+      <PasswordModal 
+        isOpen={isPasswordModalOpen}
+        onClose={() => {
+          setIsPasswordModalOpen(false);
+          setPasswordError(false);
+          setPasswordInput('');
+        }}
+        onSubmit={handleUncensorFraud}
+        passwordInput={passwordInput}
+        setPasswordInput={setPasswordInput}
+        passwordError={passwordError}
+      />
 
       {/* Main Content - 2 columns */}
-      <div className="grid grid-cols-11 lg:grid-cols-[0.8fr_1.2fr] gap-1">
+      <div className="grid grid-cols-11 lg:grid-cols-[0.7fr_1.4fr] gap-1">
         {/* Left Column - Branch Locations */}
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
@@ -238,7 +304,7 @@ const Dashboard = () => {
                 />
               </div>
             </div>
-            <div className="max-h-[600px] overflow-y-auto">
+            <div className="max-h-[520px] overflow-y-auto">
               <BranchLocationTable data={branchTableData} />
             </div>
           </CardContent>
@@ -300,8 +366,83 @@ const Dashboard = () => {
 
             {/* Fraud Cases Table */}
             <div className="mt-2">
-              <h3 className="text-sm font-semibold mb-2">Top 5 Fraud Branches</h3>
-              <TopFraudTable data={topFraudTableData} />
+              <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
+              <div className="overflow-auto max-h-[200px] border rounded">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-white shadow-sm">
+                    <tr className="text-gray-500 border-b">
+                      {/* First group of columns */}
+                      <th className="text-left py-1 px-2 font-medium">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      {/* Second group of columns */}
+                      <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      {/* Third group of columns */}
+                      <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      {/* Fourth group of columns */}
+                      <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      {/* Fifth group of columns */}
+                      <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const regionData = getRegionAuditData();
+                      const rows = [];
+                      const regionsPerRow = 5; // Changed from 3 to 5
+                      
+                      // Create rows based on the total number of regions
+                      for (let i = 0; i < Math.ceil(regionData.length / regionsPerRow); i++) {
+                        rows.push(
+                          <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                            {/* Map each group of 5 regions */}
+                            {[0, 1, 2, 3, 4].map(colIndex => { // Changed from [0, 1, 2] to [0, 1, 2, 3, 4]
+                              const dataIndex = i * regionsPerRow + colIndex;
+                              const item = regionData[dataIndex];
+                              
+                              if (!item) {
+                                // Return empty cells if no data
+                                return (
+                                  <React.Fragment key={colIndex}>
+                                    <td className="py-1 px-2 font-medium"></td>
+                                    <td className="text-right py-1 px-2"></td>
+                                    <td className="text-right py-1 px-2"></td>
+                                  </React.Fragment>
+                                );
+                              }
+                              
+                              // Return cells with data
+                              return (
+                                <React.Fragment key={colIndex}>
+                                  <td className={`py-1 px-2 font-medium ${colIndex > 0 ? 'border-l' : ''}`}>
+                                    {item.region}
+                                  </td>
+                                  <td className="text-right py-1 px-2">
+                                    <span className="text-green-600">{item.regular}</span>
+                                  </td>
+                                  <td className="text-right py-1 px-2">
+                                    <span className="text-red-600">{item.fraud}</span>
+                                  </td>
+                                </React.Fragment>
+                              );
+                            })}
+                          </tr>
+                        );
+                      }
+                      
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </CardContent>
         </Card>
