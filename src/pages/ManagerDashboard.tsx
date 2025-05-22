@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { saveAs } from 'file-saver';
+import html2canvas from 'html2canvas';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Clock, Download, Pencil, Search, TrendingUp, Users, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
@@ -159,6 +160,24 @@ interface SortConfig {
   direction: SortOrder;
 }
 
+// Add this interface with your other interfaces
+interface AuditorAuditCount {
+  auditor_id: string;
+  name: string;
+  regular_count: number;
+  fraud_count: number;
+}
+
+// Add this interface with your other interfaces
+interface FraudDetailByRegion {
+  region: string;
+  totalFraudAmount: number;
+  totalRecoveryAmount: number; // Add this line
+  totalRegularAudit: number;
+  totalSpecialAudit: number;
+  totalFraudStaff: number;
+}
+
 const ManagerDashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalBranches: 0,
@@ -189,11 +208,26 @@ const ManagerDashboard = () => {
   const [hkpAmountInput, setHkpAmountInput] = useState<number>(0);
   const [fromSalaryChecked, setFromSalaryChecked] = useState<boolean>(false);
 
+  // Add this state
+  const [auditorAuditCounts, setAuditorAuditCounts] = useState<AuditorAuditCount[]>([]);
+  const [isAuditorAuditCountOpen, setIsAuditorAuditCountOpen] = useState(false);
+
+  // Add this new state variable with your other state variables
+  const [auditorSearchTerm, setAuditorSearchTerm] = useState('');
+
+  // Add this state variable
+  const [fraudDetailsByRegion, setFraudDetailsByRegion] = useState<FraudDetailByRegion[]>([]);
+
+  // Add this state variable with your other state variables
+  const [activeFraudTab, setActiveFraudTab] = useState<'data' | 'region'>('data');
+
+  // Add this state at the top of your component with other state variables
+  const [activeSection, setActiveSection] = useState<'main' | 'auditorCounts' | 'auditSummary' | 'fraudData'>('main');
+
   useEffect(() => {
     const initializeDashboard = async () => {
       const hasAccess = await checkUserAccess(supabase);
       if (!hasAccess) {
-        // Handle unauthorized access (e.g., redirect to login or show error)
         console.error('Unauthorized access to manager dashboard');
         return;
       }
@@ -202,6 +236,8 @@ const ManagerDashboard = () => {
       fetchAuditRecapData();
       fetchAuditors();
       fetchFraudCases();
+      fetchAuditorAuditCounts();
+      fetchFraudDetailsByRegion(); // Add this line
     };
 
     initializeDashboard();
@@ -425,6 +461,108 @@ const ManagerDashboard = () => {
     }
   };
 
+  // Add this function with your other fetch functions (after fetchPaymentHistory)
+  const fetchFraudDetailsByRegion = async () => {
+    try {
+      // 1. Get all branches with their regions
+      const { data: branchesData, error: branchesError } = await supabase
+        .from('branches')
+        .select('name, region');
+      
+      if (branchesError) throw branchesError;
+      
+      // Create a lookup map for regions by branch name
+      const branchRegionMap = {};
+      branchesData?.forEach(branch => {
+        branchRegionMap[branch.name] = branch.region;
+      });
+      
+      // Get unique regions
+      const regions = [...new Set(branchesData?.map(branch => branch.region))];
+      
+      // 2. Fetch work_papers data with fraud_payments_audits information
+      const { data: workPapersData, error: workPapersError } = await supabase
+        .from('work_papers')
+        .select(`
+          branch_name, 
+          fraud_amount, 
+          audit_type, 
+          fraud_staff,
+          fraud_payments_audits (
+            hkp_amount,
+            from_salary
+          )
+        `);
+      
+      if (workPapersError) throw workPapersError;
+      
+      // 3. Fetch regular audits
+      const { data: regularAuditData, error: regularAuditError } = await supabase
+        .from('audit_regular')
+        .select('branch_name');
+      
+      if (regularAuditError) throw regularAuditError;
+      
+      // Process data by region
+      const fraudDetailsByRegion = regions.map(region => {
+        // Filter work papers for this region with audit_type='fraud'
+        const regionFraudWorkPapers = workPapersData?.filter(wp => 
+          branchRegionMap[wp.branch_name] === region && 
+          wp.audit_type === 'fraud'
+        ) || [];
+        
+        // Calculate total fraud amount for this region
+        const fraudAmount = regionFraudWorkPapers
+          .reduce((sum, wp) => sum + (wp.fraud_amount || 0), 0);
+        
+        // Calculate total recovery amount for this region
+        const recoveryAmount = regionFraudWorkPapers
+          .reduce((sum, wp) => {
+            const hkpAmount = wp.fraud_payments_audits?.[0]?.hkp_amount || 0;
+            // If payment is from salary, count the full fraud amount as recovered
+            const fromSalary = wp.fraud_payments_audits?.[0]?.from_salary || false;
+            return sum + (fromSalary ? wp.fraud_amount || 0 : hkpAmount);
+          }, 0);
+        
+        // Count regular audits for this region
+        const regularAuditCount = regularAuditData
+          ?.filter(audit => branchRegionMap[audit.branch_name] === region)
+          .length || 0;
+        
+        // Count special audits for this region - Using work_papers where audit_type='fraud'
+        const specialAuditCount = regionFraudWorkPapers.length;
+        
+        // Count fraud staff cases for this region
+        const fraudStaffSet = new Set();
+        regionFraudWorkPapers
+          .filter(wp => wp.fraud_staff && wp.fraud_staff.trim() !== '')
+          .forEach(wp => {
+            // Count unique fraud staff names
+            fraudStaffSet.add(wp.fraud_staff.trim().toLowerCase());
+          });
+        
+        return {
+          region,
+          totalFraudAmount: fraudAmount,
+          totalRecoveryAmount: recoveryAmount, // Add recovery amount
+          totalRegularAudit: regularAuditCount,
+          totalSpecialAudit: specialAuditCount,
+          totalFraudStaff: fraudStaffSet.size
+        };
+      });
+      
+      // Sort by region name and filter out empty regions
+      const sortedFraudDetails = fraudDetailsByRegion
+        .filter(detail => detail.totalFraudAmount > 0 || detail.totalRegularAudit > 0 || 
+                 detail.totalSpecialAudit > 0 || detail.totalFraudStaff > 0)
+        .sort((a, b) => a.region.localeCompare(b.region));
+      
+      setFraudDetailsByRegion(sortedFraudDetails);
+    } catch (error) {
+      console.error('Error fetching fraud details by region:', error);
+    }
+  };
+
   const processAuditTrends = (workPapers: any[]) => {
     // Initialize monthly audits counter
     const monthlyAudits: { [key: string]: { regular: number; fraud: number } } = {};
@@ -529,6 +667,84 @@ const ManagerDashboard = () => {
       saveAs(dataBlob, fileName);
     } catch (error) {
       console.error('Error downloading auditors list:', error);
+    }
+  };
+
+  // Add this function in the ManagerDashboard component
+  const handleDownloadAllReports = () => {
+    try {
+      const workbook = XLSX.utils.book_new();
+      
+      // 1. List of Auditors sheet
+      const auditorsWorksheet = XLSX.utils.json_to_sheet(auditors);
+      XLSX.utils.book_append_sheet(workbook, auditorsWorksheet, 'List of Auditors');
+      
+      // 2. Audit Trends sheet
+      const trendsWorksheet = XLSX.utils.json_to_sheet(auditTrends);
+      XLSX.utils.book_append_sheet(workbook, trendsWorksheet, 'Audit Trends');
+      
+      // 3. Audit Counts Per Auditor sheet
+      const auditorCountsWorksheet = XLSX.utils.json_to_sheet(auditorAuditCounts);
+      XLSX.utils.book_append_sheet(workbook, auditorCountsWorksheet, 'Audit Counts Per Auditor');
+      
+      // 4. Regular Audits sheet
+      const regularAuditsForExport = regularAudits.map(audit => {
+        const formattedAudit = { ...audit };
+        // Add a new field with a list of failed checks using aliases
+        formattedAudit['failed_checks'] = Object.entries(audit)
+          .filter(([key, value]) => 
+            typeof value === 'boolean' && 
+            !value && 
+            regularAuditAliases[key]
+          )
+          .map(([key]) => regularAuditAliases[key])
+          .join(', ');
+        
+        return formattedAudit;
+      });
+      const regularWorksheet = XLSX.utils.json_to_sheet(regularAuditsForExport);
+      XLSX.utils.book_append_sheet(workbook, regularWorksheet, 'Regular Audits');
+      
+      // 5. Fraud Audits sheet
+      const fraudAuditsForExport = fraudAudits.map(audit => {
+        const formattedAudit = { ...audit };
+        // Add a new field with a list of failed checks using aliases
+        formattedAudit['failed_checks'] = Object.entries(audit)
+          .filter(([key, value]) => 
+            typeof value === 'boolean' && 
+            !value && 
+            fraudAuditAliases[key]
+          )
+          .map(([key]) => fraudAuditAliases[key])
+          .join(', ');
+        
+        return formattedAudit;
+      });
+      const fraudAuditWorksheet = XLSX.utils.json_to_sheet(fraudAuditsForExport);
+      XLSX.utils.book_append_sheet(workbook, fraudAuditWorksheet, 'Fraud Audits');
+      
+      // 6. Fraud Data sheet
+      const fraudDataForExport = fraudCases.map(fraud => ({
+        branch_name: fraud.branch_name,
+        region: fraud.region,
+        fraud_staff: fraud.fraud_staff,
+        fraud_amount: fraud.fraud_amount,
+        hkp_amount: fraud.fraud_payments_audits?.[0]?.hkp_amount || 0,
+        payment_date: fraud.fraud_payments_audits?.[0]?.payment_date || '',
+        from_salary: fraud.fraud_payments_audits?.[0]?.from_salary ? 'Yes' : 'No',
+        notes: fraud.fraud_payments_audits?.[0]?.notes || '',
+        payment_status: isPaymentComplete(fraud) ? 'Complete' : 'Incomplete'
+      }));
+      const fraudDataWorksheet = XLSX.utils.json_to_sheet(fraudDataForExport);
+      XLSX.utils.book_append_sheet(workbook, fraudDataWorksheet, 'Fraud Data');
+      
+      // Generate and download the Excel file
+      const fileName = `manager_dashboard_all_reports_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(dataBlob, fileName);
+    } catch (error) {
+      console.error('Error generating complete report:', error);
     }
   };
 
@@ -674,122 +890,431 @@ const ManagerDashboard = () => {
 
   const sortedFraudCases = getSortedFraudData(filteredFraudCases);
 
+  const fetchAuditorAuditCounts = async () => {
+    try {
+      // Fetch all auditors
+      const { data: auditorsData, error: auditorsError } = await supabase
+        .from('auditors')
+        .select('auditor_id, name');
+      
+      if (auditorsError) throw auditorsError;
+      
+      // Create a map of auditor_id -> auditor data
+      const auditorIdMap = {};
+      const auditorNameMap = {};
+      
+      // Initialize map with all auditors
+      auditorsData?.forEach(auditor => {
+        auditorIdMap[auditor.auditor_id] = {
+          auditor_id: auditor.auditor_id,
+          name: auditor.name,
+          regular_count: 0,
+          fraud_count: 0
+        };
+        
+        // Also create a map of normalized names to auditor_id for matching by name
+        auditorNameMap[auditor.name.toLowerCase().trim()] = auditor.auditor_id;
+      });
+      
+      // Fetch regular audits with PIC
+      const { data: regularAuditsData, error: regularAuditsError } = await supabase
+        .from('audit_regular')
+        .select('pic');
+        
+      if (regularAuditsError) throw regularAuditsError;
+      
+      // Fetch fraud audits with PIC
+      const { data: fraudAuditsData, error: fraudAuditsError } = await supabase
+        .from('audit_fraud')
+        .select('pic');
+        
+      if (fraudAuditsError) throw fraudAuditsError;
+      
+      // Function to preprocess PIC string to handle special cases
+      const preprocessPicString = (picString) => {
+        if (!picString) return '';
+        
+        // First protect all name patterns with professional titles/degrees
+        // Pattern matches: Name, Title where Title starts with common Indonesian degree prefixes
+        return picString.replace(/([A-Za-z\s]+),\s*(S\.E|S\.Tr\.Akun|A\.Md|S\.T|M\.M|Ph\.D|S\.H|S\.Kom|S\.Pd|S\.Sos|S\.I\.P|S\.Ak|S\.Hum|S\.Kep|S\.K\.M|S\.Farm|S\.Psi|S\.Gz)/gi, 
+          (match) => {
+            // Replace the comma with a placeholder that won't be split
+            return match.replace(',', '###COMMA###');
+          }
+        );
+      };
+      
+      // Function to restore special case placeholders
+      const restoreName = (name) => {
+        // Restore the comma in the name
+        return name.replace(/###COMMA###/g, ',');
+      };
+      
+      // Process regular audits (comma-separated PICs)
+      regularAuditsData?.forEach(audit => {
+        if (audit.pic) {
+          // Preprocess to handle special cases
+          const processedPic = preprocessPicString(audit.pic);
+          const picList = processedPic.split(',')
+            .map(name => name.trim())
+            .filter(Boolean)
+            .map(restoreName);
+          
+          picList.forEach(auditorName => {
+            // Try to match by direct name
+            let matched = false;
+            
+            // Check for exact match in the auditorNameMap
+            if (auditorNameMap[auditorName.toLowerCase()]) {
+              const id = auditorNameMap[auditorName.toLowerCase()];
+              auditorIdMap[id].regular_count++;
+              matched = true;
+            }
+            
+            // If no match found, try to match by auditor_id
+            if (!matched && auditorIdMap[auditorName]) {
+              auditorIdMap[auditorName].regular_count++;
+            }
+          });
+        }
+      });
+      
+      // Process fraud audits (with both comma and ampersand separators)
+      fraudAuditsData?.forEach(audit => {
+        if (audit.pic) {
+          // Preprocess to handle special cases first
+          const processedPic = preprocessPicString(audit.pic);
+          // Replace all ampersands with commas to standardize the separator
+          const standardizedPic = processedPic.replace(/&/g, ',');
+          // Then split by comma
+          const picList = standardizedPic.split(',')
+            .map(name => name.trim())
+            .filter(Boolean)
+            .map(restoreName); // Restore special case names
+            
+          picList.forEach(auditorName => {
+            // Try to match by direct name
+            let matched = false;
+            
+            // Check for exact match in the auditorNameMap
+            if (auditorNameMap[auditorName.toLowerCase()]) {
+              const id = auditorNameMap[auditorName.toLowerCase()];
+              auditorIdMap[id].fraud_count++;
+              matched = true;
+            }
+            
+            // If no match found, try to match by auditor_id
+            if (!matched && auditorIdMap[auditorName]) {
+              auditorIdMap[auditorName].fraud_count++;
+            }
+          });
+        }
+      });
+      
+      // Convert map to array and sort by total audits
+      const countsArray = Object.values(auditorIdMap)
+        .filter(auditor => auditor.regular_count > 0 || auditor.fraud_count > 0) // Only show auditors with audits
+        .sort((a, b) => (b.regular_count + b.fraud_count) - (a.regular_count + a.fraud_count));
+      
+      setAuditorAuditCounts(countsArray);
+    } catch (error) {
+      console.error('Error fetching auditor audit counts:', error);
+    }
+  };
+
+  const handleExportAuditorCounts = () => {
+    try {
+      const fileName = 'auditor_audit_counts.xlsx';
+      const worksheet = XLSX.utils.json_to_sheet(auditorAuditCounts);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Auditor Counts');
+      
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(dataBlob, fileName);
+    } catch (error) {
+      console.error('Error downloading auditor counts:', error);
+    }
+  };
+
+  // Add this function to the ManagerDashboard component
+  const handleDownloadChartImage = () => {
+    const chartElement = document.querySelector('.recharts-wrapper') as HTMLElement;
+    if (!chartElement) {
+      console.error('Chart element not found');
+      return;
+    }
+
+    html2canvas(chartElement).then(canvas => {
+      canvas.toBlob(blob => {
+        if (blob) {
+          saveAs(blob, `audit_trends_chart_${format(new Date(), 'yyyy-MM-dd')}.png`);
+        }
+      });
+    }).catch(error => {
+      console.error('Error generating chart image:', error);
+    });
+  };
+
+  // Modify the Audit Trends Chart section to include the download image button
   return (
     <div className="p-0 space-y-3">
-      <h1 className="text-2xl font-bold">Manager Dashboard</h1>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-9 gap-2">
-        <Card className="col-span-3 min-h-[80px] flex items-center">
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Total Branch</p>
-              <p className="text-base font-bold">{stats.totalBranches}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3 min-h-[80px] flex items-center">
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-blue-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">Total Audit</p>
-              <div className="flex flex-col">
-                <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
-                <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
-                <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="col-span-3 min-h-[80px] flex items-center cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => {
-            setIsAuditorListOpen(true);
-            fetchAuditors();
-          }}
-        >
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-green-100 rounded-lg flex items-center justify-center">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Total Auditors</p>
-              <p className="text-base font-bold">{stats.totalAuditors}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3 min-h-[80px] flex items-center">
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">Total Fraud</p>
-              <p className="text-base font-bold text-red-600">{formatCurrency(stats.totalFraud)}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3 min-h-[80px] flex items-center">
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">Fraud Recovery</p>
-              <p className="text-base font-bold text-emerald-600">{formatCurrency(stats.fraudRecovery)}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3 min-h-[80px] flex items-center">
-          <CardContent className="p-3 flex items-center gap-x-3 h-full">
-            <div className="p-2 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <ArrowDown className="h-5 w-5 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">Outstanding Fraud</p>
-              <p className="text-base font-bold text-yellow-600">{formatCurrency(stats.outstandingFraud)}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Manager Dashboard</h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleDownloadAllReports}
+            className="px-3 py-1.5 rounded-md text-xs bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+          >
+            <Download className="h-3 w-3" />
+            Download All Reports
+          </button>
+          <button
+            onClick={() => setActiveSection('auditorCounts')}
+            className={`px-3 py-1.5 rounded-md text-xs ${
+              activeSection === 'auditorCounts'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Audit Counts Per Auditor
+          </button>
+          <button
+            onClick={() => setActiveSection('auditSummary')}
+            className={`px-3 py-1.5 rounded-md text-xs ${
+              activeSection === 'auditSummary'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Audit Summary
+          </button>
+          <button
+            onClick={() => setActiveSection('fraudData')}
+            className={`px-3 py-1.5 rounded-md text-xs ${
+              activeSection === 'fraudData'
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Fraud Data
+          </button>
+          <button
+            onClick={() => setActiveSection('main')}
+            className={`px-3 py-1.5 rounded-md text-xs ${
+              activeSection === 'main'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Overview
+          </button>
+        </div>
       </div>
 
-      {/* Audit Trends Chart */}
-      <Card>
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold mb-4 mt-2">Audit Trends</h2>
-          <ChartContainer config={auditTrendsConfig} className="h-[400px] w-full">
-  <BarChart data={auditTrends} height={350} width={undefined}>
-    <CartesianGrid strokeDasharray="3 3" />
-    <XAxis dataKey="month" />
-    <YAxis />
-    <ChartTooltip
-      cursor={false}
-      content={<ChartTooltipContent indicator="dashed" />}
-    />
-    <Legend />
-    <Bar dataKey="regular" name="Regular" fill="#50C878" radius={4} />
-    <Bar dataKey="fraud" name="Fraud" fill="#e74c3c" radius={4} />
-  </BarChart>
-</ChartContainer>
-        </CardContent>
-      </Card>
+      {/* Main Dashboard Section - Always visible */}
+      {activeSection === 'main' && (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-9 gap-2">
+            <Card className="col-span-3 min-h-[80px] flex items-center">
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Branch</p>
+                  <p className="text-base font-bold">{stats.totalBranches}</p>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Audit Recap Section */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-center mb-3 mt-6">
-            <h2 className="text-lg font-semibold mt-3">Audit Summary: Incomplete Documentation (Special & Regular)</h2>
-            <div className="flex items-center space-x-4">
+            <Card className="col-span-3 min-h-[80px] flex items-center">
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Total Audit</p>
+                  <div className="flex flex-col">
+                    <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
+                    <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
+                    <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="col-span-3 min-h-[80px] flex items-center cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => {
+                setIsAuditorListOpen(true);
+                fetchAuditors();
+              }}
+            >
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Users className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Auditors</p>
+                  <p className="text-base font-bold">{stats.totalAuditors}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-3 min-h-[80px] flex items-center">
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Total Fraud</p>
+                  <p className="text-base font-bold text-red-600">{formatCurrency(stats.totalFraud)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-3 min-h-[80px] flex items-center">
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <Wallet className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Fraud Recovery</p>
+                  <p className="text-base font-bold text-emerald-600">{formatCurrency(stats.fraudRecovery)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-3 min-h-[80px] flex items-center">
+              <CardContent className="p-3 flex items-center gap-x-3 h-full">
+                <div className="p-2 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <ArrowDown className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Outstanding Fraud</p>
+                  <p className="text-base font-bold text-yellow-600">{formatCurrency(stats.outstandingFraud)}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Audit Trends Chart */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Audit Trends</h2>
+                <button
+                  onClick={handleDownloadChartImage}
+                  className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Download Chart</span>
+                </button>
+              </div>
+              <ChartContainer config={auditTrendsConfig} className="h-[400px] w-full">
+                <BarChart data={auditTrends} height={350} width={undefined}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" />}
+                  />
+                  <Legend />
+                  <Bar dataKey="regular" name="Regular" fill="#50C878" radius={4} />
+                  <Bar dataKey="fraud" name="Fraud" fill="#e74c3c" radius={4} />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Audit Counts Per Auditor Section */}
+      {activeSection === 'auditorCounts' && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Audit Counts Per Auditor</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  value={auditorSearchTerm}
+                  onChange={(e) => setAuditorSearchTerm(e.target.value)}
+                  placeholder="Search auditor..."
+                  className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-12">
+                      No.
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Auditor
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Regular Audits
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Fraud Audits
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {auditorAuditCounts.filter(auditor => 
+                    auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
+                  ).map((auditor, index) => (
+                    <tr key={auditor.auditor_id}>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {auditor.name}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {auditor.regular_count}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {auditor.fraud_count}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                        {auditor.regular_count + auditor.fraud_count}
+                      </td>
+                    </tr>
+                  ))}
+                  {auditorAuditCounts.filter(auditor => 
+                    auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
+                        No auditors found matching your search
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Audit Summary Section */}
+      {activeSection === 'auditSummary' && (
+        <Card>
+          <CardContent className="p-6">
+            {/* All the existing audit summary content */}
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold">Audit Summary: Incomplete Documentation</h2>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -800,281 +1325,343 @@ const ManagerDashboard = () => {
                   className="pl-7 pr-2 py-1 border rounded-md w-44 text-xs"
                 />
               </div>
+            </div>
+
+            <div className="flex space-x-4 mb-4">
               <button
-                onClick={handleDownload}
-                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                onClick={() => setActiveTab('regular')}
+                className={`px-4 py-2 rounded-md ${
+                  activeTab === 'regular'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
               >
-                <Download className="h-4 w-4" />
-                <span>Download Report</span>
+                Regular Audits
+              </button>
+              <button
+                onClick={() => setActiveTab('fraud')}
+                className={`px-4 py-2 rounded-md ${
+                  activeTab === 'fraud'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Fraud Audits
               </button>
             </div>
-          </div>
 
-          <div className="flex space-x-4 mb-4">
-            <button
-              onClick={() => setActiveTab('regular')}
-              className={`px-4 py-2 rounded-md ${
-                activeTab === 'regular'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Regular Audits
-            </button>
-            <button
-              onClick={() => setActiveTab('fraud')}
-              className={`px-4 py-2 rounded-md ${
-                activeTab === 'fraud'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Fraud Audits
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th 
-                    className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => requestSort('branch_name')}
-                  >
-                    <div className="flex items-center">
-                      Branch Name
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </th>
-                  <th 
-                    className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => requestSort('region')}
-                  >
-                    <div className="flex items-center">
-                      Region
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </th>
-                  {activeTab === 'regular' ? (
-                    <>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                        onClick={() => requestSort('monitoring')}
-                      >
-                        <div className="flex items-center">
-                          Monitoring
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </th>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        <div className="flex items-center">
-                          Failed Checks
-                        </div>
-                      </th>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        <div className="flex items-center">
-                          PIC
-                        </div>
-                      </th>
-                    </>
-                  ) : (
-                    <>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        <div className="flex items-center">
-                          Failed Checks
-                        </div>
-                      </th>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                        onClick={() => requestSort('review')}
-                      >
-                        <div className="flex items-center">
-                          Review
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </th>
-                      <th 
-                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        <div className="flex items-center">
-                          PIC
-                        </div>
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedAudits.map((audit, index) => (
-                  <tr key={index}>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {audit.branch_name}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {audit.region}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th 
+                      className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => requestSort('branch_name')}
+                    >
+                      <div className="flex items-center">
+                        Branch Name
+                        <ArrowUpDown className="ml-1 h-4 w-4" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => requestSort('region')}
+                    >
+                      <div className="flex items-center">
+                        Region
+                        <ArrowUpDown className="ml-1 h-4 w-4" />
+                      </div>
+                    </th>
                     {activeTab === 'regular' ? (
                       <>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
-                            audit.monitoring === 'Adequate' 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {audit.monitoring}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {getFailedChecksWithAliases(audit, true)}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {audit.pic || 'N/A'}
-                        </td>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          onClick={() => requestSort('monitoring')}
+                        >
+                          <div className="flex items-center">
+                            Monitoring
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </th>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center">
+                            Failed Checks
+                          </div>
+                        </th>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center">
+                            PIC
+                          </div>
+                        </th>
                       </>
                     ) : (
                       <>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {getFailedChecksWithAliases(audit, false)}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {(audit as FraudAudit).review}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {audit.pic || 'N/A'}
-                        </td>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center">
+                            Failed Checks
+                          </div>
+                        </th>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          onClick={() => requestSort('review')}
+                        >
+                          <div className="flex items-center">
+                            Review
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </th>
+                        <th 
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          <div className="flex items-center">
+                            PIC
+                          </div>
+                        </th>
                       </>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedAudits.map((audit, index) => (
+                    <tr key={index}>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {audit.branch_name}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {audit.region}
+                      </td>
+                      {activeTab === 'regular' ? (
+                        <>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                              audit.monitoring === 'Adequate' 
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {audit.monitoring}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {getFailedChecksWithAliases(audit, true)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {audit.pic || 'N/A'}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {getFailedChecksWithAliases(audit, false)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {(audit as FraudAudit).review}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {audit.pic || 'N/A'}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Fraud Data Section */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Fraud Data</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                value={fraudSearchTerm}
-                onChange={(e) => setFraudSearchTerm(e.target.value)}
-                placeholder="Search branch or staff..."
-                className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+      {activeSection === 'fraudData' && (
+        <Card>
+          <CardContent className="p-6">
+            {/* All the existing fraud data content */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Fraud Data</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  value={fraudSearchTerm}
+                  onChange={(e) => setFraudSearchTerm(e.target.value)}
+                  placeholder="Search branch or staff..."
+                  className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
             </div>
-          </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">No.</TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => requestFraudSort('region')}
-                  >
-                    <div className="flex items-center">
-                      Region
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => requestFraudSort('branch_name')}
-                  >
-                    <div className="flex items-center">
-                      Branch Name
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => requestFraudSort('fraud_staff')}
-                  >
-                    <div className="flex items-center">
-                      Fraud Staff
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => requestFraudSort('fraud_amount')}
-                  >
-                    <div className="flex items-center">
-                      Fraud Amount
-                      <ArrowUpDown className="ml-1 h-4 w-4" />
-                    </div>
-                  </TableHead>
-                  <TableHead>HKP Amount</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedFraudCases.map((fraud, index) => (
-                  <TableRow
-                    key={fraud.id}
-                    className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
-                  >
-                    <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
-                    <TableCell className="text-xs">{fraud.region}</TableCell>
-                    <TableCell className="text-xs">{fraud.branch_name}</TableCell>
-                    <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
-                    <TableCell className="text-xs">
-                      {formatCurrency(fraud.fraud_amount)}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {fraud.fraud_payments_audits?.[0]?.hkp_amount 
-                        ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
-                        : 'No HKP'}
-                      {fraud.fraud_payments_audits?.[0]?.from_salary && (
-                        <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
-                      {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
-                      fraud.fraud_payments_audits?.[0]?.notes !== null
-                        ? fraud.fraud_payments_audits[0].notes
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={() => {
-                            setSelectedFraud(fraud);
-                            setIsPaymentDialogOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-800"
-                          aria-label="Edit Payment"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => fetchPaymentHistory(fraud.id)}
-                          className="text-gray-600 hover:text-gray-800"
-                          aria-label="View Payment History"
-                        >
-                          <Clock className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+            
+            <div className="flex space-x-4 mb-4">
+              <button
+                onClick={() => setActiveFraudTab('data')}
+                className={`px-4 py-2 rounded-md ${
+                  activeFraudTab === 'data'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Fraud Data
+              </button>
+              <button
+                onClick={() => setActiveFraudTab('region')}
+                className={`px-4 py-2 rounded-md ${
+                  activeFraudTab === 'region'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Fraud by Region
+              </button>
+            </div>
+
+            {activeFraudTab === 'data' ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No.</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => requestFraudSort('region')}
+                      >
+                        <div className="flex items-center">
+                          Region
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => requestFraudSort('branch_name')}
+                      >
+                        <div className="flex items-center">
+                          Branch Name
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => requestFraudSort('fraud_staff')}
+                      >
+                        <div className="flex items-center">
+                          Fraud Staff
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => requestFraudSort('fraud_amount')}
+                      >
+                        <div className="flex items-center">
+                          Fraud Amount
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead>HKP Amount</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedFraudCases.map((fraud, index) => (
+                      <TableRow
+                        key={fraud.id}
+                        className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
+                      >
+                        <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
+                        <TableCell className="text-xs">{fraud.region}</TableCell>
+                        <TableCell className="text-xs">{fraud.branch_name}</TableCell>
+                        <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
+                        <TableCell className="text-xs">
+                          {formatCurrency(fraud.fraud_amount)}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {fraud.fraud_payments_audits?.[0]?.hkp_amount 
+                            ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
+                            : 'No HKP'}
+                          {fraud.fraud_payments_audits?.[0]?.from_salary && (
+                            <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
+                          {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
+                          fraud.fraud_payments_audits?.[0]?.notes !== null
+                            ? fraud.fraud_payments_audits[0].notes
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={() => {
+                                setSelectedFraud(fraud);
+                                setIsPaymentDialogOpen(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-800"
+                              aria-label="Edit Payment"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => fetchPaymentHistory(fraud.id)}
+                              className="text-gray-600 hover:text-gray-800"
+                              aria-label="View Payment History"
+                            >
+                              <Clock className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No.</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Total Fraud Amount</TableHead>
+                      <TableHead>Fraud Recovery</TableHead>
+                      <TableHead>Total Regular Audit</TableHead>
+                      <TableHead>Total Special Audit</TableHead>
+                      <TableHead>Total Fraud Staff</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fraudDetailsByRegion.map((detail, index) => (
+                      <TableRow key={detail.region}>
+                        <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
+                        <TableCell className="text-xs">{detail.region}</TableCell>
+                        <TableCell className="text-xs font-medium text-red-600">
+                          {formatCurrency(detail.totalFraudAmount)}
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-emerald-600">
+                          {formatCurrency(detail.totalRecoveryAmount)}
+                        </TableCell>
+                        <TableCell className="text-xs">{detail.totalRegularAudit}</TableCell>
+                        <TableCell className="text-xs">{detail.totalSpecialAudit}</TableCell>
+                        <TableCell className="text-xs">{detail.totalFraudStaff}</TableCell>
+                      </TableRow>
+                    ))}
+                    {fraudDetailsByRegion.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
+                          No fraud details found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
@@ -1195,18 +1782,7 @@ const ManagerDashboard = () => {
       <Dialog open={isAuditorListOpen} onOpenChange={setIsAuditorListOpen}>
         <DialogContent className="max-w-md max-h-[70vh]">
           <DialogHeader className="pr-6">
-            <div className="flex items-center justify-between mb-2">
-              <DialogTitle className="text-lg">List of Auditors</DialogTitle>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDownloadAuditors}
-                  className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
-                >
-                  <Download className="h-3 w-3" />
-                  <span>Excel</span>
-                </button>
-              </div>
-            </div>
+            <DialogTitle className="text-lg">List of Auditors</DialogTitle>
           </DialogHeader>
           <div className="overflow-y-auto max-h-[50vh]">
             <table className="min-w-full divide-y divide-gray-200">
@@ -1236,6 +1812,61 @@ const ManagerDashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add this new Dialog for Auditor Audit Counts */}
+      <Dialog open={isAuditorAuditCountOpen} onOpenChange={setIsAuditorAuditCountOpen}>
+        <DialogContent className="max-w-md max-h-[70vh]">
+          <DialogHeader className="pr-6">
+            <DialogTitle className="text-lg">Audit Counts Per Auditor</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[50vh]">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    No.
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Auditor
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Regular Audits
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Fraud Audits
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {auditorAuditCounts.map((auditor, index) => (
+                  <tr key={auditor.auditor_id}>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {index + 1}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {auditor.name}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {auditor.regular_count}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {auditor.fraud_count}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                      {auditor.regular_count + auditor.fraud_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+ 
     </div>
   );
 };

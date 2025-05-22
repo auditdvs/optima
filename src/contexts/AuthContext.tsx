@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT, lakukan logout
       if (inactiveTime >= INACTIVITY_TIMEOUT) {
-        toast.info('Anda telah otomatis keluar karena tidak ada aktivitas', {
+        toast.info('Dahlah, bye!', {
           toastId: 'inactivity-logout',
         });
         signOut();

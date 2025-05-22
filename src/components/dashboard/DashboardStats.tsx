@@ -1,10 +1,33 @@
-import React from 'react';
-import { Building2, ClipboardCheck, AlertTriangle, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { AlertTriangle, Building2, ClipboardCheck, Users } from 'lucide-react';
 
-const DashboardStats = ({ stats }) => {
+interface DashboardStatsProps {
+  stats: {
+    totalBranches: number;
+    auditedBranches: number;
+    unauditedBranches: number;
+    fraudAudits: number;
+    annualAudits: number;
+    totalAudits: number;
+    totalFraud: number;
+    totalFraudCases: number;
+    totalFraudulentBranches: number;
+  };
+  isFraudAmountCensored: boolean;
+  onFraudSectionClick: () => void;
+}
+
+const DashboardStats = ({ 
+  stats, 
+  isFraudAmountCensored,
+  onFraudSectionClick
+}: DashboardStatsProps) => {
+  const formatCurrency = (amount: number) => {
+    return `Rp ${amount.toLocaleString('id-ID')}`;
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Total Branches Card */}
       <Card className="bg-white">
         <CardContent className="p-3">
@@ -47,8 +70,11 @@ const DashboardStats = ({ stats }) => {
         </CardContent>
       </Card>
 
-      {/* Total Fraud Card */}
-      <Card className="bg-white">
+      {/* Total Fraud Card with Censoring */}
+      <Card 
+        className={`bg-white ${isFraudAmountCensored ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+        onClick={isFraudAmountCensored ? onFraudSectionClick : undefined}
+      >
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-50 rounded-lg">
@@ -57,8 +83,16 @@ const DashboardStats = ({ stats }) => {
             <div className="flex-1">
               <p className="text-xs text-gray-600 mb-0.5">Total Fraud</p>
               <div className="flex flex-col leading-tight">
-                <span className="text-lg font-semibold">Rp {stats.totalFraud.toLocaleString('id-ID')}</span>
-                <span className="text-[11px] text-red-500">{stats.totalFraudCases} cases detected</span>
+                {isFraudAmountCensored ? (
+                  <>
+                    <span className="text-xl font-semibold">CONFIDENTIAL</span>
+                    <span className="text-[11px] text-gray-500">Click to reveal</span>
+                  </>
+                ) : (
+                  <span className="text-lg font-semibold text-gray-900">
+                    {formatCurrency(stats.totalFraud)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
