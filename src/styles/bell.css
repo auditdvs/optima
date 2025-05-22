@@ -1,0 +1,57 @@
+/* Custom bell notification styles */
+.bell {
+  border: 2.17px solid currentColor;
+  border-radius: 10px 10px 0 0;
+  width: 15px;
+  height: 17px;
+  background: transparent;
+  display: block;
+  position: relative;
+  top: -3px;
+}
+
+.bell::before,
+.bell::after {
+  content: "";
+  background: currentColor;
+  display: block;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 2.17px;
+}
+
+.bell::before {
+  top: 100%;
+  width: 20px;
+}
+
+.bell::after {
+  top: calc(100% + 4px);
+  width: 7px;
+}
+
+.notification:hover > .bell-container {
+  animation: bell-animation 650ms ease-out 0s 1 normal both;
+}
+
+@keyframes bell-animation {
+  20% {
+    transform: rotate(15deg);
+  }
+  40% {
+    transform: rotate(-15deg);
+    scale: 1.1;
+  }
+  60% {
+    transform: rotate(10deg);
+    scale: 1.1;
+  }
+  80% {
+    transform: rotate(-10deg);
+  }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+}

@@ -1,8 +1,9 @@
-import { AlignStartVertical, Bell, ChartNoAxesColumn, LogOut, X } from 'lucide-react';
+import { AlignStartVertical, ChartNoAxesColumn, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import '../styles/bell.css';
 import '../styles/loaders.css';
 import AuditRatingCalculator from './AuditRatingCalculator';
 
@@ -268,25 +269,42 @@ function Navbar() {
       <div className="flex items-center space-x-6">
         {/* Audit Rating */}
         <button
-          type="button"
           onClick={() => setShowAuditRating(true)}
-          className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+          className="group overflow-hidden relative w-8 h-8 bg-indigo-500 rounded-full cursor-pointer z-10 flex items-center justify-center text-white shadow-lg hover:w-28 hover:rounded-lg transition-all duration-200 active:translate-x-1 active:translate-y-1"
         >
-          <AlignStartVertical className="w-5 h-5 mr-2" />
-          <span>Audit Rating</span>
+          <AlignStartVertical className="w-4 h-4 group-hover:opacity-0 transition-opacity absolute" />
+          
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-white rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left"
+          ></span>
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-400 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left"
+          ></span>
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-600 rotate-12 transform scale-x-0 group-hover:scale-x-50 transition-transform group-hover:duration-1000 duration-500 origin-left"
+          ></span>
+          
+          <span
+            className="group-hover:opacity-100 opacity-0 text-sm font-medium transition-opacity group-hover:duration-1000 duration-100 z-10"
+          >
+            Audit Rating
+          </span>
         </button>
 
         {/* RCM */}
         <button
-          type="button"
           onClick={() => {
             setShowRCMSearch(true);
             setTimeout(() => rcmInputRef.current?.focus(), 100);
           }}
-          className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+          className="group relative cursor-pointer outline-none border-none rounded-full flex flex-row items-center justify-center h-8 w-8 hover:!w-[75px] transition-all duration-[0.75s] before:content-[''] before:absolute before:w-full before:h-full before:inset-0 before:bg-[linear-gradient(130deg,#4f46e5,#6366f1_33%,#818cf8)] before:ring-2 before:ring-offset-2 before:ring-indigo-500 before:rounded-full before:transition before:duration-300 before:ring-offset-[#fff] hover:before:scale-105 active:before:scale-95 text-white"
         >
-          <ChartNoAxesColumn className="w-5 h-5 mr-2" />
-          <span>RCM</span>
+          <ChartNoAxesColumn className="absolute left-2 group-hover:left-1.5 group-active:left-[7px] duration-300 transition-[left] z-10 w-4 h-4 text-white" />
+          <span
+            className="absolute right-1.5 text-[13px] font-semibold [--w:calc(100%-32px)] w-[--w] max-w-[--w] overflow-hidden flex items-center justify-end -z-[1] group-hover:z-[9] pointer-events-none select-none opacity-0 group-hover:opacity-100 text-transparent group-hover:text-inherit group-active:right-2 transition-all duration-[2s] group-hover:duration-300 group-active:scale-[0.85]"
+          >
+            RCM
+          </span>
         </button>
 
         {/* Notifications */}
@@ -296,11 +314,13 @@ function Navbar() {
               setShowNotifications(!showNotifications);
               setHasNewNotification(false);
             }}
-            className="text-gray-600 hover:text-gray-900 relative"
+            className="notification text-gray-600 hover:text-gray-900 relative"
           >
-            <Bell className={`w-6 h-6 ${hasNewNotification ? 'animate-bounce' : ''}`} />
+            <div className="bell-container">
+              <div className="bell"></div>
+            </div>
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-3.5 w-3.5 flex items-center justify-center">
                 {unreadCount}
               </span>
             )}
@@ -390,12 +410,24 @@ function Navbar() {
 
         {/* Logout */}
         <button
-          onClick={signOut}
-          className="text-gray-600 hover:text-gray-900"
-          title="Logout"
-        >
-          <LogOut className="w-6 h-6 mr-4" />
-        </button>
+  onClick={signOut}
+  className="group flex items-center justify-start w-8 h-8 bg-indigo-500 rounded-full cursor-pointer relative overflow-hidden transition-all duration-200 shadow-lg hover:w-24 hover:rounded-lg active:translate-x-1 active:translate-y-1"
+>
+  <div
+    className="flex items-center justify-center w-full transition-all duration-300 group-hover:justify-start group-hover:px-2"
+  >
+    <svg className="w-3 h-3" viewBox="0 0 512 512" fill="white">
+      <path
+        d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
+      ></path>
+    </svg>
+  </div>
+  <div
+    className="absolute right-3 transform translate-x-full opacity-0 text-white text-sm font-semibold transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
+  >
+    Logout
+  </div>
+</button>
       </div>
 
       {showFullMessage && selectedNotification && (

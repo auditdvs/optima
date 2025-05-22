@@ -1,5 +1,7 @@
 import {
   ChartPie,
+  ChevronsLeft,
+  ChevronsRight,
   FilePenLine,
   FileVideo,
   History,
@@ -15,7 +17,10 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-function Sidebar() {
+function Sidebar({ isCollapsed, onToggleCollapse }: { 
+  isCollapsed: boolean; 
+  onToggleCollapse: (collapsed: boolean) => void;
+}) {
   const location = useLocation();
   const { userRole } = useAuth();
   
@@ -77,24 +82,38 @@ function Sidebar() {
   }
   
  return (
-    <div className="flex flex-col h-screen bg-white border-r-2 w-64">
-      <div className="flex items-center justify-center h-16 border-b">
-        <h1 className="text-4xl font-bold text-indigo-600">OPTIMA</h1>
+    <div className={`flex flex-col h-screen bg-white border-r-2 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+      <div className="flex items-center justify-between h-16 border-b px-3">
+        {!isCollapsed && (
+          <h1 className="text-3xl font-bold text-indigo-600">OPTIMA</h1>
+        )}
+        <button
+          onClick={() => onToggleCollapse(!isCollapsed)}
+          className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronsRight className="w-5 h-5" />
+          ) : (
+            <ChevronsLeft className="w-5 h-5" />
+          )}
+        </button>
       </div>
       
-      <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-1 ">
+      <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-1">
         {menuItems.map(({ path, icon: Icon, label }) => (
           <Link
             key={path}
             to={path}
-            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex items-center px-${isCollapsed ? '2' : '4'} py-2 text-sm font-medium rounded-lg transition-colors ${
               isActive(path)
                 ? 'bg-indigo-100 text-indigo-700'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}
+            title={isCollapsed ? label : ''}
           >
-            <Icon className="w-5 h-5 mr-3" />
-            {label}
+            <Icon className={`w-5 h-5 ${isCollapsed ? 'mx-auto' : 'mr-3'}`} />
+            {!isCollapsed && label}
           </Link>
         ))}
       </nav>
