@@ -226,8 +226,8 @@ const Dashboard = () => {
 
   const chartConfig = {
     value: { label: "Audits" },
-    "Annual Audits": { label: "Annual Audits", color: "#50C878" },
-    "Fraud Audits": { label: "Fraud Audits", color: "#e74c3c" },
+    "Annual Audits": { label: "Annual Audits: ", color: "#50C878" },
+    "Fraud Audits": { label: "Special Audits: ", color: "#e74c3c" },
   } satisfies ChartConfig;
 
   // Add this function to process region audit data
@@ -374,23 +374,23 @@ const Dashboard = () => {
                       {/* First group of columns */}
                       <th className="text-left py-1 px-2 font-medium">Region</th>
                       <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                       {/* Second group of columns */}
                       <th className="text-left py-1 px-2 font-medium border-l">Region</th>
                       <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                       {/* Third group of columns */}
                       <th className="text-left py-1 px-2 font-medium border-l">Region</th>
                       <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                       {/* Fourth group of columns */}
                       <th className="text-left py-1 px-2 font-medium border-l">Region</th>
                       <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                       {/* Fifth group of columns */}
                       <th className="text-left py-1 px-2 font-medium border-l">Region</th>
                       <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Fraud</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                     </tr>
                   </thead>
                   <tbody>

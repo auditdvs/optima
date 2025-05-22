@@ -61,7 +61,7 @@ const DashboardStats = ({
               <div className="flex items-center gap-2">
                 <span className="text-xl font-semibold">{stats.totalAudits}</span>
                 <div className="flex flex-col leading-tight">
-                  <span className="text-[11px] text-red-600">{stats.fraudAudits} Fraud</span>
+                  <span className="text-[11px] text-red-600">{stats.fraudAudits} Special</span>
                   <span className="text-[11px] text-green-600">{stats.annualAudits} Annual</span>
                 </div>
               </div>
@@ -85,7 +85,7 @@ const DashboardStats = ({
               <div className="flex flex-col leading-tight">
                 {isFraudAmountCensored ? (
                   <>
-                    <span className="text-xl font-semibold">CONFIDENTIAL</span>
+                    <span className="text-xl font-semibold">Rp ***.***.***</span>
                     <span className="text-[11px] text-gray-500">Click to reveal</span>
                   </>
                 ) : (
