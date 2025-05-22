@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
-import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Clock, Download, Pencil, Search, TrendingUp, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Clock, Pencil, Search, TrendingUp, Users, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,8 @@ import {
 } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { supabase } from '../lib/supabaseClient';
+import '../styles/download-button.css';
+import '../styles/tab-navigation.css';
 
 const checkUserAccess = async (supabase: any) => {
   try {
@@ -1064,52 +1066,80 @@ const ManagerDashboard = () => {
         <div className="flex space-x-2">
           <button
             onClick={handleDownloadAllReports}
-            className="px-3 py-1.5 rounded-md text-xs bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+            className="Download-button"
           >
-            <Download className="h-3 w-3" />
-            Download All Reports
-          </button>
-          <button
-            onClick={() => setActiveSection('auditorCounts')}
-            className={`px-3 py-1.5 rounded-md text-xs ${
-              activeSection === 'auditorCounts'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Audit Counts Per Auditor
-          </button>
-          <button
-            onClick={() => setActiveSection('auditSummary')}
-            className={`px-3 py-1.5 rounded-md text-xs ${
-              activeSection === 'auditSummary'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Audit Summary
-          </button>
-          <button
-            onClick={() => setActiveSection('fraudData')}
-            className={`px-3 py-1.5 rounded-md text-xs ${
-              activeSection === 'fraudData'
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Fraud Data
-          </button>
-          <button
-            onClick={() => setActiveSection('main')}
-            className={`px-3 py-1.5 rounded-md text-xs ${
-              activeSection === 'main'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Overview
+            <svg
+              viewBox="0 0 640 512"
+              width="20"
+              height="16"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="white"
+                d="M144 480C64.5 480 0 415.5 0 336c0-62.8 40.2-116.2 96.2-135.9c-.1-2.7-.2-5.4-.2-8.1c0-88.4 71.6-160 160-160c59.3 0 111 32.2 138.7 80.2C409.9 102 428.3 96 448 96c53 0 96 43 96 96c0 12.2-2.3 23.8-6.4 34.6C596 238.4 640 290.1 640 352c0 70.7-57.3 128-128 128H144zm79-167l80 80c9.4 9.4 24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-39 39V184c0-13.3-10.7-24-24-24s-24 10.7-24 24V318.1l-39-39c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9z"
+              ></path>
+            </svg>
+            <span>Download All Reports</span>
           </button>
         </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="tab-wrap">
+        <input 
+          type="radio" 
+          id="tab-auditor" 
+          name="dashboard-tab" 
+          className="rd-1" 
+          hidden 
+          checked={activeSection === 'auditorCounts'}
+          onChange={() => setActiveSection('auditorCounts')} 
+        />
+        <label htmlFor="tab-auditor" className="tab-label" style={{"--index": 0}}>
+          <span>Audit Counts</span>
+        </label>
+
+        <input 
+          type="radio" 
+          id="tab-summary" 
+          name="dashboard-tab" 
+          className="rd-2" 
+          hidden 
+          checked={activeSection === 'auditSummary'}
+          onChange={() => setActiveSection('auditSummary')} 
+        />
+        <label htmlFor="tab-summary" className="tab-label" style={{"--index": 1}}>
+          <span>Audit Summary</span>
+        </label>
+
+        <input 
+          type="radio" 
+          id="tab-fraud" 
+          name="dashboard-tab" 
+          className="rd-3" 
+          hidden 
+          checked={activeSection === 'fraudData'}
+          onChange={() => setActiveSection('fraudData')} 
+        />
+        <label htmlFor="tab-fraud" className="tab-label" style={{"--index": 2}}>
+          <span>Fraud Data</span>
+        </label>
+
+        <input 
+          type="radio" 
+          id="tab-overview" 
+          name="dashboard-tab" 
+          className="rd-4" 
+          hidden 
+          checked={activeSection === 'main'}
+          onChange={() => setActiveSection('main')} 
+        />
+        <label htmlFor="tab-overview" className="tab-label" style={{"--index": 3}}>
+          <span>Overview</span>
+        </label>
+
+        <div className="tab-bar"></div>
+        <div className="tab-slidebar"></div>
       </div>
 
       {/* Main Dashboard Section - Always visible */}
@@ -1207,9 +1237,19 @@ const ManagerDashboard = () => {
                 <h2 className="text-lg font-semibold">Audit Trends</h2>
                 <button
                   onClick={handleDownloadChartImage}
-                  className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs"
+                  className="Download-button Download-button-sm"
                 >
-                  <Download className="h-3 w-3" />
+                  <svg
+                    viewBox="0 0 640 512"
+                    width="20"
+                    height="16"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill="white"
+                      d="M144 480C64.5 480 0 415.5 0 336c0-62.8 40.2-116.2 96.2-135.9c-.1-2.7-.2-5.4-.2-8.1c0-88.4 71.6-160 160-160c59.3 0 111 32.2 138.7 80.2C409.9 102 428.3 96 448 96c53 0 96 43 96 96c0 12.2-2.3 23.8-6.4 34.6C596 238.4 640 290.1 640 352c0 70.7-57.3 128-128 128H144zm79-167l80 80c9.4 9.4 24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-39 39V184c0-13.3-10.7-24-24-24s-24 10.7-24 24V318.1l-39-39c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9z"
+                    ></path>
+                  </svg>
                   <span>Download Chart</span>
                 </button>
               </div>
