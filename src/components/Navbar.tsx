@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import '../styles/bell.css';
+import '../styles/hamburger-menu.css';
 import '../styles/loaders.css';
 import AuditRatingCalculator from './AuditRatingCalculator';
 
@@ -258,7 +259,8 @@ function Navbar() {
 
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
-      <div className="group">
+      {/* Only show greeting on desktop (lg screens and up) */}
+      <div className="group hidden lg:block">
         <a href="https://i.pinimg.com/736x/f4/7d/1a/f47d1a20470813af55020d51c4f5159a.jpg" target="_blank" rel="noopener noreferrer"> 
           <div className="text-xl text-gray-600 group-hover:animate-bounce cursor-pointer">
             Hello, {fullName}. Have a great day!
@@ -266,7 +268,167 @@ function Navbar() {
         </a>
       </div>
 
-      <div className="flex items-center space-x-6">
+      {/* Mobile/Tablet Hamburger Menu (hidden on desktop) */}
+      <div className="block lg:hidden w-full flex justify-end">
+        <label className="event-wrapper">
+          <input type="checkbox" className="event-wrapper-inp" />
+          <div className="bar">
+            <span className="top bar-list"></span>
+            <span className="middle bar-list"></span>
+            <span className="bottom bar-list"></span>
+          </div>
+          <section className="menu-container">
+            {/* Audit Rating Menu Item */}
+            <div className="menu-list" onClick={() => setShowAuditRating(true)}>
+              <div className="flex items-center">
+                <AlignStartVertical className="w-4 h-4 mr-2 text-indigo-600" />
+                <span>Audit Rating</span>
+              </div>
+            </div>
+            
+            {/* RCM Menu Item */}
+            <div 
+              className="menu-list" 
+              onClick={() => {
+                setShowRCMSearch(true);
+                setTimeout(() => rcmInputRef.current?.focus(), 100);
+              }}
+            >
+              <div className="flex items-center">
+                <ChartNoAxesColumn className="w-4 h-4 mr-2 text-indigo-600" />
+                <span>RCM</span>
+              </div>
+            </div>
+            
+            {/* Notifications Menu Item */}
+            <div 
+              className="menu-list" 
+              onClick={() => {
+                // Close the hamburger menu
+                const checkbox = document.querySelector('.event-wrapper-inp') as HTMLInputElement;
+                if (checkbox) checkbox.checked = true;
+                
+                // Show notifications panel
+                setShowNotifications(true);
+                setHasNewNotification(false);
+              }}
+            >
+              <div className="flex items-center">
+                <div className="bell-container mr-2">
+                  <div className="bell !border-indigo-600 !before:bg-indigo-600 !after:bg-indigo-600"></div>
+                </div>
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            {/* Logout Menu Item */}
+            <div className="menu-list" onClick={signOut}>
+              <div className="flex items-center">
+                <svg className="w-4 h-4 mr-2 text-indigo-600" viewBox="0 0 512 512" fill="currentColor">
+                  <path 
+                    d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
+                  />
+                </svg>
+                <span>Logout</span>
+              </div>
+            </div>
+          </section>
+        </label>
+      </div>
+
+      {/* Mobile/Tablet Notification Panel */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="bg-black bg-opacity-40 absolute inset-0" onClick={() => setShowNotifications(false)}></div>
+          <div className="absolute top-16 right-0 w-full sm:w-96 max-h-[80vh] bg-white rounded-b-lg shadow-lg overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="font-semibold">Notifications</h3>
+              <div className="flex items-center gap-4">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-sm text-indigo-600 hover:text-indigo-800"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-gray-500 hover:text-gray-700 flex items-center justify-center w-8 h-8"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[calc(80vh-4rem)] overflow-y-auto">
+              {notifications.filter(n => !n.read_by.includes(user?.id || '')).length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  No notifications
+                </div>
+              ) : (
+                notifications
+                  .filter(n => !n.read_by.includes(user?.id || ''))
+                  .map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="p-4 border-b hover:bg-gray-50 bg-blue-50"
+                    >
+                      {/* Same notification content as in the desktop view */}
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{notification.title}</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {notification.message.length > 80
+                              ? `${notification.message.slice(0, 80)}...`
+                              : notification.message}
+                          </p>
+                          {notification.message.length > 80 && (
+                            <button
+                              onClick={() => handleShowFullMessage(notification)}
+                              className="text-xs text-indigo-600 hover:underline mt-1"
+                            >
+                              See full message
+                            </button>
+                          )}
+                          {notification.attachment_url && (
+                            <a
+                              href={notification.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+                            >
+
+                            </a>
+                          )}
+                          <p className="text-xs text-gray-400 mt-2">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Sent by: {notification.sender_name}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => markNotificationAsRead(notification.id)}
+                          className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 ml-4"
+                        >
+                          Mark as read
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Buttons (hidden on mobile/tablet) */}
+      <div className="hidden lg:flex items-center space-x-6">
         {/* Audit Rating */}
         <button
           onClick={() => setShowAuditRating(true)}
@@ -410,24 +572,24 @@ function Navbar() {
 
         {/* Logout */}
         <button
-  onClick={signOut}
-  className="group flex items-center justify-start w-8 h-8 bg-indigo-500 rounded-full cursor-pointer relative overflow-hidden transition-all duration-200 shadow-lg hover:w-24 hover:rounded-lg active:translate-x-1 active:translate-y-1"
->
-  <div
-    className="flex items-center justify-center w-full transition-all duration-300 group-hover:justify-start group-hover:px-2"
-  >
-    <svg className="w-3 h-3" viewBox="0 0 512 512" fill="white">
-      <path
-        d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
-      ></path>
-    </svg>
-  </div>
-  <div
-    className="absolute right-3 transform translate-x-full opacity-0 text-white text-sm font-semibold transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
-  >
-    Logout
-  </div>
-</button>
+          onClick={signOut}
+          className="group flex items-center justify-start w-8 h-8 bg-indigo-500 rounded-full cursor-pointer relative overflow-hidden transition-all duration-200 shadow-lg hover:w-24 hover:rounded-lg active:translate-x-1 active:translate-y-1"
+        >
+          <div
+            className="flex items-center justify-center w-full transition-all duration-300 group-hover:justify-start group-hover:px-2"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 512 512" fill="white">
+              <path
+                d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
+              ></path>
+            </svg>
+          </div>
+          <div
+            className="absolute right-3 transform translate-x-full opacity-0 text-white text-sm font-semibold transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
+          >
+            Logout
+          </div>
+        </button>
       </div>
 
       {showFullMessage && selectedNotification && (

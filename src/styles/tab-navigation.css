@@ -1,0 +1,130 @@
+/* Dashboard Tab Navigation Styles */
+.tab-wrap {
+  --round: 10px;
+  --p-x: 8px;
+  --p-y: 4px;
+  --w-label: 120px;  /* Made wider to fit text */
+  display: flex;
+  align-items: center;
+  padding: var(--p-y) var(--p-x);
+  position: relative;
+  background: #f3f4f6; /* Gray-100 */
+  border-radius: var(--round);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+
+.tab-wrap input {
+  height: 0;
+  width: 0;
+  position: absolute;
+  overflow: hidden;
+  display: none;
+  visibility: hidden;
+}
+
+.tab-label {
+  cursor: pointer;
+  outline: none;
+  font-size: 0.875rem;
+  letter-spacing: initial;
+  font-weight: 500;
+  color: #4b5563; /* Gray-600 */
+  background: transparent;
+  padding: 12px 16px;
+  width: var(--w-label);
+  min-width: var(--w-label);
+  text-decoration: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: color 0.25s ease;
+  outline-offset: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-label span {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.tab-wrap input[class*="rd-"]:checked + label {
+  color: #ffffff; /* White text when active */
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: absolute;
+  transform-origin: 0 0 0;
+  height: 100%;
+  width: var(--w-label);
+  z-index: 0;
+  transition: transform 0.5s cubic-bezier(0.33, 0.83, 0.99, 0.98);
+}
+
+.tab-bar::before,
+.tab-bar::after {
+  content: "";
+  position: absolute;
+  height: 4px;
+  width: 100%;
+  background: #4f46e5; /* Indigo-600 */
+}
+
+.tab-bar::before {
+  top: 0;
+  border-radius: 0 0 9999px 9999px;
+}
+
+.tab-bar::after {
+  bottom: 0;
+  border-radius: 9999px 9999px 0 0;
+}
+
+.tab-slidebar {
+  position: absolute;
+  height: calc(100% - (var(--p-y) * 4));
+  width: var(--w-label);
+  border-radius: calc(var(--round) - var(--p-y));
+  background: #4f46e5; /* Indigo-600 */
+  transform-origin: 0 0 0;
+  z-index: 0;
+  transition: transform 0.5s cubic-bezier(0.33, 0.83, 0.99, 0.98);
+}
+
+.rd-1:checked ~ .tab-bar,
+.rd-1:checked ~ .tab-slidebar,
+.rd-1 + label:hover ~ .tab-slidebar {
+  transform: translateX(0) scaleX(1);
+}
+
+.rd-2:checked ~ .tab-bar,
+.rd-2:checked ~ .tab-slidebar,
+.rd-2 + label:hover ~ .tab-slidebar {
+  transform: translateX(100%) scaleX(1);
+}
+
+.rd-3:checked ~ .tab-bar,
+.rd-3:checked ~ .tab-slidebar,
+.rd-3 + label:hover ~ .tab-slidebar {
+  transform: translateX(200%) scaleX(1);
+}
+
+.rd-4:checked ~ .tab-bar,
+.rd-4:checked ~ .tab-slidebar,
+.rd-4 + label:hover ~ .tab-slidebar {
+  transform: translateX(300%) scaleX(1);
+}
