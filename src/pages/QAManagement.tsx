@@ -763,7 +763,7 @@ const QAManagement: React.FC = () => {
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <div className="inline-block min-w-full align-middle">
-                  <div className="max-h-[850px] overflow-y-auto">
+                  <div className="overflow-y-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
