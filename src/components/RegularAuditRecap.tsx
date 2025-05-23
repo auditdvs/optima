@@ -158,7 +158,6 @@ export const RegularAuditRecap: React.FC = () => {
         const rating = info.getValue();
         const qaRating = info.row.original.qaRating;
         
-        // Tentukan warna background: hijau jika sama, kuning jika berbeda
         const bgColor = 
           rating && qaRating && rating.toLowerCase() === qaRating.toLowerCase()
             ? 'bg-green-100' 
