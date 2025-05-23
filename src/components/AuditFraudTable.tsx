@@ -228,6 +228,9 @@ export const AuditFraudTable: React.FC = () => {
     []
   );
 
+  // Tambahkan state regionFilter di dekat state filter lainnya
+  const [regionFilter, setRegionFilter] = useState<string>('');
+
   useEffect(() => {
     fetchAuditData();
     getCurrentUserRole();
@@ -264,7 +267,7 @@ export const AuditFraudTable: React.FC = () => {
       const { data, error } = await supabase
         .from('audit_fraud')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true }); // Ubah ke true untuk terlama -> terbaru
 
       if (error) throw error;
       setAuditData(data || []);
@@ -460,6 +463,12 @@ export const AuditFraudTable: React.FC = () => {
   const columnHelper = createColumnHelper<AuditFraudData>();
 
   const columns = [
+    // Tambahkan kolom No. sebagai kolom pertama
+    columnHelper.display({
+      id: 'no',
+      header: 'No.',
+      cell: info => info.row.index + 1, // Nomor urut berdasarkan posisi di tabel
+    }),
     columnHelper.accessor('branch_name', {
       header: 'Branch Name',
       cell: info => info.getValue(),
@@ -616,15 +625,35 @@ export const AuditFraudTable: React.FC = () => {
     }),
   ];
 
-  // Filter completed audits if needed
-  const filteredAuditData = hideCompleted
-    ? auditData.filter(item => 
+  // Extract unique regions from the data
+  const uniqueRegions = React.useMemo(() => {
+    return Array.from(new Set(auditData.map(item => item.region)))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [auditData]);
+
+  // Modify filteredAuditData to include region filtering
+  const filteredAuditData = React.useMemo(() => {
+    let filtered = auditData;
+    
+    // Filter by completion status if needed
+    if (hideCompleted) {
+      filtered = filtered.filter(item => 
         !(item.data_preparation && 
           item.assignment_letter && 
           item.audit_working_papers && 
           item.audit_report && 
-          item.detailed_findings))
-    : auditData;
+          item.detailed_findings)
+      );
+    }
+    
+    // Filter by region if selected
+    if (regionFilter) {
+      filtered = filtered.filter(item => item.region === regionFilter);
+    }
+    
+    return filtered;
+  }, [auditData, hideCompleted, regionFilter]);
 
   // Update your React Table configuration to use virtualization for large datasets
 
@@ -702,6 +731,21 @@ export const AuditFraudTable: React.FC = () => {
               placeholder="Search..."
               className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+          
+          {/* Region Filter */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Region:</label>
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className="border rounded px-2 py-2 min-w-[120px]"
+            >
+              <option value="">All Regions</option>
+              {uniqueRegions.map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
           </div>
           
           <div className="flex items-center">

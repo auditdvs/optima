@@ -154,22 +154,54 @@ export const RegularAuditRecap: React.FC = () => {
     }),
     columnHelper.accessor('rating', {
       header: 'Rating',
-      cell: info => info.getValue(),
+      cell: info => {
+        const rating = info.getValue();
+        const qaRating = info.row.original.qaRating;
+        
+        // Tentukan warna background: hijau jika sama, kuning jika berbeda
+        const bgColor = 
+          rating && qaRating && rating.toLowerCase() === qaRating.toLowerCase()
+            ? 'bg-green-100' 
+            : (rating && qaRating) 
+              ? 'bg-yellow-100'
+              : '';
+        
+        return (
+          <div className={`px-2 py-1 rounded ${bgColor}`}>
+            {info.getValue()}
+          </div>
+        );
+      },
     }),
     columnHelper.accessor('qaRating', {
       header: 'Rating by QA',
-      cell: info => (
-        <select
-          value={info.getValue() || ''}
-          onChange={(e) => info.row.original.id && handleQARatingChange(info.row.original.id, e.target.value)}
-          className="w-full border rounded px-2 py-1"
-        >
-          <option value="">Select...</option>
-          <option value="High">High</option>  {/* Perbaiki text jadi uppercase */}
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
-      ),
+      cell: info => {
+        const qaRating = info.getValue();
+        const rating = info.row.original.rating;
+        
+        // Tentukan warna background: hijau jika sama, kuning jika berbeda
+        const bgColor = 
+          qaRating && rating && qaRating.toLowerCase() === rating.toLowerCase()
+            ? 'bg-green-100' 
+            : (qaRating && rating && qaRating !== '-' && rating !== '-') 
+              ? 'bg-yellow-100'
+              : '';
+        
+        return (
+          <div className={bgColor}>
+            <select
+              value={info.getValue() || ''}
+              onChange={(e) => info.row.original.id && handleQARatingChange(info.row.original.id, e.target.value)}
+              className={`w-full border rounded px-2 py-1 ${bgColor}`}
+            >
+              <option value="">Select...</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        );
+      },
     }),
   ];
 
