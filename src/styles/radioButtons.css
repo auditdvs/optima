@@ -4,11 +4,7 @@
   display: flex;
   flex-wrap: nowrap;
   border-radius: 0.5rem;
-  background: linear-gradient(145deg, #e6e6e6, #ffffff);
-  box-sizing: border-box;
-  box-shadow:
-    5px 5px 15px rgba(0, 0, 0, 0.15),
-    -5px -5px 15px rgba(255, 255, 255, 0.8);
+  background: linear-gradient(145deg, #f9fafb, #f9fafb);
   padding: 0.5rem;
   width: 700px;
   max-width: 100%;
