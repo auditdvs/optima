@@ -28,27 +28,33 @@ interface Auditor {
   name: string;
 }
 
+// Ubah tipe data untuk semua field checkbox
 interface AuditData {
   id?: string;
-  no: number;
-  branchName: string;
+  no: string;
   region: string;
+  branchId: string;
+  branchName: string;
+  priorityNo: string;
   auditPeriodStart: string;
   auditPeriodEnd: string;
   pic: string;
-  dapa: boolean;
-  revisedDapa: boolean;
-  dapaSupportingData: boolean;
-  assignmentLetter: boolean;
-  entranceAgenda: boolean;
-  entranceAttendance: boolean;
-  auditWorkingPapers: boolean;
-  exitMeetingMinutes: boolean;
-  exitAttendanceList: boolean;
-  auditResultLetter: boolean;
-  rta: boolean;
-  monitoring: 'Adequate' | 'Inadequate' | '';
-  comment?: string;
+  // Ubah semua boolean menjadi CheckState (null | true | false)
+  dapa: null | boolean;
+  revisedDapa: null | boolean;
+  dapaSupportingData: null | boolean;
+  assignmentLetter: null | boolean;
+  entranceAgenda: null | boolean;
+  entranceAttendance: null | boolean;
+  auditWorkingPapers: null | boolean;
+  cashCount: null | boolean;
+  auditReporting: null | boolean;
+  exitMeetingMinutes: null | boolean;
+  exitAttendanceList: null | boolean;
+  auditResultLetter: null | boolean;
+  rta: null | boolean;
+  monitoring: 'Adequate' | 'Inadequate';
+  comment: string;
 }
 
 interface AuditTableProps {
@@ -748,18 +754,36 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange, regionFilte
   };
 
   const handleFieldChange = (rowIndex: number, field: keyof AuditData, value: any) => {
-    const item = data[rowIndex];
+    console.log(`Changing field ${field} at index ${rowIndex} to ${value}`);
+    
+    // Get the item by ID from the filtered data
+    const item = filteredData[rowIndex];
+    if (!item || !item.id) {
+      console.error('Cannot update: item or item ID not found');
+      return;
+    }
+    
+    // Find the actual index in the full data array
+    const originalIndex = data.findIndex(d => d.id === item.id);
+    if (originalIndex === -1) {
+      console.error(`Item with id ${item.id} not found in original data`);
+      return;
+    }
+    
+    // Create a proper deep copy of the data
     const newData = [...data];
-    newData[rowIndex] = { ...newData[rowIndex], [field]: value };
+    newData[originalIndex] = { ...newData[originalIndex], [field]: value };
+    
+    console.log(`Updated ${field} for ${item.branchName} to:`, value);
+    
+    // Update the UI immediately
     onDataChange(newData);
     
-    // Store in pending changes
-    if (item.id) {
-      setPendingChanges(prev => ({
-        ...prev,
-        [item.id]: { ...newData[rowIndex] }
-      }));
-    }
+    // Store in pending changes for later save
+    setPendingChanges(prev => ({
+      ...prev,
+      [item.id]: { ...newData[originalIndex] }
+    }));
   };
 
   const uniqueRegions = React.useMemo(() => {
