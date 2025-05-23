@@ -1,8 +1,7 @@
-import { Edit2, Table2, UserPlus } from 'lucide-react';
+import { Edit2, RefreshCw, UserPlus } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { AuditFraudTable } from '../components/AuditFraudTable';
-import AuditScheduleViewer from '../components/AuditScheduleViewer';
 import AuditTable from '../components/AuditTable';
 import { LoadingAnimation } from '../components/LoadingAnimation';
 import { MatriksSection } from '../components/MatriksSection';
@@ -12,6 +11,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import '../styles/radioButtons.css';
 
 interface Auditor {
   id: string;
@@ -59,8 +59,9 @@ interface Branch {
 interface AuditEntry {
   no: string;
   region: string;
-  branchId: string;  // Add this to store the selected branch ID
+  branchId: string;
   branchName: string;
+  priorityNo: string; // Add this field for the priority number from audit_schedule
   auditPeriodStart: string;
   auditPeriodEnd: string;
   pic: string;
@@ -209,8 +210,9 @@ const QAManagement: React.FC = () => {
     {
       no: '',
       region: '',
-      branchId: '',  // Add this field
+      branchId: '',
       branchName: '',
+      priorityNo: '', // Add initial value for priorityNo
       auditPeriodStart: '',
       auditPeriodEnd: '',
       pic: '',
@@ -231,12 +233,24 @@ const QAManagement: React.FC = () => {
       comment: '',
     },
   ]);
+  const [regionFilter, setRegionFilter] = useState<string>('');
+  const [auditRegular, setAuditRegular] = useState<{ branch_name: string; audit_period: string }[]>([]);
+  // Tambahkan state untuk refresh loading
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchAuditors();
     fetchBranches();
-    fetchAuditSchedules();
+    fetchAuditRegular();
   }, []);
+
+  useEffect(() => {
+    // fetchAuditSchedules setelah auditRegular terisi
+    if (auditRegular.length > 0) {
+      fetchAuditSchedules();
+    }
+    // eslint-disable-next-line
+  }, [auditRegular]);
 
   const fetchAuditors = async () => {
     try {
@@ -302,16 +316,46 @@ const QAManagement: React.FC = () => {
     }
   };
 
+  const fetchAuditRegular = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_regular')
+        .select('branch_name, audit_period_start, audit_period_end');
+      if (error) throw error;
+      setAuditRegular(data || []);
+    } catch (error) {
+      console.error('Error fetching audit_regular:', error);
+      toast.error('Failed to fetch audit_regular');
+    }
+  };
+
   const fetchAuditSchedules = async () => {
     try {
       const { data, error } = await supabase
         .from('audit_schedule')
         .select('branch_name, region, no');
-      
       if (error) throw error;
-      
-      setAuditSchedules(data || []);
-      console.log('Fetched audit schedules:', data);
+
+      // Mapping period & status dari audit_regular
+      const schedulesWithPeriod = (data || []).map(item => {
+        const reg = auditRegular.find(
+          r => r.branch_name.trim().toLowerCase() === item.branch_name.trim().toLowerCase()
+        );
+        const periodStart = reg?.audit_period_start || '';
+        const periodEnd = reg?.audit_period_end || '';
+        const period = periodStart && periodEnd
+          ? `${periodStart} - ${periodEnd}`
+          : '-';
+        const status = periodStart && periodEnd ? 'Audited' : 'Unaudited';
+        return {
+          ...item,
+          period,
+          status,
+        };
+      });
+
+      setAuditSchedules(schedulesWithPeriod);
+      console.log('Fetched audit schedules:', schedulesWithPeriod);
     } catch (error) {
       console.error('Error fetching audit schedules:', error);
       toast.error('Failed to fetch audit schedule');
@@ -456,7 +500,7 @@ const QAManagement: React.FC = () => {
       // Ambil region dari audit_schedule
       const match = findMatchingBranch(entry.branchName);
       const region = match ? match.region : 'Unassigned';
-      const overallNo = match ? match.no : ''; // Ambil no dari audit_schedule
+      const priorityNo = match ? match.no : ''; // Ambil no dari audit_schedule
 
       // Inisialisasi counter jika belum ada
       if (!regionCounters[region]) {
@@ -471,7 +515,7 @@ const QAManagement: React.FC = () => {
         ...entry,
         region,
         no: no.toString(),
-        overallNo: overallNo, // Tambahkan overallNo dari audit_schedule
+        priorityNo: priorityNo, // Ganti overallNo menjadi priorityNo
       };
     });
   };
@@ -567,85 +611,139 @@ const QAManagement: React.FC = () => {
     </div>
   );
 
+  // Dapatkan daftar region unik dari auditSchedules
+  const uniqueRegions = Array.from(
+    new Set(auditSchedules.map(item => item.region).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  // Filter auditSchedules sesuai region yang dipilih
+  const filteredAuditSchedules = regionFilter
+    ? auditSchedules.filter(item => item.region === regionFilter)
+    : auditSchedules;
+
+  // Fungsi untuk membagi data menjadi 2 kolom (gunakan filteredAuditSchedules)
+  const getAuditScheduleRows = () => {
+    const rows = [];
+    for (let i = 0; i < filteredAuditSchedules.length; i += 2) {
+      const left = filteredAuditSchedules[i];
+      const right = filteredAuditSchedules[i + 1];
+      rows.push([left, right]);
+    }
+    return rows;
+  };
+
+  const filteredData = React.useMemo(() => {
+    if (!regionFilter) return auditData;
+    return auditData.filter(item => item.region === regionFilter);
+  }, [auditData, regionFilter]);
+
+  // Fungsi untuk refresh semua data
+  const refreshAllData = async () => {
+    setRefreshing(true);
+    toast.loading('Refreshing data...', { id: 'refresh-toast' });
+    
+    try {
+      // Refresh semua data yang diperlukan
+      await fetchAuditors();
+      await fetchBranches();
+      await fetchAuditRegular();
+      // Schedule akan di-fetch otomatis karena ada dependency ke auditRegular
+      
+      toast.success('Data refreshed successfully', { id: 'refresh-toast' });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast.error('Failed to refresh data', { id: 'refresh-toast' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading && auditors.length === 0) {
     return <LoadingAnimation />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quality Assurance Management</h1>
-          <p className="text-sm text-gray-500">Manage auditors and their regional assignments</p>
+      <div>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Quality Assurance Management</h1>
+            <button 
+              onClick={refreshAllData}
+              disabled={refreshing}
+              className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-all"
+              title="Refresh all data"
+            >
+              <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          
+          {/* Radio buttons */}
+          <div className="radio-inputs">
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'auditors'} 
+                onChange={() => switchTab('auditors')}
+              />
+              <span className="name">Auditors</span>
+            </label>
+            
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'excel'} 
+                onChange={() => switchTab('excel')}
+              />
+              <span className="name">Regular</span>
+            </label>
+            
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'fraud'} 
+                onChange={() => switchTab('fraud')}
+              />
+              <span className="name">Special</span>
+            </label>
+            
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'recap'} 
+                onChange={() => switchTab('recap')}
+              />
+              <span className="name">Rating</span>
+            </label>
+            
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'rpm'} 
+                onChange={() => switchTab('rpm')}
+              />
+              <span className="name">RPM Letter</span>
+            </label>
+            
+            <label className="radio">
+              <input 
+                type="radio" 
+                name="qaTab" 
+                checked={activeTab === 'matriks'} 
+                onChange={() => switchTab('matriks')}
+              />
+              <span className="name">Matriks</span>
+            </label>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <button
-            onClick={() => switchTab('auditors')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'auditors'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <UserPlus className="h-5 w-5" />
-            Auditors
-          </button>
-          <button
-            onClick={() => switchTab('excel')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'excel'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <Table2 className="h-5 w-5" />
-            Audit Table Regular
-          </button>
-          <button
-            onClick={() => switchTab('fraud')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'fraud'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <Table2 className="h-5 w-5" />
-            Audit Table Fraud
-          </button>
-          <button
-            onClick={() => switchTab('recap')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'recap'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <Table2 className="h-5 w-5" />
-            Regular Audit Recap
-          </button>
-          <button
-            onClick={() => switchTab('rpm')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'rpm'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <Table2 className="h-5 w-5" />
-            RPM Letter
-          </button>
-          <button
-            onClick={() => switchTab('matriks')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              activeTab === 'matriks'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <Table2 className="h-5 w-5" />
-            Matriks
-          </button>
-        </div>
+        
+        {/* Description text moved below the header */}
+        <p className="text-sm text-gray-500 mt-1">Manage auditors and their regional assignments</p>
       </div>
 
       {activeTab === 'auditors' ? (
@@ -729,7 +827,64 @@ const QAManagement: React.FC = () => {
       ) : activeTab === 'excel' ? (
         <Card>
           <CardContent className="p-6">
-            <AuditScheduleViewer className="mb-6" />
+            {/* Filter region */}
+            <div className="mb-4 flex items-center gap-2">
+              <label className="font-medium">Filter by Region:</label>
+              <select
+                value={regionFilter}
+                onChange={e => setRegionFilter(e.target.value)}
+                className="border rounded px-2 py-1"
+              >
+                <option value="">All Regions</option>
+                {uniqueRegions.map(region => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+            </div>
+            {/* Audit Schedule 2 kolom */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-2">Audit Schedule</h2>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>No</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getAuditScheduleRows().map(([left, right], idx) => (
+                      <TableRow key={idx}>
+                        {/* Kolom kiri */}
+                        <TableCell>{left?.no || ''}</TableCell>
+                        <TableCell>{left?.branch_name || ''}</TableCell>
+                        <TableCell>{left?.period || '-'}</TableCell>
+                        <TableCell>
+                          <span className={left?.status === 'Audited' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {left?.status || '-'}
+                          </span>
+                        </TableCell>
+                        {/* Kolom kanan */}
+                        <TableCell>{right?.no || ''}</TableCell>
+                        <TableCell>{right?.branch_name || ''}</TableCell>
+                        <TableCell>{right?.period || '-'}</TableCell>
+                        <TableCell>
+                          <span className={right?.status === 'Audited' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {right?.status || '-'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
                 {loadingRegularTable ? (
@@ -739,16 +894,18 @@ const QAManagement: React.FC = () => {
                     data={getNumberedAuditData()}
                     onDataChange={(newData) => {
                       console.log("Data yang akan diupdate:", newData);
-                      const dataWithoutNumbers = newData.map(({ no, region, ...rest }) => ({
+                      const dataWithoutNumbers = newData.map(({ no, region, priorityNo, ...rest }) => ({
                         ...rest,
                         no: '',
                         region: '',
+                        // Remove priorityNo from the saved data
                       }));
                       setAuditData(dataWithoutNumbers);
                     }}
                     renderRow={(row, idx) => (
                       <div className="flex items-center gap-4">
                         <span className="font-medium w-8">{row.no}</span>
+                        <span className="font-medium w-8 text-blue-600">{row.priorityNo}</span>
                         <div className="flex-1">
                           <select
                             value={row.branchId || ''}
@@ -756,10 +913,13 @@ const QAManagement: React.FC = () => {
                               const branchId = e.target.value;
                               const selectedBranch = branches.find(b => b.id === branchId);
                               const branchName = selectedBranch ? selectedBranch.name : '';
+                              const match = findMatchingBranch(branchName);
+                              const priorityNo = match ? match.no : '';
                               handleRowChange(idx, { 
                                 ...row, 
                                 branchId: branchId,
                                 branchName: branchName,
+                                priorityNo: priorityNo, // Add priorityNo when changing branch
                               });
                             }}
                             className="border rounded px-2 py-1 w-full"
@@ -774,109 +934,68 @@ const QAManagement: React.FC = () => {
                         </div>
                       </div>
                     )}
+                    regionFilter={regionFilter}
+                    setRegionFilter={setRegionFilter}
                   />
                 )}
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button 
-                onClick={fetchAuditSchedules}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-              >
-                Refresh Audit Schedule
-              </button>
-              <button 
-                onClick={() => {
-                  console.log("Audit Schedules:", auditSchedules);
-                  auditData.forEach(entry => {
-                    if (entry.branchName) {
-                      const match = findMatchingBranch(entry.branchName);
-                      if (!match) {
-                        console.warn(`No match found for branch: "${entry.branchName}"`);
-                      } else {
-                        console.log(`Match found for "${entry.branchName}": region=${match.region}`);
-                      }
-                    }
-                  });
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md"
-              >
-                Debug Branch Matching
-              </button>
-              <button 
-                onClick={() => {
-                  const numberedData = getNumberedAuditData();
-                  const regions = [...new Set(numberedData.map(item => item.region))];
-                  console.log("Regions found:", regions);
-                  regions.forEach(region => {
-                    const itemsInRegion = numberedData.filter(item => item.region === region);
-                    console.log(`Region ${region}: ${itemsInRegion.length} items`);
-                    console.log("Items:", itemsInRegion.map(item => ({
-                      no: item.no,
-                      branch: item.branchName
-                    })));
-                  });
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md"
-              >
-                Debug Numbering
-              </button>
-            </div>
+
           </CardContent>
         </Card>
       ) : activeTab === 'fraud' ? (
         <Card>
           <CardContent className="p-6">
-            <div className="overflow-x-auto">
-              <div className="inline-block min-w-full align-middle">
-                {loadingFraudTable ? (
-                  <LoadingAnimation />
-                ) : (
-                  <AuditFraudTable />
-                )}
-              </div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Audit Special Data</h2>
             </div>
+            {loadingFraudTable ? (
+              <LoadingAnimation />
+            ) : (
+              <AuditFraudTable data={auditData} />
+            )}
+          </CardContent>
+        </Card>
+      ) : activeTab === 'recap' ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Audit Recap</h2>
+            </div>
+            {loadingRecapTable ? (
+              <LoadingAnimation />
+            ) : (
+              <RegularAuditRecap data={auditData} />
+            )}
           </CardContent>
         </Card>
       ) : activeTab === 'rpm' ? (
         <Card>
           <CardContent className="p-6">
-            <div className="overflow-x-auto">
-              <div className="inline-block min-w-full align-middle">
-                {loadingRPMTable ? (
-                  <LoadingAnimation />
-                ) : (
-                  <RPMLetterTable />
-                )}
-              </div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">RPM Letter</h2>
             </div>
+            {loadingRPMTable ? (
+              <LoadingAnimation />
+            ) : (
+              <RPMLetterTable data={auditData} />
+            )}
           </CardContent>
         </Card>
       ) : activeTab === 'matriks' ? (
         <Card>
           <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Matriks</h2>
+            </div>
             {loadingMatriksTable ? (
               <LoadingAnimation />
             ) : (
-              <MatriksSection />
+              <MatriksSection data={auditData} />
             )}
           </CardContent>
         </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-6">
-            <div className="overflow-x-auto">
-              <div className="inline-block min-w-full align-middle">
-                {loadingRecapTable ? (
-                  <LoadingAnimation />
-                ) : (
-                  <RegularAuditRecap />
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      ) : null}
 
       {showAddModal && (
         <AddAuditorModal
@@ -885,9 +1004,10 @@ const QAManagement: React.FC = () => {
           loading={loading}
         />
       )}
-      {showAssignmentModal && selectedAuditor && <UpdateAssignmentModal />}
-      <Toaster />
-      {loading && <LoadingAnimation />}
+
+      {showAssignmentModal && selectedAuditor && (
+        <UpdateAssignmentModal />
+      )}
     </div>
   );
 };

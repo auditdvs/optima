@@ -54,6 +54,8 @@ interface AuditData {
 interface AuditTableProps {
   data: AuditData[];
   onDataChange: (newData: AuditData[]) => void;
+  regionFilter: string;
+  setRegionFilter: (region: string) => void;
 }
 
 interface AddBranchModalProps {
@@ -221,7 +223,7 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onAdd,
 
 const columnHelper = createColumnHelper<AuditData>();
 
-const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
+const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange, regionFilter, setRegionFilter }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [auditors, setAuditors] = useState<Auditor[]>([]);
@@ -232,14 +234,38 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   const [pendingChanges, setPendingChanges] = useState<{[key: string]: AuditData}>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [regionFilter, setRegionFilter] = useState<string>('');
-  const [commentPopup, setCommentPopup] = useState<{rowIndex: number, value: string} | null>(null);
+  const [commentPopup, setCommentPopup] = useState<{
+    id: string; 
+    rowIndex: number; 
+    value: string;
+  } | null>(null);
+  const [scheduleNumbers, setScheduleNumbers] = useState<{ [branchName: string]: number }>({});
 
   useEffect(() => {
     fetchBranches();
     fetchAuditors();
     fetchAuditData();
+    fetchScheduleNumbers(); // Tambahkan ini
   }, []);
+
+  // Fungsi untuk fetch nomor dari audit_schedule
+  const fetchScheduleNumbers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_schedule')
+        .select('branch_name, no');
+      if (error) throw error;
+      // Buat mapping branch_name -> no
+      const mapping: { [branchName: string]: number } = {};
+      data?.forEach((item: any) => {
+        mapping[item.branch_name] = item.no;
+      });
+      setScheduleNumbers(mapping);
+    } catch (error) {
+      console.error('Error fetching schedule numbers:', error);
+      toast.error('Failed to fetch schedule numbers');
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -577,12 +603,19 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
   
   const saveAuditData = async (newData: AuditData) => {
     try {
+      // Validasi data wajib
+      if (!newData.branchName) {
+        console.error('Missing required field: branchName', newData);
+        toast.error('Cannot save: Branch name is required');
+        return;
+      }
+      
       const dbData = {
         branch_name: newData.branchName,
-        region: newData.region,
-        audit_period_start: newData.auditPeriodStart,
-        audit_period_end: newData.auditPeriodEnd,
-        pic: newData.pic,
+        region: newData.region || '', // Pastikan tidak null
+        audit_period_start: newData.auditPeriodStart || '',
+        audit_period_end: newData.auditPeriodEnd || '',
+        pic: newData.pic || '',
         dapa: newData.dapa,
         revised_dapa: newData.revisedDapa,
         dapa_supporting_data: newData.dapaSupportingData,
@@ -687,23 +720,30 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
 
   const handleSaveAllChanges = async () => {
     try {
-      // Create a loading toast that we'll update with the result
       const toastId = toast.loading(`Saving ${Object.keys(pendingChanges).length} changes...`);
+      let successCount = 0;
+      let errorCount = 0;
       
       for (const id of Object.keys(pendingChanges)) {
-        await saveAuditData(pendingChanges[id]);
+        try {
+          await saveAuditData(pendingChanges[id]);
+          successCount++;
+        } catch (err) {
+          console.error(`Error saving change for item ${id}:`, err);
+          errorCount++;
+        }
       }
       
-      // Clear pending changes after successful save
       setPendingChanges({});
       
-      // Update the toast to show success
-      toast.success(`${Object.keys(pendingChanges).length} changes saved successfully`, {
-        id: toastId
-      });
+      if (errorCount === 0) {
+        toast.success(`${successCount} changes saved successfully`, { id: toastId });
+      } else {
+        toast.error(`Saved ${successCount} changes, failed to save ${errorCount} changes`, { id: toastId });
+      }
     } catch (error) {
       console.error('Error saving changes:', error);
-      toast.error('Failed to save some changes');
+      toast.error('Failed to save changes');
     }
   };
 
@@ -741,9 +781,14 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       cell: info => info.row.original.no, // Pakai nilai 'no' per region
     }),
 
-    columnHelper.accessor('no', {
-      header: 'Overall No',
-      cell: info => info.row.index + 1,
+    // Ganti kolom Overall No:
+    columnHelper.accessor('priorityNo', {
+      header: 'PRIO NO.',
+      cell: info => {
+        // Ambil nomor dari scheduleNumbers berdasarkan branchName
+        const branchName = info.row.original.branchName;
+        return scheduleNumbers[branchName] || '-';
+      },
     }),
 
     columnHelper.accessor('branchName', {
@@ -959,7 +1004,11 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       cell: info => (
         <div className="relative">
           <button
-            onClick={() => setCommentPopup({ rowIndex: info.row.index, value: info.getValue() || '' })}
+            onClick={() => setCommentPopup({ 
+              id: info.row.original.id,  // Gunakan id dari original data
+              rowIndex: info.row.index, 
+              value: info.getValue() || '' 
+            })}
             className="text-gray-500 hover:text-gray-700"
           >
             <MessageSquare className="h-4 w-4" />
@@ -1031,21 +1080,6 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
               placeholder="Search..."
               className="pl-9 pr-4 py-2 border rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-          </div>
-          
-          {/* Region filter moved here */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Region:</label>
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="border rounded px-2 py-1.5 min-w-[120px]"
-            >
-              <option value="">All Regions</option>
-              {uniqueRegions.map(region => (
-                <option key={region} value={region}>{region}</option>
-              ))}
-            </select>
           </div>
         </div>
         
@@ -1162,8 +1196,32 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange }) => {
       {commentPopup && (
         <CommentPopup
           initial={commentPopup.value}
-          onSave={val => {
-            handleFieldChange(commentPopup.rowIndex, 'comment', val);
+          onSave={async (val) => {
+            // Cari item menggunakan commentPopup.id, bukan rowIndex
+            const item = data.find(item => item.id === commentPopup.id);
+            if (!item || !item.id) {
+              toast.error('Cannot save comment: missing record ID');
+              return;
+            }
+
+            // Update pendingChanges dengan semua data item
+            setPendingChanges(prev => ({
+              ...prev,
+              [item.id]: {
+                ...item, // Pastikan semua data lain tetap ada
+                comment: val
+              }
+            }));
+            
+            // Update data lokal untuk tampilan
+            const updatedData = data.map(dataItem => 
+              dataItem.id === item.id 
+                ? { ...dataItem, comment: val }
+                : dataItem
+            );
+            onDataChange(updatedData);
+            
+            setCommentPopup(null);
           }}
           onClose={() => setCommentPopup(null)}
         />
@@ -1381,28 +1439,19 @@ const CommentCell: React.FC<{
   value: string;
   onSave: (val: string) => void;
 }> = ({ value, onSave }) => {
-  const [show, setShow] = React.useState(false);
-
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Gunakan nilai dari pendingChanges jika ada, atau value original
+  const displayValue = pendingChanges[item.id]?.comment ?? value;
+  
   return (
     <div className="relative">
       <button
-        onClick={() => setShow(true)}
-        className="text-gray-500 hover:text-gray-700"
+        onClick={() => setIsOpen(true)}
+        className="text-blue-600 hover:text-blue-800 text-sm truncate max-w-[100px] block"
       >
-        <MessageSquare className="h-4 w-4" />
+        {displayValue || 'Add comment...'}
       </button>
-      {value && (
-        <div className="absolute bottom-full mb-2 left-0 bg-white p-2 rounded shadow-lg border text-sm z-10">
-          {value}
-        </div>
-      )}
-      {show && (
-        <CommentPopup
-          initial={value || ''}
-          onSave={onSave}
-          onClose={() => setShow(false)}
-        />
-      )}
     </div>
   );
 };
