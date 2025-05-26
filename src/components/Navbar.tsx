@@ -1,11 +1,16 @@
-import { AlignStartVertical, ChartNoAxesColumn, X } from 'lucide-react';
+import { AlignStartVertical, ChartNoAxesColumn, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import dvs1Icon from '../assets/dvs-1.png';
+import dvs2Icon from '../assets/dvs-2.png';
+import managerIcon from '../assets/manager.png';
+import qaIcon from '../assets/qa.png';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import '../styles/bell.css';
 import '../styles/hamburger-menu.css';
 import '../styles/loaders.css';
+import '../styles/pic.css';
 import AuditRatingCalculator from './AuditRatingCalculator';
 
 interface Notification {
@@ -37,6 +42,9 @@ function Navbar() {
   const rcmInputRef = useRef<HTMLInputElement>(null);
 
   const [showAuditRating, setShowAuditRating] = useState(false);
+  const [showPICList, setShowPICList] = useState(false);
+  const [picList, setPicList] = useState<any[]>([]);
+  const [picLoading, setPicLoading] = useState(false);
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -257,6 +265,32 @@ function Navbar() {
     }
   };
 
+  // Add this function to fetch PIC data
+  const fetchPICList = async () => {
+    setPicLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('pic')
+        .select('*');
+        
+      if (error) throw error;
+      
+      if (data) {
+        setPicList(data);
+      }
+    } catch (error) {
+      console.error('Error fetching PIC list:', error);
+      toast.error('Failed to load PIC list');
+    } finally {
+      setPicLoading(false);
+    }
+  };
+
+  const handleShowPICList = () => {
+    setShowPICList(true);
+    fetchPICList();
+  };
+
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
       {/* Only show greeting on desktop (lg screens and up) */}
@@ -297,6 +331,14 @@ function Navbar() {
               <div className="flex items-center">
                 <ChartNoAxesColumn className="w-4 h-4 mr-2 text-indigo-600" />
                 <span>RCM</span>
+              </div>
+            </div>
+            
+            {/* PIC List Menu Item */}
+            <div className="menu-list" onClick={handleShowPICList}>
+              <div className="flex items-center">
+                <Users className="w-2 h-2 mr-2 text-indigo-600" />
+                <span>PIC List</span>
               </div>
             </div>
             
@@ -359,9 +401,29 @@ function Navbar() {
                 )}
                 <button
                   onClick={() => setShowNotifications(false)}
-                  className="text-gray-500 hover:text-gray-700 flex items-center justify-center w-8 h-8"
+                  className="group flex items-center justify-center transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
                 >
-                  <X className="h-5 w-5" />
+                  <svg
+                    fill="currentColor"
+                    stroke="none"
+                    strokeWidth="0"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+                  >
+                    <path
+                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                      d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                    ></path>
+                    <path
+                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                      d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                    ></path>
+                    <path
+                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                      d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                    ></path>
+                  </svg>
                 </button>
               </div>
             </div>
@@ -469,6 +531,30 @@ function Navbar() {
           </span>
         </button>
 
+        {/* PIC List */}
+        <button
+          onClick={handleShowPICList}
+          className="group overflow-hidden relative w-8 h-8 bg-indigo-500 rounded-full cursor-pointer z-10 flex items-center justify-center text-white shadow-lg hover:w-28 hover:rounded-lg transition-all duration-200 active:translate-x-1 active:translate-y-1"
+        >
+          <Users className="w-4 h-4 group-hover:opacity-0 transition-opacity absolute" />
+          
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-white rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left"
+          ></span>
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-400 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left"
+          ></span>
+          <span
+            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-600 rotate-12 transform scale-x-0 group-hover:scale-x-50 transition-transform group-hover:duration-1000 duration-500 origin-left"
+          ></span>
+          
+          <span
+            className="group-hover:opacity-100 opacity-0 text-sm font-medium transition-opacity group-hover:duration-1000 duration-100 z-10"
+          >
+            PIC List
+          </span>
+        </button>
+
         {/* Notifications */}
         <div className="relative">
           <button
@@ -503,9 +589,29 @@ function Navbar() {
                   )}
                   <button
                     onClick={() => setShowNotifications(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="group flex items-center justify-center transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
                   >
-                    <X className="h-5 w-5" />
+                    <svg
+                      fill="currentColor"
+                      stroke="none"
+                      strokeWidth="0"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+                    >
+                      <path
+                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                        d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                      ></path>
+                      <path
+                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                        d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                      ></path>
+                      <path
+                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                        d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                      ></path>
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -597,9 +703,29 @@ function Navbar() {
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
             <button
               onClick={handleCloseFullMessage}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
             >
-              <X className="h-5 w-5" />
+              <svg
+                fill="currentColor"
+                stroke="none"
+                strokeWidth="0"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+              >
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                ></path>
+              </svg>
             </button>
             <h4 className="font-semibold text-lg mb-2">{selectedNotification.title}</h4>
             <div className="overflow-y-auto max-h-[400px]">
@@ -624,9 +750,29 @@ function Navbar() {
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
             <button
               onClick={() => setShowRCMSearch(false)}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
             >
-              <X className="h-5 w-5" />
+              <svg
+                fill="currentColor"
+                stroke="none"
+                strokeWidth="0"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+              >
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                ></path>
+              </svg>
             </button>
             <h4 className="font-semibold text-lg mb-4">Search Matriks</h4>
             <form onSubmit={handleRCMSearch} className="mb-4">
@@ -712,11 +858,129 @@ function Navbar() {
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
             <button
               onClick={() => setShowAuditRating(false)}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
             >
-              <X className="h-5 w-5" />
+              <svg
+                fill="currentColor"
+                stroke="none"
+                strokeWidth="0"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+              >
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                ></path>
+                <path
+                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                ></path>
+              </svg>
             </button>
             <AuditRatingCalculator />
+          </div>
+        </div>
+      )}
+
+      {/* PIC List Modal */}
+      {showPICList && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="pic-list-container rounded-lg shadow-lg max-w-6xl w-full p-6 relative">
+            {/* Background waves */}
+            <div className="background-wave"></div>
+            <div className="background-wave"></div>
+            <div className="background-wave"></div>
+            
+            {/* Modal content */}
+            <div className="pic-content">
+              {/* Replace the current close button in the PIC List modal */}
+              <button
+                onClick={() => setShowPICList(false)}
+                className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+              >
+                <svg
+                  fill="currentColor"
+                  stroke="none"
+                  strokeWidth="0"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
+                >
+                  <path
+                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
+                    d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
+                  ></path>
+                  <path
+                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
+                    d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
+                  ></path>
+                  <path
+                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
+                    d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
+                  ></path>
+                </svg>
+              </button>
+              <h4 className="font-semibold text-lg mb-4 text-indigo-900">PIC List</h4>
+              
+              {picLoading ? (
+                <div className="flex justify-center items-center py-10">
+                  <div id="wifi-loader">
+                    {/* Loader content */}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8 p-4">
+                  {picList.length === 0 ? (
+                    <div className="col-span-full text-center text-gray-500">No PIC data available</div>
+                  ) : (
+                    picList.map((pic) => (
+                      <div key={pic.id} className="flex justify-center">
+                        <div className="e-card playing">
+                          <div className="wave"></div>
+                          <div className="wave"></div>
+                          <div className="wave"></div>
+                          
+                          <div className="infotop">
+                            {/* Conditional rendering based on name/position */}
+                            {(() => {
+                              // Determine which image to use
+                              let iconSrc;
+                              if (pic.nama === "Ganjar Raharja") {
+                                iconSrc = dvs1Icon;
+                              } else if (pic.nama === "Dede Yudha N") {
+                                iconSrc = dvs2Icon;
+                              } else if (pic.posisi === "QA" || pic.posisi.includes("QA")) {
+                                iconSrc = qaIcon;
+                              } else if (pic.nama === "M Afan") {
+                                iconSrc = managerIcon;
+                              } else {
+                                iconSrc = pic.posisi === "Manager" ? managerIcon : qaIcon;
+                              }
+                              
+                              return (
+                                <div className="icon-container">
+                                  <img src={iconSrc} alt={pic.posisi} className="icon" />
+                                </div>
+                              );
+                            })()}
+                            <br />
+                            <div className="font-semibold text-white mb-4">
+                              {pic.nama || 'Name'} - {pic.posisi || 'Position'}
+                            </div>
+                            <div className="pic-area">{pic.pic_area || 'Area'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
