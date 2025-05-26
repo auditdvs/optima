@@ -1,0 +1,151 @@
+.e-card {
+  margin: 0 auto; /* Remove the 100px top margin */
+  background: transparent;
+  box-shadow: 0px 8px 28px -9px rgba(0,0,0,0.45);
+  position: relative;
+  width: 220px; /* Updated width */
+  height: 300px; /* Updated height */
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.wave {
+  position: absolute;
+  width: 540px;
+  height: 700px;
+  opacity: 0.6;
+  left: 0;
+  top: 0;
+  margin-left: -50%;
+  margin-top: -70%;
+  background: linear-gradient(744deg, #7e3af2, #6366f1 60%, #818cf8); /* Updated to purple gradient */
+}
+
+.icon-container {
+  width: 3.5em;
+  height: 3.5em;
+  background-color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -1em auto 0.5em auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.icon {
+  width: 2.5em;
+  height: 2.5em;
+  display: block;
+  object-fit: contain;
+}
+
+.infotop {
+  text-align: center;
+  font-size: 18px; /* Slightly smaller */
+  position: absolute;
+  top: 5em; /* Changed from 7em to 5em to move content higher */
+  left: 0;
+  right: 0;
+  color: rgb(255, 255, 255);
+  padding: 0 15px; /* Added padding */
+}
+
+.name {
+  font-size: 16px; /* Slightly larger */
+  font-weight: 400; /* More visible */
+  position: relative;
+  top: 1em;
+  text-transform: none; /* Don't lowercase names */
+}
+
+.pic-area {
+  font-size: 16px; /* Slightly larger */
+  font-weight: 400;
+  position: relative;
+  color: rgba(255, 255, 255, 0.9); /* More visible */
+  margin-top: 0.25em; /* Reduced from 0.5em */
+}
+
+.wave:nth-child(2),
+.wave:nth-child(3) {
+  top: 210px;
+}
+
+.playing .wave {
+  border-radius: 40%;
+  animation: wave 3000ms infinite linear;
+}
+
+.wave {
+  border-radius: 40%;
+  animation: wave 55s infinite linear;
+}
+
+.playing .wave:nth-child(2) {
+  animation-duration: 4000ms;
+}
+
+.wave:nth-child(2) {
+  animation-duration: 50s;
+}
+
+.playing .wave:nth-child(3) {
+  animation-duration: 5000ms;
+}
+
+.wave:nth-child(3) {
+  animation-duration: 45s;
+}
+
+@keyframes wave {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Update these styles to make the background waves more visible */
+.pic-list-container {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(237, 242, 255, 0.9); /* More opaque background */
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Make background waves more visible */
+.background-wave {
+  position: absolute;
+  width: 1400px;
+  height: 1400px;
+  opacity: 0.4; /* Increased from 0.2 */
+  left: 50%;
+  top: 50%;
+  margin-left: -700px;
+  margin-top: -700px;
+  background: linear-gradient(744deg, #8b5cf6, #6366f1 60%, #818cf8); /* More saturated purple gradient */
+  border-radius: 40%;
+  animation: wave 95s infinite linear;
+  z-index: 0;
+}
+
+.background-wave:nth-child(2) {
+  opacity: 0.3; /* Increased from 0.15 */
+  animation-duration: 120s;
+  animation-direction: reverse;
+}
+
+.background-wave:nth-child(3) {
+  opacity: 0.2; /* Increased from 0.1 */
+  animation-duration: 70s;
+}
+
+/* Ensure content appears above the waves */
+.pic-content {
+  position: relative;
+  z-index: 1;
+}
