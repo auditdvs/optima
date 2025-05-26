@@ -1,13 +1,33 @@
-import { Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast'; // Add this import
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
+const notifyError = (message) => {
+  // Clear any existing toasts first
+  toast.dismiss();
+  
+  toast.error(message, {
+    position: 'top-center',
+    duration: 4000,
+    style: {
+      background: '#f44336',
+      color: '#fff',
+      borderRadius: '10px',
+      padding: '14px 20px',
+      maxWidth: '350px',
+      boxShadow: '0 3px 10px rgba(0, 0, 0, 0.2)',
+      margin: '0 auto', // Center horizontally
+    },
+  });
+};
+
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  // Remove the error state since we'll use toast instead
+  // const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -60,18 +80,15 @@ function Login() {
     e.preventDefault();
     
     try {
-      setError('');
       setLoading(true);
       await signIn(email, password);
       // Don't navigate here - let the useEffect handle it
-      // When user is set in AuthContext, the useEffect above will redirect
     } catch (err) {
-      setError('Failed to sign in');
+      // Replace the toast.error with our custom function
+      notifyError('Failed to sign in');
       console.error(err);
-      setLoading(false); // Only reset loading on error
+      setLoading(false);
     }
-    // Note: We intentionally don't set loading to false on success,
-    // as the page will navigate away
   }
 
   // Handle password reset
@@ -79,12 +96,12 @@ function Login() {
     e.preventDefault();
     
     if (!email) {
-      setError('Please enter your email address');
+      notifyError('Please enter your email address');
       return;
     }
 
     try {
-      setError('');
+      // Remove setError('')
       setLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -95,7 +112,7 @@ function Login() {
       setMessage('Password reset instructions have been sent to your email');
       setIsResettingPassword(false);
     } catch (err) {
-      setError('Failed to send password reset email');
+      notifyError('Failed to send password reset email');
       console.error(err);
     } finally {
       setLoading(false);
@@ -106,278 +123,257 @@ function Login() {
   const isPageLoading = loading || authLoading;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-6 sm:px-6 lg:px-8">
-      {/* Add a simple loading indicator at the top if needed */}
-      {isPageLoading && (
-        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200">
-          <div className="h-full bg-indigo-600 animate-pulse-slow" style={{ width: '30%' }}></div>
-        </div>
-      )}
+    <>
+      {/* Add the Toaster component at the top of your JSX */}
+      <Toaster 
+  position="top-center" 
+  reverseOrder={false}
+  gutter={8}
+  containerClassName=""
+  containerStyle={{}}
+  toastOptions={{
+    // Default options for all toasts
+    duration: 4000,
+    style: {
+      maxWidth: '350px',
+      margin: '0 auto',
+    },
+  }}
+/>
+      
+      {/* Existing style jsx */}
+      <style jsx>{`
+        /* Fix for autofill background in Chrome, Safari, and Edge */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus,
+        input:-webkit-autofill:active {
+          -webkit-box-shadow: 0 0 0 30px rgba(30, 58, 138, 0.3) inset !important;
+          -webkit-text-fill-color: white !important;
+          transition: background-color 5000s ease-in-out 0s;
+          caret-color: white;
+        }
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className={`rounded-full bg-indigo-100 p-3 transition-all duration-700 ${fadeIn ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
-            <Users className="h-12 w-12 text-indigo-600" />
+        /* Fix for Firefox */
+        @-moz-document url-prefix() {
+          input:-moz-autofill,
+          input:-moz-autofill:focus {
+            background-color: rgba(30, 58, 138, 0.3) !important;
+            color: white !important;
+          }
+        }
+      `}</style>
+
+      <div className="min-h-screen bg-indigo-200 flex flex-col justify-center py-6 sm:px-6 lg:px-8">
+        {/* Loading indicator remains unchanged */}
+        {isPageLoading && (
+          <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200">
+            <div className="h-full bg-indigo-600 animate-pulse-slow" style={{ width: '30%' }}></div>
           </div>
-        </div>
-        <h2 className={`mt-1 text-center text-3xl font-extrabold text-gray-900 transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-          OPTIMA Dashboard
-        </h2>
-      </div>
+        )}
 
-      <div className={`mt-2 sm:mx-auto sm:w-full sm:max-w-5xl transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
-        <div className="bg-white overflow-hidden shadow-md rounded-lg">
-          <div className="flex flex-col md:flex-row">
-            {/* Login Form */}
-            <div className="md:w-1/2 p-8 md:border-r md:border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Sign in to your account</h3>
-              
-              {error && (
-                <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded-md animate-fadeIn">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {message && (
-                <div className="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded-md animate-fadeIn">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-green-700">{message}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {!isResettingPassword ? (
-                <form className="space-y-6" onSubmit={handleSubmit}>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Email address
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                      Password
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="current-password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <input
-                        id="remember-me"
-                        name="remember-me"
-                        type="checkbox"
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                        Remember me
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition duration-150 ease-in-out transform hover:scale-[1.02]"
-                    >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Signing in...
-                        </>
-                      ) : 'Sign in'}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <form className="space-y-6" onSubmit={handlePasswordReset}>
-                  <div>
-                    <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700">
-                      Email address
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="reset-email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition duration-150 ease-in-out transform hover:scale-[1.02]"
-                    >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Sending...
-                        </>
-                      ) : 'Send Reset Instructions'}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Options</span>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-col space-y-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsResettingPassword(!isResettingPassword)}
-                    className="text-sm text-indigo-600 hover:text-indigo-500 transition duration-150 ease-in-out"
-                  >
-                    {isResettingPassword ? 'Back to login' : 'Forgot your password?'}
-                  </button>
+        <div className={`mt-2 sm:mx-auto sm:w-full sm:max-w-lg transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+          <div className="bg-indigo-200 overflow-hidden rounded-lg">
+            <div className="flex flex-col">
+              {/* Login Form - Now takes full width */}
+              <div className="p-8 flex items-center justify-center">
+                <div
+                  style={{ animation: "slideInFromLeft 1s ease-out" }}
+                  className="max-w-md w-full bg-gradient-to-r from-blue-800 to-purple-600 rounded-xl shadow-2xl overflow-hidden p-8 space-y-8"
+                >
+                  {/* Remove the error div since we're using toast */}
                   
-                  <p className="text-center text-sm text-gray-600">
-                    To create an account, please contact the administrator
-                  </p>
+                  {/* Keep the success message div */}
+                  {message && (
+                    <div className="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded-md animate-fadeIn">
+                      <div className="flex">
+                        <div className="ml-3">
+                          <p className="text-sm text-green-700">{message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Replace the separate heading and paragraph with this grouped div */}
+                  <div className="mb-6">
+                    <h2
+                      style={{ animation: "appear 2s ease-out" }}
+                      className="text-left text-4xl font-extrabold text-white mb-0"
+                    >
+                      OPTIMA Dashboard
+                    </h2>
+                    <p style={{ animation: "appear 3s ease-out" }} className="text-left text-gray-200 -mt-1 pl-1">
+                      {isResettingPassword ? 'Reset your password' : 'Sign in to your account'}
+                    </p>
+                  </div>
+
+                  {/* Login form and reset password form remain unchanged */}
+                  {!isResettingPassword ? (
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="relative mb-6">
+                        <input
+                          placeholder="joey@example.com"
+                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
+                          required
+                          id="email"
+                          name="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                        <label
+                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
+                          htmlFor="email"
+                        >
+                          Email address
+                        </label>
+                      </div>
+                      <div className="relative mb-6">
+                        <input
+                          placeholder="Password"
+                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
+                          required
+                          id="password"
+                          name="password"
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <label
+                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
+                          htmlFor="password"
+                        >
+                          Password
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center text-sm text-gray-200">
+                          <input
+                            className="form-checkbox h-4 w-4 text-purple-600 bg-gray-800 border-gray-300 rounded"
+                            type="checkbox"
+                          />
+                          <span className="ml-2">Remember me</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsResettingPassword(true)}
+                          className="text-sm text-purple-200 hover:underline"
+                        >
+                          Forgot your password?
+                        </button>
+                      </div>
+<button
+  className="relative w-full py-3 px-8 text-white text-base font-semibold overflow-hidden bg-purple-600 rounded-md transition-all duration-400 ease-in-out shadow-md hover:scale-105 hover:text-white hover:shadow-lg active:scale-95 before:absolute before:top-0 before:-left-full before:w-full before:h-full before:bg-gradient-to-r before:from-blue-800 before:to-purple-700 before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-md hover:before:left-0 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
+  type="submit"
+  disabled={loading}
+>
+  {loading ? (
+    <>
+      <svg className="animate-spin inline -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Signing in...
+    </>
+  ) : 'Sign In'}
+</button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handlePasswordReset} className="space-y-6">
+                      <div className="relative mb-6">
+                        <input
+                          placeholder="john@example.com"
+                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
+                          required
+                          id="reset-email"
+                          name="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                        <label
+                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
+                          htmlFor="reset-email"
+                        >
+                          Email address
+                        </label>
+                      </div>
+<button
+  className="relative w-full py-3 px-8 text-white text-base font-semibold overflow-hidden bg-purple-600 rounded-md transition-all duration-400 ease-in-out shadow-md hover:scale-105 hover:text-white hover:shadow-lg active:scale-95 before:absolute before:top-0 before:-left-full before:w-full before:h-full before:bg-gradient-to-r before:from-blue-800 before:to-purple-700 before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-md hover:before:left-0 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
+  type="submit"
+  disabled={loading}
+>
+  {loading ? (
+    <>
+      <svg className="animate-spin inline -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Sending...
+    </>
+  ) : 'Send Reset Instructions'}
+</button>
+                    </form>
+                  )}
+
+                  <div className="text-center text-gray-300">
+                    {isResettingPassword ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsResettingPassword(false)}
+                        className="text-purple-300 hover:underline"
+                      >
+                        Back to login
+                      </button>
+                    ) : (
+                      "To create an account, please contact the administrator"
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Person In Charge section */}
-            <div className="md:w-1/2 p-4 bg-gray-50">
-              <h2 className="text-xl font-bold text-gray-900 mb-1 text-center">Person In Charge</h2>
               
-              {loadingPic ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                </div>
-              ) : (
-                <>
-                  <div 
-                    className="relative overflow-x-auto shadow-md sm:rounded-lg max-h-[400px] overflow-y-auto"
-                    style={{
-                      msOverflowStyle: 'none',  /* IE and Edge */
-                      scrollbarWidth: 'none',   /* Firefox */
-                      '&::-webkit-scrollbar': {
-                        display: 'none'         /* Chrome, Safari and Opera */
-                      }
-                    }}
-                  >
-                    <table className="w-full text-sm text-left text-gray-500">
-                      <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
-                        <tr>
-                          <th scope="col" className="px-6 py-3">
-                            Nama
-                          </th>
-                          <th scope="col" className="px-6 py-3">
-                            Posisi
-                          </th>
-                          <th scope="col" className="px-6 py-3">
-                            PIC Area
-                          </th>
-                          <th scope="col" className="px-6 py-3">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {picData.length > 0 ? (
-                          picData.map((person, index) => (
-                            <tr key={index} className="bg-white border-b border-gray-200 hover:bg-gray-50">
-                              <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                                {person.nama}
-                              </th>
-                              <td className="px-6 py-4">
-                                {person.posisi}
-                              </td>
-                              <td className="px-6 py-4">
-                                {person.pic_area}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  person.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                                  person.status === 'Sick' ? 'bg-red-100 text-red-800' : 
-                                  person.status === 'On leave' ? 'bg-yellow-100 text-yellow-800' :
-                                  person.status === 'On Branch' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {person.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr className="bg-white">
-                            <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                              No PIC data available
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>               
-                </>
-              )}
+              {/* Person In Charge section - Now appears below login */}
+              <div className="p-4 bg-indigo-200 flex flex-col">
+                <h2 className="text-xs font-bold text-black mb-6 text-center marquee_header">Person In Charge</h2>
+                
+                {loadingPic ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                  </div>
+                ) : (
+                  <div className="marquee">
+                    <div className="marquee__inner">
+                      <div className="marquee__group">
+                        {picData.map((person, index) => (
+                          <span key={index}>{person.nama} - {person.posisi} - {person.status}</span>
+                        ))}
+                      </div>
+                      <div className="marquee__group">
+                        {picData.map((person, index) => (
+                          <span key={`repeat-${index}`}>{person.nama} - {person.posisi} - {person.status}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
+        
+        <div className="mt-6 text-center text-sm text-gray-500">
+          OPTIMA Internal Audit © 2025
+        </div>
       </div>
-      
-      <div className="mt-6 text-center text-sm text-gray-500">
-        OPTIMA Internal Audit © 2025
-      </div>
-    </div>
+    </>
   );
 }
 
+// ResetPassword component remains unchanged
 function ResetPassword() {
   const [searchParams] = useSearchParams();
   const [password, setPassword] = useState('');
@@ -410,27 +406,6 @@ function ResetPassword() {
   );
 }
 
-// Add these animations to your global CSS file
-const globalStyles = `
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes pulseEffect {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-out;
-}
-
-.animate-pulse-slow {
-  animation: pulseEffect 3s infinite ease-in-out;
-}
-`;
 
 export default Login;
 export { ResetPassword };
