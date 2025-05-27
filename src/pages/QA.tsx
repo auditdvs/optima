@@ -1101,12 +1101,7 @@ const QASection: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Auditor Details</h3>
-              <button 
-                onClick={() => setShowAuditorDetails(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={24} />
-              </button>
+
             </div>
             <div className="space-y-2">
               {selectedAuditorDetails.map((auditor, index) => (
@@ -1126,7 +1121,7 @@ const QASection: React.FC = () => {
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => setShowAuditorDetails(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
               >
                 Close
               </button>
