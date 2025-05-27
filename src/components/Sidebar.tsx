@@ -12,7 +12,8 @@ import {
   Table2,
   UserCog,
   Users,
-  Wrench
+  Wrench,
+  Mail
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +34,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
+    { path: '/email-address', icon: Mail, label: 'Email Address Branch' },
   ];
   
   // super admin, qa, manager dan dvs

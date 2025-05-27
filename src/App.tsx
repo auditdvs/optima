@@ -1,14 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+import { Toaster } from 'react-hot-toast';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
-import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AddUser from './pages/AddUser';
 import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
+import EmailAddress from './pages/EmailAddress';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
 import NotificationHistory from './pages/NotificationHistory';
@@ -103,6 +104,11 @@ function App() {
               <Route path="notification-history" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
                   <NotificationHistory />
+                </PrivateRoute>
+              } />
+              <Route path="email-address" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <EmailAddress />
                 </PrivateRoute>
               } />
             </Route>
