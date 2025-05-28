@@ -13,6 +13,7 @@ import EmailAddress from './pages/EmailAddress';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
 import NotificationHistory from './pages/NotificationHistory';
+import PullRequestPage from './pages/PullRequestPage';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
@@ -55,6 +56,7 @@ function App() {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="/pull-request" element={<PullRequestPage />} />
               <Route path="tools/*" element={
                 <PrivateRoute requiredRoles={['user', 'qa', 'superadmin','dvs','manager', 'risk']}>
                   <Tools />

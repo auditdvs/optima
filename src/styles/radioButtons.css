@@ -10,8 +10,6 @@
   max-width: 100%;
   font-size:12px;
   gap: 0.5rem;
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .radio-inputs::-webkit-scrollbar {
@@ -24,8 +22,8 @@
 }
 
 .radio-inputs .radio {
-  flex: 1 1 0;
-  min-width: 80px;
+  flex: 1 1 auto;
+  min-width: 70px;
   text-align: center;
   position: relative;
 }
