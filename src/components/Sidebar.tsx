@@ -4,16 +4,17 @@ import {
   ChevronsRight,
   FilePenLine,
   FileVideo,
+  GitPullRequest,
   History,
   LayoutDashboard,
   Library,
+  Mail,
   MapPinPlus,
   Megaphone,
   Table2,
   UserCog,
   Users,
-  Wrench,
-  Mail
+  Wrench
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -82,6 +83,11 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
       { path: '/add-user', icon: UserCog, label: 'Admin Menu' }
      );
   }
+
+  // Add this to your menuItems array
+  menuItems.push(
+    { path: '/pull-request', icon: GitPullRequest, label: 'Pull Request' }
+  );
   
  return (
     <div className={`flex flex-col h-screen bg-white border-r-2 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>

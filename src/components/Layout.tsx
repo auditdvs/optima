@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 
-function Layout() {
+interface LayoutProps {
+  children?: ReactNode;
+}
+
+function Layout({ children }: LayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   return (
@@ -16,7 +20,7 @@ function Layout() {
       <div className="flex flex-col flex-1 overflow-hidden">
         <Navbar />
         <main className="flex-1 overflow-auto p-6 bg-gray-50">
-          <Outlet />
+          {children || <Outlet />}
         </main>
       </div>
     </div>
