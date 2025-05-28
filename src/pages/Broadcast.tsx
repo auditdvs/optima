@@ -1,8 +1,24 @@
-import { Send, Upload, X } from 'lucide-react';
+import { Plus, RefreshCw, Send, Upload, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+
+// Shadcn UI components
+import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
+import { Textarea } from "../components/ui/textarea";
 
 // Add these constants at the top of your component
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -32,6 +48,7 @@ function Broadcast() {
   const [attachmentDetails, setAttachmentDetails] = useState<{ url: string; name: string } | null>(null);
   const [notifications, setNotifications] = useState<NotificationWithReaders[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -133,7 +150,7 @@ function Broadcast() {
         .insert({
           title,
           message,
-          sender_id: user.id, // <-- field ini tidak di-select di Navbar
+          sender_id: user.id,
           attachment_url: attachmentUrl,
           attachment_name: attachmentDetails?.name,
           created_at: new Date().toISOString()
@@ -148,6 +165,8 @@ function Broadcast() {
       setTitle('');
       setMessage('');
       setFile(null);
+      setDialogOpen(false);
+      fetchNotifications();
     } catch (error) {
       console.error('Error broadcasting message:', error);
       toast.error('Failed to broadcast message');
@@ -213,138 +232,153 @@ function Broadcast() {
   }, []);
 
   return (
-    <div className="max-w-6xl ml-1 mr-2 p-1">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Kiri: Broadcast Message */}
-        <div className="md:w-2/3 w-full">
-          <h1 className="text-2xl font-bold mb-6">Broadcast Message</h1>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Message
-              </label>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Attachment (optional)
-              </label>
-              <div className="mt-1 flex items-center">
-                <label className="relative cursor-pointer bg-white px-4 py-2 border rounded-md hover:bg-gray-50">
-                  <Upload className="h-5 w-5 text-gray-600" />
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileChange}
-                    accept=".pdf,.jpg,.jpeg,.png,.gif"
+    <div className="w-full min-h-screen py-6 px-1 pt-1 md:px-6">
+      <div className="flex justify-between items-center mb-5">
+        <h1 className="text-2xl font-bold pt-1">Broadcast Messages</h1>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={fetchNotifications}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+          
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                New Broadcast
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg w-full">
+              <DialogHeader>
+                <DialogTitle>Send Broadcast Message</DialogTitle>
+              </DialogHeader>
+              
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
                   />
-                </label>
-                {file && (
-                  <div className="ml-4 flex items-center">
-                    <span className="text-sm text-gray-500">{file.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFile(null);
-                        setAttachmentDetails(null);
-                      }}
-                      className="ml-2 text-gray-400 hover:text-gray-500"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-gray-500">
-                PDF, JPG, PNG or GIF up to 5MB
-              </p>
-            </div>
+                </div>
 
-            <button
-              type="submit"
-              disabled={loading || uploading}
-              className="flex items-center justify-center w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <Send className="h-5 w-5 mr-2" />
-              {uploading ? 'Uploading...' : loading ? 'Broadcasting...' : 'Broadcast Message'}
-            </button>
-          </form>
-        </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message</Label>
+                  <Textarea
+                    id="message"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={4}
+                    required
+                  />
+                </div>
 
-        {/* Kanan: Broadcast History */}
-        <div className="md:w-2/3 w-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Broadcast History</h2>
-            <button
-              onClick={fetchNotifications}
-              disabled={refreshing}
-              className="flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm text-gray-700 disabled:opacity-50"
-              title="Refresh"
-            >
-              <svg className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.582 9A7.003 7.003 0 0112 5c3.314 0 6.127 2.163 6.816 5M18.418 15A7.003 7.003 0 0112 19c-3.314 0-6.127-2.163-6.816-5" />
-              </svg>
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-          <div className="overflow-x-auto overflow-y-visible max-h-[500px] border rounded">
-            <table className="w-full text-sm table-fixed">
-              <thead className="bg-gray-100 sticky top-0">
-                <tr>
-                  <th className="p-2 text-left w-32">Title</th>
-                  <th className="p-2 text-left">Message</th>
-                  <th className="p-2 text-left w-36">Attachment</th>
-                  <th className="p-2 text-left w-32">Read by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {notifications.map((notif) => (
-                  <tr key={notif.id} className="border-b align-top">
-                    <td className="p-2 font-medium break-words">{notif.title}</td>
-                    <td className="p-2 break-words">{notif.message}</td>
-                    <td className="p-2">
-                      {notif.attachment_url && (
-                        <a
-                          href={notif.attachment_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline"
+                <div className="space-y-2">
+                  <Label>Attachment (optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" className="h-9" asChild>
+                      <label>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileChange}
+                          accept=".pdf,.jpg,.jpeg,.png,.gif"
+                        />
+                      </label>
+                    </Button>
+                    {file && (
+                      <div className="flex items-center">
+                        <span className="text-sm text-gray-500">{file.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFile(null);
+                            setAttachmentDetails(null);
+                          }}
+                          className="h-6 w-6 p-0 ml-1"
                         >
-                          {notif.attachment_name || 'Attachment'}
-                        </a>
-                      )}
-                    </td>
-                    <td className="p-2 break-words">
-                      {notif.readers.length > 0
-                        ? notif.readers.join(', ')
-                        : <span className="italic text-gray-400">Belum ada</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    PDF, JPG, PNG or GIF up to 5MB
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={loading || uploading}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {uploading ? 'Uploading...' : loading ? 'Sending...' : 'Send Message'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
+      </div>
+      {/* Table for broadcast history */}
+      <div className="border rounded-lg overflow-x-auto bg-white dark:bg-background">
+        <Table className="min-w-[700px] w-full">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[250px]">Title</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead className="w-[150px]">Attachment</TableHead>
+              <TableHead className="w-[200px]">Read by</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {notifications.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-6 text-gray-500 italic">
+                  No broadcast messages found
+                </TableCell>
+              </TableRow>
+            ) : (
+              notifications.map((notif) => (
+                <TableRow key={notif.id}>
+                  <TableCell className="font-medium">{notif.title}</TableCell>
+                  <TableCell className="whitespace-pre-wrap">{notif.message}</TableCell>
+                  <TableCell>
+                    {notif.attachment_url ? (
+                      <Button 
+                        variant="link" 
+                        onClick={() => handleDownload(notif.attachment_url!, notif.attachment_name || 'attachment')}
+                        className="p-0 h-auto"
+                      >
+                        {notif.attachment_name || 'Attachment'}
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    {notif.readers.length > 0
+                      ? notif.readers.join(', ')
+                      : <span className="italic text-gray-400">Belum ada</span>}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
