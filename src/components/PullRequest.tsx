@@ -6,6 +6,9 @@ import { supabase } from '../lib/supabaseClient';
 
 const PullRequest = () => {
   const { user, userRole } = useAuth();
+  
+  // Tambahkan state untuk uploaders
+  const [uploaders, setUploaders] = useState<{id: string, name: string}[]>([]);
   const [fullName, setFullName] = useState('');
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,11 @@ const PullRequest = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [adminResponse, setAdminResponse] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [selectedUploader, setSelectedUploader] = useState('');
+
+  // Tambahkan state uploading
+  const [uploading, setUploading] = useState(false);
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
 
@@ -25,6 +33,7 @@ const PullRequest = () => {
     if (user) {
       fetchUserProfile();
       fetchRequests();
+      fetchUploaders(); // Tambahkan pemanggilan fungsi fetchUploaders
     }
   }, [user]);
 
@@ -105,6 +114,27 @@ const PullRequest = () => {
     }
   };
 
+  // Fungsi untuk mengambil data uploaders dari tabel profiles
+  const fetchUploaders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name');
+      
+      if (error) throw error;
+      
+      // Transform data untuk sesuai dengan format yang dibutuhkan
+      const formattedUploaders = data.map(profile => ({
+        id: profile.id,
+        name: profile.full_name
+      }));
+      
+      setUploaders(formattedUploaders);
+    } catch (error) {
+      console.error('Error fetching uploaders:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -139,31 +169,67 @@ const PullRequest = () => {
 
       // Upload files jika status Done
       if (selectedFiles.length > 0 && selectedRequest.status === 'Done') {
-        const uploadResults = await Promise.all(selectedFiles.map(async (file) => {
-          const filePath = file.name; // gunakan nama asli file
-          const { error: uploadError } = await supabase.storage
-            .from('pull.request')
-            .upload(filePath, file, { upsert: true }); // upsert agar file lama bisa tertimpa jika nama sama
+        try {
+          // Mulai loading
+          setUploading(true);
+          
+          // Kumpulkan URL yang berhasil diupload
+          const successfulUploads = [];
+          
+          for (const file of selectedFiles) {
+            try {
+              // Bersihkan nama file - ganti spasi dengan underscore
+              const safeFileName = file.name.replace(/\s+/g, '_');
+              
+              // Gunakan folder per request + nama file yang aman
+              const filePath = `${selectedRequest.id}/${safeFileName}`;
+              
+              console.log("Uploading file:", file.name);
+              console.log("Using safe path:", filePath);
+              
+              const { error: uploadError } = await supabase.storage
+                .from('pull.request')
+                .upload(filePath, file, { upsert: true });
 
-          if (uploadError) throw uploadError;
+              if (uploadError) {
+                console.error("Upload error for file:", file.name, uploadError);
+                continue; // Skip ke file berikutnya jika gagal
+              }
 
-          const { data: publicURL } = supabase.storage
-            .from('pull.request')
-            .getPublicUrl(filePath);
+              const { data: publicURL } = supabase.storage
+                .from('pull.request')
+                .getPublicUrl(filePath);
 
-          return publicURL.publicUrl;
-        }));
-
-        fileUrls = uploadResults;
+              successfulUploads.push(publicURL.publicUrl);
+              console.log("Uploaded successfully:", publicURL.publicUrl);
+            } catch (fileError) {
+              console.error("Error processing file:", file.name, fileError);
+              // Lanjut ke file berikutnya
+            }
+          }
+          
+          // Tambahkan URL baru ke fileUrls yang sudah ada
+          fileUrls = [...(selectedRequest.file_urls || []), ...successfulUploads];
+          console.log("Final file URLs:", fileUrls);
+          
+        } catch (batchError) {
+          console.error("Batch upload error:", batchError);
+          toast.error("Some files failed to upload");
+          // Tetap lanjutkan dengan file yang berhasil
+        } finally {
+          // Selesai loading
+          setUploading(false);
+        }
       }
 
-      // Update request
+      // Update request - uploader adalah user yang login (fullName)
       const { error } = await supabase
         .from('pull_requests')
         .update({
           status: selectedRequest.status,
           admin_response: adminResponse,
-          file_urls: fileUrls, // <-- array of urls
+          file_urls: fileUrls,
+          uploader: fullName // Nama user yang login saat ini
         })
         .eq('id', selectedRequest.id);
 
@@ -177,6 +243,95 @@ const PullRequest = () => {
     } catch (error) {
       console.error('Error updating request:', error);
       toast.error('Failed to update request');
+    }
+  };
+  
+  // Handler untuk delete
+  const handleDeleteRequest = async (request: any) => {
+    try {
+      setLoading(true);
+      console.log("Starting delete for request:", request.id);
+      
+      // Hapus file di storage jika ada
+      if (request.file_urls && Array.isArray(request.file_urls)) {
+        console.log("Files to delete:", request.file_urls);
+        
+        for (const url of request.file_urls) {
+          try {
+            console.log("Processing URL:", url);
+            
+            // Extract file path - improve path extraction
+            let filePath;
+            try {
+              const urlObj = new URL(url);
+              console.log("URL pathname:", urlObj.pathname);
+              
+              // More robust path extraction
+              if (urlObj.pathname.includes('/pull.request/')) {
+                const bucketPart = '/pull.request/';
+                const bucketIndex = urlObj.pathname.indexOf(bucketPart);
+                if (bucketIndex !== -1) {
+                  filePath = decodeURIComponent(urlObj.pathname.substring(bucketIndex + bucketPart.length));
+                  console.log("Extracted file path:", filePath);
+                }
+              }
+            } catch (parseErr) {
+              console.error("URL parsing failed:", parseErr);
+            }
+            
+            // Fallback method if first approach fails
+            if (!filePath) {
+              const parts = url.split('/pull.request/');
+              if (parts.length > 1) {
+                filePath = decodeURIComponent(parts[1].split('?')[0]);
+                console.log("Fallback file path:", filePath);
+              }
+            }
+            
+            if (filePath) {
+              console.log("Attempting to delete:", filePath);
+              const { data, error: removeError } = await supabase.storage
+                .from('pull.request')
+                .remove([filePath]);
+                
+              console.log("Delete result:", { data, error: removeError });
+              
+              if (removeError) {
+                console.error("File delete error:", removeError);
+              }
+            } else {
+              console.error("Could not extract file path from URL:", url);
+            }
+          } catch (fileErr) {
+            console.error("Error processing file:", fileErr);
+          }
+        }
+      }
+      
+      // Hapus data di table - do this outside the file loop
+      console.log("Deleting database record for request:", request.id);
+      const { data, error } = await supabase
+        .from('pull_requests')
+        .delete()
+        .eq('id', request.id);
+      
+      console.log("Database delete result:", { data, error });
+      
+      if (error) {
+        console.error("Database delete error:", error);
+        throw error;
+      }
+
+      toast.success('Request & files deleted');
+      console.log("Refreshing requests list");
+      await fetchRequests(); // pastikan refresh data setelah delete
+      console.log("Refresh complete");
+    } catch (err) {
+      console.error('Complete delete error:', err);
+      toast.error('Failed to delete request or files');
+    } finally {
+      setLoading(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -340,18 +495,38 @@ const PullRequest = () => {
               </div>
               
               {selectedRequest.status === 'Done' && (
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Upload Data</label>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      setSelectedFiles(prev => [...prev, ...files]);
-                    }}
-                    className="w-full p-2 border rounded"
-                  />
-                </div>
+                <>
+                  {/* Hapus dropdown uploader dan ganti dengan informasi */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-gray-700">Uploader</label>
+                      <span className="text-sm font-medium text-indigo-600">
+                        {fullName}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">Upload Data</label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          setSelectedFiles(prev => [...prev, ...files]);
+                        }}
+                        className={`w-full p-2 border rounded ${uploading ? 'opacity-50' : ''}`}
+                        disabled={uploading}
+                      />
+                      {uploading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
+                          <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
               
               {selectedFiles.length > 0 && (
@@ -387,17 +562,50 @@ const PullRequest = () => {
                   type="button"
                   onClick={() => setSelectedRequest(null)}
                   className="px-4 py-2 border text-gray-600 rounded hover:bg-gray-100"
+                  disabled={uploading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                  disabled={uploading}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-2"
                 >
-                  Submit Response
+                  {uploading ? (
+                    <>
+                      <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                      <span>Uploading...</span>
+                    </>
+                  ) : 'Submit Response'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Konfirmasi Delete Custom */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+            <h2 className="text-lg font-semibold mb-4 text-red-600">Konfirmasi Hapus</h2>
+            <p className="mb-6">Yakin ingin menghapus request <span className="font-semibold">{deleteTarget.request_type}</span> beserta file di bucket?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded border text-gray-600 hover:bg-gray-100"
+                onClick={() => setDeleteTarget(null)}
+                disabled={loading}
+              >
+                Batal
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                onClick={() => handleDeleteRequest(deleteTarget)}
+                disabled={loading}
+              >
+                {loading ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -434,6 +642,9 @@ const PullRequest = () => {
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Admin Response
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Uploader
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
@@ -483,6 +694,15 @@ const PullRequest = () => {
                       <span className="text-sm text-gray-400">-</span>
                     )}
                   </td>
+                  <td className="px-6 py-4">
+                    {request.uploader ? (
+                      <div className="text-sm text-gray-900">
+                        {request.uploader}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(request.created_at).toLocaleString()}
                   </td>
@@ -496,6 +716,46 @@ const PullRequest = () => {
                               href={url}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={(e) => {
+                                // Prevent default action to handle manually
+                                e.preventDefault();
+                                
+                                // Try to download using fetch API first
+                                fetch(url)
+                                  .then(response => {
+                                    if (!response.ok) {
+                                      throw new Error('Network response was not ok');
+                                    }
+                                    return response.blob();
+                                  })
+                                  .then(blob => {
+                                    // Create a download link
+                                    const downloadUrl = window.URL.createObjectURL(blob);
+                                    
+                                    // Extract filename from URL
+                                    const urlParts = url.split('/');
+                                    const fileName = urlParts[urlParts.length - 1].split('?')[0];
+                                    const decodedFileName = decodeURIComponent(fileName);
+                                    
+                                    // Create temporary link and click it
+                                    const tempLink = document.createElement('a');
+                                    tempLink.href = downloadUrl;
+                                    tempLink.setAttribute('download', decodedFileName);
+                                    document.body.appendChild(tempLink);
+                                    tempLink.click();
+                                    document.body.removeChild(tempLink);
+                                    
+                                    // Clean up
+                                    window.URL.revokeObjectURL(downloadUrl);
+                                  })
+                                  .catch(error => {
+                                    console.error('Download error details:', error);
+                                    console.error('URL tried:', url);
+                                    // Fallback to direct link if fetch fails
+                                    window.open(url, '_blank');
+                                    toast.error('Error downloading file. Trying direct link.');
+                                  });
+                              }}
                               className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                             >
                               <Download size={16} /> Download {idx + 1}
@@ -513,6 +773,17 @@ const PullRequest = () => {
                           className="text-indigo-600 hover:text-indigo-800 underline"
                         >
                           Respond
+                        </button>
+                      )}
+
+                      {/* Delete action for superadmin */}
+                      {userRole === 'superadmin' && (
+                        <button
+                          onClick={() => setDeleteTarget(request)}
+                          className="text-red-600 hover:text-red-800 underline"
+                          title="Delete request beserta file"
+                        >
+                          Delete
                         </button>
                       )}
                     </div>
