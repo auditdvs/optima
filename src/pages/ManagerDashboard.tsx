@@ -21,7 +21,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { supabase } from '../lib/supabaseClient';
 import '../styles/download-button.css';
-import '../styles/tab-navigation.css';
+import '../styles/radioButtons.css';
 
 const checkUserAccess = async (supabase: any) => {
   try {
@@ -226,6 +226,9 @@ const ManagerDashboard = () => {
   // Add this state at the top of your component with other state variables
   const [activeSection, setActiveSection] = useState<'main' | 'auditorCounts' | 'auditSummary' | 'fraudData'>('main');
 
+  // Add this state
+  const [supportAuditorSummary, setSupportAuditorSummary] = useState<{ auditor: string, inputAudit: number, supportingData: number }[]>([]);
+
   useEffect(() => {
     const initializeDashboard = async () => {
       const hasAccess = await checkUserAccess(supabase);
@@ -240,6 +243,7 @@ const ManagerDashboard = () => {
       fetchFraudCases();
       fetchAuditorAuditCounts();
       fetchFraudDetailsByRegion(); // Add this line
+      fetchSupportAuditorSummary();
     };
 
     initializeDashboard();
@@ -252,6 +256,58 @@ const ManagerDashboard = () => {
       setFromSalaryChecked(false);
     }
   }, [isPaymentDialogOpen]);
+
+  const fetchSupportAuditorSummary = async () => {
+  // Mapping nama lengkap ke alias auditor
+  const ALIASES: Record<string, string> = {
+    'Joey': 'Dede',
+    'Ganjar Raharja': 'Ganjar',
+    'Lise Roswati R.': 'Lise',
+    'Lise Roswati Rochendi MP': 'Lise',
+    'Ayu Sri Erian Agustin': 'Ayu',
+    'Ayusri Erian Agustin': 'Ayu',
+  };
+  const AUDITORS = ['Ganjar', 'Dede', 'Lise', 'Ayu'];
+
+  // 1. Ambil data input audit dari work_papers.inputted_by
+  const { data: workPapers } = await supabase
+    .from('work_papers')
+    .select('inputted_by');
+
+  // Hitung jumlah input audit per auditor
+  const inputAuditCount: Record<string, number> = {};
+  AUDITORS.forEach(auditor => inputAuditCount[auditor] = 0);
+  workPapers?.forEach(wp => {
+    if (AUDITORS.includes(wp.inputted_by)) {
+      inputAuditCount[wp.inputted_by]++;
+    }
+  });
+
+  // 2. Ambil data supporting dari pull_requests.uploader
+  const { data: pullRequests } = await supabase
+    .from('pull_requests')
+    .select('uploader');
+
+  // Hitung jumlah supporting data per auditor (mapping alias)
+  const supportingDataCount: Record<string, number> = {};
+  AUDITORS.forEach(auditor => supportingDataCount[auditor] = 0);
+  pullRequests?.forEach(pr => {
+    let mapped = pr.uploader;
+    if (ALIASES[mapped]) mapped = ALIASES[mapped];
+    if (AUDITORS.includes(mapped)) {
+      supportingDataCount[mapped]++;
+    }
+  });
+
+  // Gabungkan ke summary
+  const summary = AUDITORS.map(auditor => ({
+    auditor,
+    inputAudit: inputAuditCount[auditor] || 0,
+    supportingData: supportingDataCount[auditor] || 0,
+  }));
+
+  setSupportAuditorSummary(summary);
+};
 
   const fetchDashboardData = async () => {
     try {
@@ -524,7 +580,7 @@ const ManagerDashboard = () => {
             // If payment is from salary, count the full fraud amount as recovered
             const fromSalary = wp.fraud_payments_audits?.[0]?.from_salary || false;
             return sum + (fromSalary ? wp.fraud_amount || 0 : hkpAmount);
-          }, 0);
+          }, 0) || 0;
         
         // Count regular audits for this region
         const regularAuditCount = regularAuditData
@@ -1058,6 +1114,15 @@ const ManagerDashboard = () => {
     });
   };
 
+  const SUPPORT_AUDITOR_ALIASES: Record<string, string> = {
+    'Joey': 'Dede',
+    'Ganjar Raharja': 'Ganjar',
+    'Lise Roswati R.': 'Lise',
+    'Ayu Sri Erian Agustin': 'Ayu',
+    // Tambahkan jika ada nama lain yang perlu di-mapping
+  };
+  const SUPPORT_AUDITORS = ['Ganjar', 'Dede', 'Lise', 'Ayu'];
+
   // Modify the Audit Trends Chart section to include the download image button
   return (
     <div className="p-0 space-y-3">
@@ -1085,61 +1150,43 @@ const ManagerDashboard = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="tab-wrap">
-        <input 
-          type="radio" 
-          id="tab-auditor" 
-          name="dashboard-tab" 
-          className="rd-1" 
-          hidden 
-          checked={activeSection === 'auditorCounts'}
-          onChange={() => setActiveSection('auditorCounts')} 
-        />
-        <label htmlFor="tab-auditor" className="tab-label" style={{"--index": 0}}>
-          <span>Audit Counts</span>
+      <div className="radio-inputs mt-2 mb-4 py-2">
+        <label className="radio">
+          <input
+            type="radio"
+            name="managerTab"
+            checked={activeSection === 'auditorCounts'}
+            onChange={() => setActiveSection('auditorCounts')}
+          />
+          <span className="name">Auditor Performa</span>
         </label>
-
-        <input 
-          type="radio" 
-          id="tab-summary" 
-          name="dashboard-tab" 
-          className="rd-2" 
-          hidden 
-          checked={activeSection === 'auditSummary'}
-          onChange={() => setActiveSection('auditSummary')} 
-        />
-        <label htmlFor="tab-summary" className="tab-label" style={{"--index": 1}}>
-          <span>Audit Summary</span>
+        <label className="radio">
+          <input
+            type="radio"
+            name="managerTab"
+            checked={activeSection === 'auditSummary'}
+            onChange={() => setActiveSection('auditSummary')}
+          />
+          <span className="name">Audit Summary</span>
         </label>
-
-        <input 
-          type="radio" 
-          id="tab-fraud" 
-          name="dashboard-tab" 
-          className="rd-3" 
-          hidden 
-          checked={activeSection === 'fraudData'}
-          onChange={() => setActiveSection('fraudData')} 
-        />
-        <label htmlFor="tab-fraud" className="tab-label" style={{"--index": 2}}>
-          <span>Fraud Data</span>
+        <label className="radio">
+          <input
+            type="radio"
+            name="managerTab"
+            checked={activeSection === 'fraudData'}
+            onChange={() => setActiveSection('fraudData')}
+          />
+          <span className="name">Fraud Data</span>
         </label>
-
-        <input 
-          type="radio" 
-          id="tab-overview" 
-          name="dashboard-tab" 
-          className="rd-4" 
-          hidden 
-          checked={activeSection === 'main'}
-          onChange={() => setActiveSection('main')} 
-        />
-        <label htmlFor="tab-overview" className="tab-label" style={{"--index": 3}}>
-          <span>Overview</span>
+        <label className="radio">
+          <input
+            type="radio"
+            name="managerTab"
+            checked={activeSection === 'main'}
+            onChange={() => setActiveSection('main')}
+          />
+          <span className="name">Overview</span>
         </label>
-
-        <div className="tab-bar"></div>
-        <div className="tab-slidebar"></div>
       </div>
 
       {/* Main Dashboard Section - Always visible */}
@@ -1274,78 +1321,108 @@ const ManagerDashboard = () => {
 
       {/* Audit Counts Per Auditor Section */}
       {activeSection === 'auditorCounts' && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Audit Counts Per Auditor</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  type="text"
-                  value={auditorSearchTerm}
-                  onChange={(e) => setAuditorSearchTerm(e.target.value)}
-                  placeholder="Search auditor..."
-                  className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+        <>
+          {/* Audit Counts Per Auditor */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Audit Counts Per Auditor</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    value={auditorSearchTerm}
+                    onChange={(e) => setAuditorSearchTerm(e.target.value)}
+                    placeholder="Search auditor..."
+                    className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-12">
-                      No.
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Auditor
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Regular Audits
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Fraud Audits
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {auditorAuditCounts.filter(auditor => 
-                    auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
-                  ).map((auditor, index) => (
-                    <tr key={auditor.auditor_id}>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {index + 1}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {auditor.name}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {auditor.regular_count}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {auditor.fraud_count}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                        {auditor.regular_count + auditor.fraud_count}
-                      </td>
-                    </tr>
-                  ))}
-                  {auditorAuditCounts.filter(auditor => 
-                    auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
-                  ).length === 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
-                        No auditors found matching your search
-                      </td>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-12">
+                        No.
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                        Auditor
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                        Regular Audits
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                        Fraud Audits
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                        Total
+                      </th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {auditorAuditCounts.filter(auditor => 
+                      auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
+                    ).map((auditor, index) => (
+                      <tr key={auditor.auditor_id}>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {auditor.name}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {auditor.regular_count}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {auditor.fraud_count}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                          {auditor.regular_count + auditor.fraud_count}
+                        </td>
+                      </tr>
+                    ))}
+                    {auditorAuditCounts.filter(auditor => 
+                      auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
+                    ).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
+                          No auditors found matching your search
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Support Auditor Table (TABEL TERPISAH) */}
+          <Card className="mt-8">
+            <CardContent className="p-6">
+              <h3 className="text-md font-semibold mb-2">Support Auditor</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Input Audit</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supporting Data</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {supportAuditorSummary.map((row) => (
+                      <tr key={row.auditor}>
+                        <td className="px-3 py-2 text-sm text-gray-900">{row.auditor}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">{row.inputAudit}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">{row.supportingData}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Audit Summary Section */}
@@ -1485,8 +1562,8 @@ const ManagerDashboard = () => {
                                 : 'bg-red-100 text-red-800'
                             }`}>
                               {audit.monitoring}
-                            </span>
-                          </td>
+                              </span>
+                            </td>
                           <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                             {getFailedChecksWithAliases(audit, true)}
                           </td>
@@ -1906,7 +1983,6 @@ const ManagerDashboard = () => {
         </DialogContent>
       </Dialog>
 
- 
     </div>
   );
 };
