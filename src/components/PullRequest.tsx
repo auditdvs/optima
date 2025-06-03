@@ -339,7 +339,11 @@ const PullRequest = () => {
     <div className="w-full h-full px-4 py-2 overflow-hidden">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Data Pull Requests</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Data Pull Requests</h1>
+            <p className="text-sm text-gray-500 mt-1">Request data only 1 per input to minimize errors and a maximum of 5 data per-week. If there are problems in retrieving data, please coordinate with DVS.
+</p>
+          </div>
           <button
             onClick={() => {
               setLoading(true);
