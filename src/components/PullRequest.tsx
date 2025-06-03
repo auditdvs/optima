@@ -139,15 +139,11 @@ const PullRequest = () => {
 
       // Upload files jika status Done
       if (selectedFiles.length > 0 && selectedRequest.status === 'Done') {
-        fileUrls = [];
-        for (const file of selectedFiles) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-          const filePath = fileName;
-
-          const { data, error: uploadError } = await supabase.storage
+        const uploadResults = await Promise.all(selectedFiles.map(async (file) => {
+          const filePath = file.name; // gunakan nama asli file
+          const { error: uploadError } = await supabase.storage
             .from('pull.request')
-            .upload(filePath, file);
+            .upload(filePath, file, { upsert: true }); // upsert agar file lama bisa tertimpa jika nama sama
 
           if (uploadError) throw uploadError;
 
@@ -155,8 +151,10 @@ const PullRequest = () => {
             .from('pull.request')
             .getPublicUrl(filePath);
 
-          fileUrls.push(publicURL.publicUrl);
-        }
+          return publicURL.publicUrl;
+        }));
+
+        fileUrls = uploadResults;
       }
 
       // Update request
@@ -347,10 +345,30 @@ const PullRequest = () => {
                   <input
                     type="file"
                     multiple
-                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setSelectedFiles(prev => [...prev, ...files]);
+                    }}
                     className="w-full p-2 border rounded"
                   />
                 </div>
+              )}
+              
+              {selectedFiles.length > 0 && (
+                <ul className="mb-2">
+                  {selectedFiles.map((file, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm">
+                      {file.name}
+                      <button
+                        type="button"
+                        className="text-red-500 hover:underline"
+                        onClick={() => setSelectedFiles(files => files.filter((_, i) => i !== idx))}
+                      >
+                        Hapus
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
               
               <div className="mb-4">
