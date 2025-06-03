@@ -15,6 +15,7 @@ const PullRequest = () => {
     message: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [adminResponse, setAdminResponse] = useState('');
 
@@ -106,7 +107,6 @@ const PullRequest = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
       const { data, error } = await supabase
         .from('pull_requests')
@@ -114,7 +114,7 @@ const PullRequest = () => {
           user_id: user?.id,
           request_type: formData.requestData,
           message: formData.message,
-          status: 'Waiting List',
+          status: 'Pending', // <-- ubah ke Pending
         })
         .select();
 
@@ -135,40 +135,27 @@ const PullRequest = () => {
     if (!selectedRequest) return;
 
     try {
-      let fileUrl = null;
+      let fileUrls: string[] = selectedRequest.file_urls || [];
 
-      // Upload file if selected and status is Done
-      if (selectedFile && selectedRequest.status === 'Done') {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        // Simplify the path for testing - remove the subfolder
-        const filePath = fileName; // Instead of `pull-requests/${fileName}`
+      // Upload files jika status Done
+      if (selectedFiles.length > 0 && selectedRequest.status === 'Done') {
+        fileUrls = [];
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+          const filePath = fileName;
 
-        console.log('Attempting to upload file:', fileName);
-        
-        try {
           const { data, error: uploadError } = await supabase.storage
             .from('pull.request')
-            .upload(filePath, selectedFile);
+            .upload(filePath, file);
 
-          if (uploadError) {
-            console.error('Upload error details:', uploadError);
-            throw uploadError;
-          }
-          
-          console.log('Upload successful:', data);
+          if (uploadError) throw uploadError;
 
-          // Get public URL
           const { data: publicURL } = supabase.storage
             .from('pull.request')
             .getPublicUrl(filePath);
 
-          console.log('File URL:', publicURL);
-          fileUrl = publicURL.publicUrl;
-        } catch (err) {
-          console.error('Detailed upload error:', err);
-          toast.error('File upload failed');
-          throw err;
+          fileUrls.push(publicURL.publicUrl);
         }
       }
 
@@ -178,16 +165,16 @@ const PullRequest = () => {
         .update({
           status: selectedRequest.status,
           admin_response: adminResponse,
-          file_url: fileUrl || selectedRequest.file_url,
+          file_urls: fileUrls, // <-- array of urls
         })
         .eq('id', selectedRequest.id);
 
       if (error) throw error;
-      
+
       toast.success('Response submitted successfully');
       setSelectedRequest(null);
       setAdminResponse('');
-      setSelectedFile(null);
+      setSelectedFiles([]);
       fetchRequests();
     } catch (error) {
       console.error('Error updating request:', error);
@@ -220,6 +207,26 @@ const PullRequest = () => {
             New Request
           </button>
         )}
+      </div>
+
+      {/* Status Legend */}
+      <div className="mb-4 flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-semibold">Pending</span>
+          <span className="text-sm text-gray-600">: Menunggu persetujuan admin</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Waiting List</span>
+          <span className="text-sm text-gray-600">: Sedang diproses/diterima admin</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Done</span>
+          <span className="text-sm text-gray-600">: Selesai, data sudah diberikan</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Rejected</span>
+          <span className="text-sm text-gray-600">: Ditolak admin</span>
+        </div>
       </div>
 
       {/* Request Form */}
@@ -327,6 +334,7 @@ const PullRequest = () => {
                   onChange={(e) => setSelectedRequest({...selectedRequest, status: e.target.value})}
                   className="w-full p-2 border rounded"
                 >
+                  <option value="Pending">Pending</option>
                   <option value="Waiting List">Waiting List</option>
                   <option value="Done">Done</option>
                   <option value="Rejected">Rejected</option>
@@ -338,7 +346,8 @@ const PullRequest = () => {
                   <label className="block text-gray-700 mb-2">Upload Data</label>
                   <input
                     type="file"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    multiple
+                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
                     className="w-full p-2 border rounded"
                   />
                 </div>
@@ -426,10 +435,19 @@ const PullRequest = () => {
                     <div className="text-sm text-gray-900">{request.profiles?.full_name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                      ${request.status === 'Done' ? 'bg-green-100 text-green-800' : 
-                      request.status === 'Rejected' ? 'bg-red-100 text-red-800' : 
-                      'bg-yellow-100 text-yellow-800'}`}>
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        ${request.status === 'Done'
+                          ? 'bg-green-100 text-green-800'
+                          : request.status === 'Rejected'
+                          ? 'bg-red-100 text-red-800'
+                          : request.status === 'Pending'
+                          ? 'bg-orange-100 text-orange-800'
+                          : request.status === 'Waiting List'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                        }`}
+                    >
                       {request.status}
                     </span>
                   </td>
@@ -452,15 +470,20 @@ const PullRequest = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex gap-2">
-                      {request.status === 'Done' && request.file_url && (
-                        <a 
-                          href={request.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                        >
-                          <Download size={16} /> Download
-                        </a>
+                      {request.status === 'Done' && request.file_urls && Array.isArray(request.file_urls) && request.file_urls.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                          {request.file_urls.map((url: string, idx: number) => (
+                            <a 
+                              key={idx}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                            >
+                              <Download size={16} /> Download {idx + 1}
+                            </a>
+                          ))}
+                        </div>
                       )}
                       
                       {isAdmin && (
