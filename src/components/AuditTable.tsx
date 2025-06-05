@@ -308,35 +308,56 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange, regionFilte
       const { data: auditData, error } = await supabase
         .from('audit_regular')
         .select('*')
-        .order('created_at', { ascending: false });
-  
+        .order('created_at', { ascending: true }); // ascending: true untuk terlama
+
       if (error) throw error;
       if (auditData) {
-        console.log("Raw data from database:", auditData); 
-        const mappedData = auditData.map((item, index) => ({
-          id: item.id,
-          no: index + 1,
-          branchName: item.branch_name,
-          region: item.region,
-          auditPeriodStart: item.audit_period_start,
-          auditPeriodEnd: item.audit_period_end,
-          pic: item.pic,
-          dapa: item.dapa,
-          revisedDapa: item.revised_dapa,
-          dapaSupportingData: item.dapa_supporting_data,
-          assignmentLetter: item.assignment_letter,
-          entranceAgenda: item.entrance_agenda,
-          entranceAttendance: item.entrance_attendance,
-          auditWorkingPapers: item.audit_working_papers,
-          exitMeetingMinutes: item.exit_meeting_minutes,
-          exitAttendanceList: item.exit_attendance_list,
-          auditResultLetter: item.audit_result_letter,
-          rta: item.rta,
-          monitoring: item.monitoring,
-          comment: item.comment
-        }));
-        
-        console.log("Mapped data for component:", mappedData);
+        // Kelompokkan data berdasarkan region
+        const grouped: { [region: string]: any[] } = {};
+        auditData.forEach(item => {
+          const region = item.region || 'Unknown';
+          if (!grouped[region]) grouped[region] = [];
+          grouped[region].push(item);
+        });
+
+        // Untuk setiap region, urutkan berdasarkan created_at ASC, lalu beri nomor urut per region
+        let mappedData: any[] = [];
+        Object.keys(grouped).forEach(region => {
+          const sorted = grouped[region].sort((a, b) => {
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return aDate - bDate;
+          });
+          sorted.forEach((item, idx) => {
+            mappedData.push({
+              id: item.id,
+              no: (idx + 1).toString(),
+              branchName: item.branch_name,
+              region: item.region,
+              auditPeriodStart: item.audit_period_start,
+              auditPeriodEnd: item.audit_period_end,
+              pic: item.pic,
+              dapa: item.dapa,
+              revisedDapa: item.revised_dapa,
+              dapaSupportingData: item.dapa_supporting_data,
+              assignmentLetter: item.assignment_letter,
+              entranceAgenda: item.entrance_agenda,
+              entranceAttendance: item.entrance_attendance,
+              auditWorkingPapers: item.audit_working_papers,
+              cashCount: item.cash_count,
+              auditReporting: item.audit_reporting,
+              exitMeetingMinutes: item.exit_meeting_minutes,
+              exitAttendanceList: item.exit_attendance_list,
+              auditResultLetter: item.audit_result_letter,
+              rta: item.rta,
+              monitoring: item.monitoring,
+              comment: item.comment,
+              branchId: item.branch_id || '',
+              priorityNo: item.priority_no || '',
+            });
+          });
+        });
+
         onDataChange(mappedData);
       }
     } catch (error) {
