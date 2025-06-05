@@ -88,8 +88,9 @@ const Dashboard = () => {
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [adminRegularAudits, setAdminRegularAudits] = useState<any[]>([]);
   const [uniqueRegions, setUniqueRegions] = useState<string[]>([]);
-  const [adminAuditType, setAdminAuditType] = useState<'annual' | 'fraud'>('annual');
+  const [adminAuditType, setAdminAuditType] = useState<'annual' | 'fraud' | 'schedule'>('annual');
   const [adminFraudAudits, setAdminFraudAudits] = useState<any[]>([]);
+  const [auditScheduleData, setAuditScheduleData] = useState<any[]>([]);
   
   // Add these state variables near your other state declarations
   const [isAdminSectionLocked, setIsAdminSectionLocked] = useState(true);
@@ -201,13 +202,92 @@ const Dashboard = () => {
       console.error('Error fetching fraud administrative data:', error);
     }
   };
-  
+
+  // Add this function to fetch audit schedule data
+  const fetchAuditScheduleData = async () => {
+    try {
+      // Ambil data audit_schedule (hanya berisi no, branch_name, region)
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('audit_schedule')
+        .select('no, branch_name, region');
+
+      if (scheduleError) throw scheduleError;
+
+      // Ambil data audit_regular dengan created_at untuk menentukan execution order
+      const { data: auditedBranches, error: auditedError } = await supabase
+        .from('audit_regular')
+        .select('branch_name, audit_period_start, audit_period_end, created_at');
+
+      if (auditedError) throw auditedError;
+
+      // Ambil data branch untuk mendapatkan region
+      const { data: branchData, error: branchError } = await supabase
+        .from('branches')
+        .select('name, region');
+
+      if (branchError) throw branchError;
+
+      // Buat map branch ke region
+      const branchRegionMap = {};
+      branchData?.forEach(branch => {
+        branchRegionMap[branch.name] = branch.region;
+      });
+
+      // Mengelompokkan audit berdasarkan region
+      const auditsByRegion = {};
+      auditedBranches?.forEach(item => {
+        const region = branchRegionMap[item.branch_name] || 'Unknown';
+        if (!auditsByRegion[region]) {
+          auditsByRegion[region] = [];
+        }
+        auditsByRegion[region].push({
+          ...item,
+          region
+        });
+      });
+
+      // Untuk setiap region, urutkan berdasarkan created_at dan beri execution_order
+      const auditedBranchMap = {};
+      Object.keys(auditsByRegion).forEach(region => {
+        // Urutkan dari created_at terlama (ascending)
+        const sortedAudits = auditsByRegion[region].sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        
+        // Beri execution_order untuk setiap audit dalam region
+        sortedAudits.forEach((audit, index) => {
+          auditedBranchMap[audit.branch_name] = {
+            isAudited: true,
+            audit_period_start: audit.audit_period_start,
+            audit_period_end: audit.audit_period_end,
+            execution_order: index + 1,
+            region: audit.region
+          };
+        });
+      });
+
+      // Gabungkan status ke data schedule
+      const scheduleWithStatus = scheduleData?.map(item => ({
+        ...item,
+        isAudited: !!auditedBranchMap[item.branch_name],
+        audit_period_start: auditedBranchMap[item.branch_name]?.audit_period_start || null,
+        audit_period_end: auditedBranchMap[item.branch_name]?.audit_period_end || null,
+        execution_order: auditedBranchMap[item.branch_name]?.execution_order || null
+      })) || [];
+
+      setAuditScheduleData(scheduleWithStatus);
+    } catch (error) {
+      console.error('Error fetching audit schedule data:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     
     // Add this call to fetch admin audit data
     fetchAdminRegularAudits();
     fetchAdminFraudAudits();
+    fetchAuditScheduleData(); // Add this line
   }, []);
 
   // Update the handleUncensorFraud function to accept the password
@@ -696,6 +776,16 @@ const Dashboard = () => {
               >
                 Fraud Audit
               </button>
+              <button 
+                onClick={() => setAdminAuditType('schedule')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  adminAuditType === 'schedule' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Audit Schedule
+              </button>
             </div>
             
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
@@ -884,6 +974,90 @@ const Dashboard = () => {
                       <tr>
                         <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
                           No fraud audit deficiencies found matching your criteria
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {/* Audit Schedule Table */}
+            {adminAuditType === 'schedule' && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Priority
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Execution Order
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Branch Name
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Region
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {auditScheduleData
+                      .filter(item => 
+                        (regionFilter === 'all' || item.region === regionFilter) &&
+                        item.branch_name.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((item, index) => {
+                        let periodText = '';
+                        if (item.isAudited && item.audit_period_start && item.audit_period_end) {
+                          const startDate = new Date(item.audit_period_start);
+                          const endDate = new Date(item.audit_period_end);
+                          const formattedStartDate = startDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                          const formattedEndDate = endDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                          periodText = `${formattedStartDate} s.d. ${formattedEndDate}`;
+                        }
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {item.no}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {item.execution_order || '-'}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {item.branch_name}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {item.region}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              <div className="flex flex-col">
+                                <span className={`px-2 py-1 inline-block rounded-full text-[10px] font-medium ${
+                                  item.isAudited 
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {item.isAudited ? 'Audited' : 'Unaudited'}
+                                </span>
+                                {periodText && <span className="text-xs text-gray-500 mt-1">{periodText}</span>}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    }
+                    {auditScheduleData
+                      .filter(item => 
+                        (regionFilter === 'all' || item.region === regionFilter) &&
+                        item.branch_name.toLowerCase().includes(searchTerm.toLowerCase())
+                      ).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
+                          No audit schedule data found matching your criteria
                         </td>
                       </tr>
                     )}
