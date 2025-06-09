@@ -1608,7 +1608,7 @@ const ManagerDashboard = () => {
                     : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                Fraud Audits
+                Special Audits
               </button>
             </div>
 
