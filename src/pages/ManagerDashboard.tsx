@@ -1,10 +1,13 @@
-import { format, parseISO } from 'date-fns';
+import { format, parseISO } from "date-fns";
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
-import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, Clock, Pencil, Search, TrendingUp, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, CalendarIcon, Clock, Pencil, Search, TrendingUp, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from 'react';
+import { DateRange } from "react-day-picker";
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
+import { Button } from "../components/ui/button";
+import { Calendar } from "../components/ui/calendar";
 import { Card, CardContent } from '../components/ui/card';
 import {
   ChartContainer,
@@ -18,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { supabase } from '../lib/supabaseClient';
 import '../styles/download-button.css';
@@ -229,6 +233,10 @@ const ManagerDashboard = () => {
   // Add this state
   const [supportAuditorSummary, setSupportAuditorSummary] = useState<{ auditor: string, inputAudit: number, supportingData: number }[]>([]);
 
+  // Add these state variables at the top of ManagerDashboard component
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
   useEffect(() => {
     const initializeDashboard = async () => {
       const hasAccess = await checkUserAccess(supabase);
@@ -256,6 +264,13 @@ const ManagerDashboard = () => {
       setFromSalaryChecked(false);
     }
   }, [isPaymentDialogOpen]);
+
+  // Add this useEffect
+  useEffect(() => {
+    if (activeSection === 'auditorCounts') {
+      fetchAuditorAuditCounts();
+    }
+  }, [startDate, endDate, activeSection]);
 
   const fetchSupportAuditorSummary = async () => {
   // Mapping nama lengkap ke alias auditor
@@ -950,131 +965,191 @@ const ManagerDashboard = () => {
 
   const fetchAuditorAuditCounts = async () => {
     try {
-      // Fetch all auditors
-      const { data: auditorsData, error: auditorsError } = await supabase
-        .from('auditors')
-        .select('auditor_id, name');
+      // Auditor mapping tetap sama seperti sebelumnya
+      const auditorMapping = [
+        { label: 'Andre Perkasa Ginting', value: 'andre' },
+        { label: 'Sanjung', value: 'sanjung' },
+        { label: 'Abduloh', value: 'abduloh' },
+        { label: 'Fatir Anis Sabir', value: 'fatir' },
+        { label: 'Anwar Sadat, S.E', value: 'anwar' },
+        { label: 'Antoni', value: 'antoni' },
+        { label: 'Maya Lestari, S.E', value: 'maya' },
+        { label: 'Indah Marsita', value: 'indah' },
+        { label: 'Aditya Dwi Susanto', value: 'aditya' },
+        { label: 'Achmad Miftachul Huda, S.E', value: 'miftach' },
+        { label: 'Heri Hermawan', value: 'heri' },
+        { label: 'Aris Munandar', value: 'aris' },
+        { label: 'Sandi Mulyadi', value: 'sandi' },
+        { label: 'Ahmad', value: 'ahmad' },
+        { label: 'Widya Lestari', value: 'widya' },
+        { label: 'Retno Istiyanto, A.Md', value: 'retno' },
+        { label: 'Ade Yadi Heryadi', value: 'ade' },
+        { label: 'Muhamad Yunus', value: 'yunus' },
+        { label: 'Dara Fusvita Adityacakra, S.Tr.Akun', value: 'dara' },
+        { label: 'Lukman Yasir', value: 'lukman' },
+        { label: 'Ngadiman', value: 'ngadiman' },
+        { label: 'Solikhin, A.Md', value: 'solikhin' },
+        { label: 'Amriani', value: 'amriani' },
+        { label: 'Maria Sulistya Wati', value: 'maria' },
+        { label: "Muhammad Rifa'i", value: 'rifai' },
+        { label: 'Buldani', value: 'buldani' },
+        { label: 'Imam Kristiawan', value: 'imam' },
+        { label: 'Darmayani', value: 'darmayani' },
+        { label: 'Novi Dwi Juanda', value: 'novi' },
+        { label: 'Afdal Juanda', value: 'afdal' },
+        { label: 'Kandidus Yosef Banu', value: 'kandidus' },
+        { label: 'Muhammad Alfian Sidiq', value: 'alfian' },
+        { label: 'Fadhlika Sugeng Achmadani, S.E', value: 'fadhlika' },
+        { label: 'Hendra Hermawan', value: 'hendra' },
+        { label: 'Dadang Supriatna', value: 'dadang' },
+        { label: 'Yogi Nugraha', value: 'yogi' },
+        { label: 'Iqbal Darmazi', value: 'iqbal' },
+        { label: 'Ganjar Raharja', value: 'ganjar' },
+        { label: 'Dede Yudha Nersanto', value: 'dede' },
+        { label: 'Ayu Sri Erian Agustin', value: 'eri' },
+        { label: 'Lise Roswati Rochendi MP', value: 'lise' },
+      ];
       
-      if (auditorsError) throw auditorsError;
-      
-      // Create a map of auditor_id -> auditor data
-      const auditorIdMap = {};
-      const auditorNameMap = {};
-      
-      // Initialize map with all auditors
-      auditorsData?.forEach(auditor => {
-        auditorIdMap[auditor.auditor_id] = {
-          auditor_id: auditor.auditor_id,
-          name: auditor.name,
+      // Initialize counts for all auditors
+      const auditorCounts = {};
+      auditorMapping.forEach(auditor => {
+        auditorCounts[auditor.value] = {
+          auditor_id: auditor.value,
+          name: auditor.label,
           regular_count: 0,
           fraud_count: 0
         };
-        
-        // Also create a map of normalized names to auditor_id for matching by name
-        auditorNameMap[auditor.name.toLowerCase().trim()] = auditor.auditor_id;
       });
       
-      // Fetch regular audits with PIC
-      const { data: regularAuditsData, error: regularAuditsError } = await supabase
-        .from('audit_regular')
-        .select('pic');
+      // Create mapping from auditor_name in database to our auditor values
+      // This handles both matching full lowercase names and short codes
+      const nameToValueMap = {};
+      
+      // First, map direct values (short codes like 'buldani', 'yogi', etc.)
+      auditorMapping.forEach(auditor => {
+        nameToValueMap[auditor.value] = auditor.value;
+        nameToValueMap[auditor.value.toLowerCase()] = auditor.value;
+      });
+      
+      // Second, map from auditor names to their code values
+      auditorMapping.forEach(auditor => {
+        // Map full names (case insensitive)
+        nameToValueMap[auditor.label.toLowerCase()] = auditor.value;
         
-      if (regularAuditsError) throw regularAuditsError;
-      
-      // Fetch fraud audits with PIC
-      const { data: fraudAuditsData, error: fraudAuditsError } = await supabase
-        .from('audit_fraud')
-        .select('pic');
+        // Map first names (many db entries just use first names)
+        const firstName = auditor.label.split(' ')[0].toLowerCase();
+        if (!nameToValueMap[firstName]) {
+          nameToValueMap[firstName] = auditor.value;
+        }
         
-      if (fraudAuditsError) throw fraudAuditsError;
+        // Add special case for shortened or common names
+        if (auditor.label.includes('Ayu')) nameToValueMap['eri'] = auditor.value;
+        if (auditor.label.includes('Lise')) nameToValueMap['lise'] = auditor.value;
+      });
       
-      // Function to preprocess PIC string to handle special cases
-      const preprocessPicString = (picString) => {
-        if (!picString) return '';
+      console.log('Name mapping created:', nameToValueMap);
+      
+      // Fetch regular audit counts
+      let regularQuery = supabase
+        .from('audit_counts')
+        .select('*')
+        .eq('audit_type', 'regular');
+    
+      // Fetch fraud audit counts
+      let fraudQuery = supabase
+        .from('audit_counts')
+        .select('*')
+        .eq('audit_type', 'fraud');
+    
+      // Add date filters if provided
+      if (startDate && endDate) {
+        regularQuery = regularQuery.gte('audit_end_date', startDate).lte('audit_end_date', endDate);
+        fraudQuery = fraudQuery.gte('audit_end_date', startDate).lte('audit_end_date', endDate);
+      }
+    
+      // Execute queries
+      const { data: regularCounts, error: regularError } = await regularQuery;
+      if (regularError) throw regularError;
+      console.log('Regular counts fetched:', regularCounts?.length);
+      
+      const { data: fraudCounts, error: fraudError } = await fraudQuery;
+      if (fraudError) throw fraudError;
+      console.log('Fraud counts fetched:', fraudCounts?.length);
+      
+      // Struktur untuk melacak audit unik per auditor berdasarkan branch_name dan audit_end_date
+      const uniqueRegularAudits = {}; // {auditor_id: Set("branch_name|audit_end_date")}
+      const uniqueFraudAudits = {};
+      
+      // Process regular audits - dengan penghapusan duplikat
+      regularCounts?.forEach(record => {
+        const auditorName = record.auditor_name?.toLowerCase();
+        if (!auditorName) return;
         
-        // First protect all name patterns with professional titles/degrees
-        // Pattern matches: Name, Title where Title starts with common Indonesian degree prefixes
-        return picString.replace(/([A-Za-z\s]+),\s*(S\.E|S\.Tr\.Akun|A\.Md|S\.T|M\.M|Ph\.D|S\.H|S\.Kom|S\.Pd|S\.Sos|S\.I\.P|S\.Ak|S\.Hum|S\.Kep|S\.K\.M|S\.Farm|S\.Psi|S\.Gz)/gi, 
-          (match) => {
-            // Replace the comma with a placeholder that won't be split
-            return match.replace(',', '###COMMA###');
-          }
-        );
-      };
-      
-      // Function to restore special case placeholders
-      const restoreName = (name) => {
-        // Restore the comma in the name
-        return name.replace(/###COMMA###/g, ',');
-      };
-      
-      // Process regular audits (comma-separated PICs)
-      regularAuditsData?.forEach(audit => {
-        if (audit.pic) {
-          // Preprocess to handle special cases
-          const processedPic = preprocessPicString(audit.pic);
-          const picList = processedPic.split(',')
-            .map(name => name.trim())
-            .filter(Boolean)
-            .map(restoreName);
+        // Find the matching auditor value
+        const auditorValue = nameToValueMap[auditorName];
+        if (auditorValue && auditorCounts[auditorValue]) {
+          // Buat kunci unik dari branch_name dan audit_end_date
+          const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
           
-          picList.forEach(auditorName => {
-            // Try to match by direct name
-            let matched = false;
-            
-            // Check for exact match in the auditorNameMap
-            if (auditorNameMap[auditorName.toLowerCase()]) {
-              const id = auditorNameMap[auditorName.toLowerCase()];
-              auditorIdMap[id].regular_count++;
-              matched = true;
-            }
-            
-            // If no match found, try to match by auditor_id
-            if (!matched && auditorIdMap[auditorName]) {
-              auditorIdMap[auditorName].regular_count++;
-            }
-          });
+          // Inisialisasi set jika belum ada
+          if (!uniqueRegularAudits[auditorValue]) {
+            uniqueRegularAudits[auditorValue] = new Set();
+          }
+          
+          // Hanya tambahkan count jika kunci belum ada (audit unik)
+          if (!uniqueRegularAudits[auditorValue].has(uniqueKey)) {
+            uniqueRegularAudits[auditorValue].add(uniqueKey);
+            auditorCounts[auditorValue].regular_count += 1;
+            console.log(`Counted unique regular audit for "${auditorName}": ${uniqueKey}`);
+          } else {
+            console.log(`Skipped duplicate regular audit for "${auditorName}": ${uniqueKey}`);
+          }
         }
       });
       
-      // Process fraud audits (with both comma and ampersand separators)
-      fraudAuditsData?.forEach(audit => {
-        if (audit.pic) {
-          // Preprocess to handle special cases first
-          const processedPic = preprocessPicString(audit.pic);
-          // Replace all ampersands with commas to standardize the separator
-          const standardizedPic = processedPic.replace(/&/g, ',');
-          // Then split by comma
-          const picList = standardizedPic.split(',')
-            .map(name => name.trim())
-            .filter(Boolean)
-            .map(restoreName); // Restore special case names
-            
-          picList.forEach(auditorName => {
-            // Try to match by direct name
-            let matched = false;
-            
-            // Check for exact match in the auditorNameMap
-            if (auditorNameMap[auditorName.toLowerCase()]) {
-              const id = auditorNameMap[auditorName.toLowerCase()];
-              auditorIdMap[id].fraud_count++;
-              matched = true;
-            }
-            
-            // If no match found, try to match by auditor_id
-            if (!matched && auditorIdMap[auditorName]) {
-              auditorIdMap[auditorName].fraud_count++;
-            }
-          });
+      // Process fraud audits - dengan penghapusan duplikat
+      fraudCounts?.forEach(record => {
+        const auditorName = record.auditor_name?.toLowerCase();
+        if (!auditorName) return;
+        
+        // Find the matching auditor value
+        const auditorValue = nameToValueMap[auditorName];
+        if (auditorValue && auditorCounts[auditorValue]) {
+          // Buat kunci unik dari branch_name dan audit_end_date
+          const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
+          
+          // Inisialisasi set jika belum ada
+          if (!uniqueFraudAudits[auditorValue]) {
+            uniqueFraudAudits[auditorValue] = new Set();
+          }
+          
+          // Hanya tambahkan count jika kunci belum ada (audit unik)
+          if (!uniqueFraudAudits[auditorValue].has(uniqueKey)) {
+            uniqueFraudAudits[auditorValue].add(uniqueKey);
+            auditorCounts[auditorValue].fraud_count += 1;
+            console.log(`Counted unique fraud audit for "${auditorName}": ${uniqueKey}`);
+          } else {
+            console.log(`Skipped duplicate fraud audit for "${auditorName}": ${uniqueKey}`);
+          }
         }
       });
       
-      // Convert map to array and sort by total audits
-      const countsArray = Object.values(auditorIdMap)
-        .filter(auditor => auditor.regular_count > 0 || auditor.fraud_count > 0) // Only show auditors with audits
+      // Convert to array and sort - ini tetap sama
+      const countsArray = Object.values(auditorCounts);
+      
+      // Filter auditors with counts and sort by total
+      const filteredCounts = countsArray
+        .filter(auditor => auditor.regular_count > 0 || auditor.fraud_count > 0)
         .sort((a, b) => (b.regular_count + b.fraud_count) - (a.regular_count + a.fraud_count));
       
-      setAuditorAuditCounts(countsArray);
+      console.log('Filtered auditor counts:', filteredCounts.length);
+      
+      // Set the state - use filtered if available, otherwise alphabetical
+      if (filteredCounts.length > 0) {
+        setAuditorAuditCounts(filteredCounts);
+      } else {
+        setAuditorAuditCounts(countsArray.sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (error) {
       console.error('Error fetching auditor audit counts:', error);
     }
@@ -1327,15 +1402,84 @@ const ManagerDashboard = () => {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Audit Counts Per Auditor</h2>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    value={auditorSearchTerm}
-                    onChange={(e) => setAuditorSearchTerm(e.target.value)}
-                    placeholder="Search auditor..."
-                    className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+                <div className="flex items-center gap-4">
+                  {/* Date Filter Controls - Shadcn Version */}
+                  <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="justify-start text-xs h-9 px-3 py-1 w-[240px]"
+                        >
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {startDate && endDate ? (
+                            <span>
+                              {format(parseISO(startDate), "PPP")} - {format(parseISO(endDate), "PPP")}
+                            </span>
+                          ) : (
+                            <span>Pick a date range</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={startDate ? parseISO(startDate) : new Date()}
+                          selected={{
+                            from: startDate ? parseISO(startDate) : undefined,
+                            to: endDate ? parseISO(endDate) : undefined,
+                          }}
+                          onSelect={(range: DateRange | undefined) => {
+                            if (range?.from) {
+                              setStartDate(format(range.from, "yyyy-MM-dd"));
+                            } else {
+                              setStartDate("");
+                            }
+                            if (range?.to) {
+                              setEndDate(format(range.to, "yyyy-MM-dd"));
+                            } else {
+                              setEndDate("");
+                            }
+                          }}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    
+                    <Button
+                      onClick={() => fetchAuditorAuditCounts()}
+                      className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                      size="sm"
+                    >
+                      Apply Filter
+                    </Button>
+                    
+                    <Button
+                      onClick={() => {
+                        setStartDate('');
+                        setEndDate('');
+                        fetchAuditorAuditCounts();
+                      }}
+                      variant="outline"
+                      className="h-9 text-xs"
+                      size="sm"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  
+                  {/* Existing Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      type="text"
+                      value={auditorSearchTerm}
+                      onChange={(e) => setAuditorSearchTerm(e.target.value)}
+                      placeholder="Search auditor..."
+                      className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -1352,7 +1496,7 @@ const ManagerDashboard = () => {
                         Regular Audits
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                        Fraud Audits
+                        Special Audits
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                         Total
@@ -1360,35 +1504,36 @@ const ManagerDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {auditorAuditCounts.filter(auditor => 
-                      auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
-                    ).map((auditor, index) => (
-                      <tr key={auditor.auditor_id}>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {index + 1}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {auditor.name}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {auditor.regular_count}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {auditor.fraud_count}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                          {auditor.regular_count + auditor.fraud_count}
-                        </td>
-                      </tr>
-                    ))}
-                    {auditorAuditCounts.filter(auditor => 
-                      auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
-                    ).length === 0 && (
+                    {auditorAuditCounts.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
-                          No auditors found matching your search
+                          No data available. Try clearing filters.
                         </td>
                       </tr>
+                    ) : (
+                      auditorAuditCounts
+                        .filter(auditor => 
+                          auditor.name.toLowerCase().includes(auditorSearchTerm.toLowerCase())
+                        )
+                        .map((auditor, index) => (
+                          <tr key={auditor.auditor_id}>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {index + 1}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {auditor.name}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {auditor.regular_count}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                              {auditor.fraud_count}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                              {auditor.regular_count + auditor.fraud_count}
+                            </td>
+                          </tr>
+                        ))
                     )}
                   </tbody>
                 </table>
