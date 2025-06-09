@@ -774,7 +774,7 @@ const Dashboard = () => {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                Fraud Audit
+                Special Audit
               </button>
               <button 
                 onClick={() => setAdminAuditType('schedule')}
