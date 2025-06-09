@@ -1,4 +1,4 @@
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, MessageSquare, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -708,12 +708,16 @@ const PullRequest = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(request.created_at).toLocaleString()}
+                    {new Date(request.created_at).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: '2-digit'
+                    })}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">
                       {request.status === 'Done' && request.file_urls && Array.isArray(request.file_urls) && request.file_urls.length > 0 && (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex gap-2">
                           {request.file_urls.map((url: string, idx: number) => (
                             <a 
                               key={idx}
@@ -760,9 +764,10 @@ const PullRequest = () => {
                                     toast.error('Error downloading file. Trying direct link.');
                                   });
                               }}
-                              className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                              className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
+                              title={`Download file ${idx + 1}`}
                             >
-                              <Download size={16} /> Download {idx + 1}
+                              <Download size={18} />
                             </a>
                           ))}
                         </div>
@@ -774,9 +779,10 @@ const PullRequest = () => {
                             setSelectedRequest(request);
                             setAdminResponse(request.admin_response || '');
                           }}
-                          className="text-indigo-600 hover:text-indigo-800 underline"
+                          className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-full hover:bg-indigo-50"
+                          title="Respond to request"
                         >
-                          Respond
+                          <MessageSquare size={18} />
                         </button>
                       )}
 
@@ -784,10 +790,10 @@ const PullRequest = () => {
                       {userRole === 'superadmin' && (
                         <button
                           onClick={() => setDeleteTarget(request)}
-                          className="text-red-600 hover:text-red-800 underline"
-                          title="Delete request beserta file"
+                          className="text-red-600 hover:text-red-800 p-1.5 rounded-full hover:bg-red-50"
+                          title="Delete request and files"
                         >
-                          Delete
+                          <Trash2 size={18} />
                         </button>
                       )}
                     </div>
