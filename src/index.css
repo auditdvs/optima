@@ -1,3 +1,12 @@
+/* Import Poppins font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Apply Poppins globally */
+html, body, #root {
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Rest of your existing CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -596,3 +605,24 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -440;
   }
 }
+
+{
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+

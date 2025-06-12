@@ -555,7 +555,7 @@ const Dashboard = () => {
 
       {/* Main Dashboard Content */}
       {activeSection === 'main' && (
-        <div className="grid grid-cols-1 lg:grid-cols-[0.5fr_1.1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[0.5fr_1.1fr] gap-2">
           {/* Branch Locations */}
           <Card className="bg-white shadow-sm">
             <CardContent className="p-4">
@@ -572,7 +572,7 @@ const Dashboard = () => {
                   />
                 </div>
               </div>
-              <div className="max-h-[520px] overflow-y-auto">
+              <div className="max-h-[470px] overflow-y-auto">
                 <BranchLocationTable data={branchTableData} />
               </div>
             </CardContent>
@@ -584,15 +584,16 @@ const Dashboard = () => {
               <h2 className="text-sm font-semibold pt-1 mb-4">Audit Performance Summary</h2>
               
               {/* Charts - Stack on mobile AND tablet, 2 columns ONLY on large screens */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
                 {/* Pie Chart */}
                 <Card className="flex flex-col bg-white shadow-sm">
                   <CardContent className="flex-1">
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2 mt-3 text-center">Composition Regular and Annual</h3>
                     <ChartContainer
                       config={chartConfig}
-                      className="mx-auto aspect-square max-h-[300px]"
+                      className="mx-auto aspect-square max-h-[250px]"
                     >
-                      <PieChart>
+                      <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                         <ChartTooltip
                           cursor={false}
                           content={<ChartTooltipContent hideLabel />}
@@ -610,15 +611,24 @@ const Dashboard = () => {
 
                 {/* Bar Chart */}
                 <Card>
-                  <CardContent className="pt-5 pb-2">
+                  <CardContent className="pt-5 pb-5">
                     <ChartContainer config={barChartConfig}>
-                      <BarChart data={monthlyData}>
+                      <BarChart data={monthlyData}
+                        margin={{ top: 5, right: 5, left: 5, bottom:0}}>
                         <CartesianGrid vertical={false} />
                         <XAxis
                           dataKey="month"
                           tickLine={false}
-                          tickMargin={10}
+                          tickMargin={15}
                           axisLine={false}
+                          tick={{ 
+                            fontSize: 10,
+                            angle: -90,
+                            textAnchor: 'end',
+                            dy: 10
+                          }}
+                          height={80}
+                          interval={0}
                         />
                         <ChartTooltip
                           cursor={false}
