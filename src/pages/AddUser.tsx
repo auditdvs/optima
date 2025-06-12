@@ -2,9 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { Database, RefreshCw, Search, Trash2, UserPen, UserPlus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Database, RefreshCw, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { supabase } from '../lib/supabase';
 import { supabaseService } from '../lib/supabaseService';
 
@@ -376,6 +384,7 @@ function UserControlPanel() {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [picSectionExpanded, setPicSectionExpanded] = useState(true);
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
@@ -778,26 +787,103 @@ function UserControlPanel() {
       {/* Add this line to show the loader when backup is in progress */}
       {loading && <BackupLoader />}
       
-      {/* Side by side layout for user list and PIC management */}
-      <div className="flex flex-row gap-4">
-        {/* User List section with search bar and Add User button */}
-        <div className="flex-1">
+      {/* Change from flex-row to flex-col for stacked layout */}
+      <div className="flex flex-col gap-6">
+        {/* PIC Management section - collapsible */}
+        <div className="w-full bg-white shadow rounded-lg overflow-hidden">
+          <div 
+            className="flex justify-between items-center p-4 cursor-pointer"
+            onClick={() => setPicSectionExpanded(!picSectionExpanded)}
+          >
+            <h2 className="text-xl font-semibold text-gray-900">Manage PIC</h2>
+            <button className="text-gray-500 hover:text-gray-700">
+              {picSectionExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </button>
+          </div>
+          
+          {picSectionExpanded && (
+            <div className="overflow-y-auto max-h-[400px] border-t border-gray-200">
+              <Table>
+                <TableHeader className="bg-gray-50 sticky top-0">
+                  <TableRow>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">PIC Area</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pics?.map((pic) => (
+                    <TableRow key={pic.id}>
+                      <TableCell className="text-sm text-gray-900">{pic.nama}</TableCell>
+                      <TableCell className="text-sm text-gray-900">{pic.posisi}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{pic.pic_area}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          pic.status === 'Active' ? 'bg-green-100 text-green-800' :
+                          pic.status === 'Sick' ? 'bg-red-100 text-red-800' :
+                          pic.status === 'On leave' ? 'bg-yellow-100 text-yellow-800' :
+                          pic.status === 'On Branch' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {pic.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent toggle when clicking the button
+                            setSelectedPIC(pic);
+                            setShowEditPICModal(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Edit PIC"
+                        >
+                          <UserPen className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        {/* User List section moved below the PIC section */}
+        <div className="w-full">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center flex-grow">
               <h2 className="text-xl font-semibold text-gray-900 mr-4">User List</h2>
               
-              {/* Search bar */}
-              <div className="relative flex-grow max-w-md">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
+              {/* Search bar with modern style */}
+              <div className="relative w-[300px]">
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   placeholder="Search by email or name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="peer w-full pl-10 pr-2 py-2 text-base border-0 border-b-2 border-gray-300 bg-transparent outline-none transition-colors focus:border-indigo-500"
                 />
+                {/* Underline animation */}
+                <div className="absolute bottom-0 left-0 h-0.5 w-full scale-x-0 bg-indigo-500 transition-transform duration-300 peer-focus:scale-x-100"></div>
+
+                {/* Highlight background on focus */}
+                <div className="absolute bottom-0 left-0 h-full w-0 bg-indigo-500/10 transition-all duration-300 peer-focus:w-full"></div>
+
+                {/* Search icon */}
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 peer-focus:text-indigo-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="w-5 h-5">
+                    <path
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      strokeWidth="2"
+                      stroke="currentColor"
+                      d="M21 21L16.65 16.65M19 11C19 15.4183 15.4183 19 11 19C6.58172 19 3 15.4183 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11Z"
+                    ></path>
+                  </svg>
+                </div>
               </div>
             </div>
             
@@ -811,49 +897,49 @@ function UserControlPanel() {
             </button>
           </div>
           
-          <div className="bg-white shadow rounded-lg overflow-hidden h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                {/* Table header remains the same */}
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {/* Use filteredUsers instead of users */}
+          <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
+            <div className="overflow-y-auto max-h-[500px]">
+              <Table>
+                <TableHeader className="bg-gray-50 sticky top-0">
+                  <TableRow>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Role</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filteredUsers?.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.full_name}</td>
-                      <td className="px-6 py-4 whitespace-wrap">
+                    <TableRow key={user.id}>
+                      <TableCell className="text-sm text-gray-900">{user.email}</TableCell>
+                      <TableCell className="text-sm text-gray-900">{user.full_name}</TableCell>
+                      <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                          user.role === 'dvs' ? 'bg-cyan-100 text-cyan-800' :
                           user.role === 'qa' ? 'bg-blue-100 text-blue-800' :
-                          user.role === 'risk' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
+                          user.role === 'risk' ? 'bg-teal-100 text-teal-800' :
+                          user.role === 'superadmin' ? 'bg-sky-100 text-sky-800' :
+                          user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                          'bg-pink-100 text-pink-800'
                         }`}>
                           {user.role.toUpperCase()}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-wrap">
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center">
                           <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
-                            user.status === 'ACTIVE' ? 'bg-green-400' : 'bg-gray-400'
+                            user.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-rose-400'
                           }`} />
                           <span className="text-sm text-gray-500">
                             {user.status === 'ACTIVE' ? 'Active' : 
                               user.last_sign_in_at ? 
-                                `Online ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
+                                `Log in, ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
                                 'Never logged in'}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">
                         <div className="flex items-center space-x-3">
                           <button
                             onClick={() => {
@@ -873,63 +959,11 @@ function UserControlPanel() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* PIC Management section - unchanged */}
-        <div className="flex-1">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Manage PIC</h2>
-          <div className="bg-white shadow rounded-lg overflow-hidden h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PIC Area</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pics?.map((pic) => (
-                    <tr key={pic.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pic.nama}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pic.posisi}</td>
-                      <td className="px-6 py-4 whitespace-wrap text-sm text-gray-500">{pic.pic_area}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          pic.status === 'Active' ? 'bg-green-100 text-green-800' :
-                          pic.status === 'Sick' ? 'bg-red-100 text-red-800' :
-                          pic.status === 'On leave' ? 'bg-yellow-100 text-yellow-800' :
-                          pic.status === 'On Branch' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {pic.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button
-                          onClick={() => {
-                            setSelectedPIC(pic);
-                            setShowEditPICModal(true);
-                          }}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Edit PIC"
-                        >
-                          <UserPen className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast'; // Add this import
+import toast, { Toaster } from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import Logo from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -26,28 +27,33 @@ const notifyError = (message) => {
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // Remove the error state since we'll use toast instead
-  // const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
   const navigate = useNavigate();
-  const { signIn, isLoading: authLoading, user } = useAuth(); // Also get the user from context
+  const { signIn, isLoading: authLoading, user } = useAuth();
+
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // PIC state
+  const [picData, setPicData] = useState([]);
+  const [loadingPic, setLoadingPic] = useState(true);
 
   // Add this effect to redirect to dashboard if already logged in
   useEffect(() => {
     if (user) {
       navigate('/dashboard');
     }
+    
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+    }
   }, [user, navigate]);
-  
-  // PIC state
-  const [picData, setPicData] = useState([]);
-  const [loadingPic, setLoadingPic] = useState(true);
-  
-  // Animation state
-  const [fadeIn, setFadeIn] = useState(false);
   
   // Fetch PIC data from Supabase
   useEffect(() => {
@@ -68,12 +74,12 @@ function Login() {
     }
     
     fetchPICData();
-    
-    // Trigger animation after component mounts
-    setTimeout(() => {
-      setFadeIn(true);
-    }, 300);
   }, []);
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    localStorage.setItem('theme', !isDarkMode ? 'dark' : 'light');
+  };
 
   // Handle login form submission
   async function handleSubmit(e: React.FormEvent) {
@@ -84,7 +90,6 @@ function Login() {
       await signIn(email, password);
       // Don't navigate here - let the useEffect handle it
     } catch (err) {
-      // Replace the toast.error with our custom function
       notifyError('Failed to sign in');
       console.error(err);
       setLoading(false);
@@ -101,7 +106,6 @@ function Login() {
     }
 
     try {
-      // Remove setError('')
       setLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -124,249 +128,279 @@ function Login() {
 
   return (
     <>
-      {/* Add the Toaster component at the top of your JSX */}
       <Toaster 
-  position="top-center" 
-  reverseOrder={false}
-  gutter={8}
-  containerClassName=""
-  containerStyle={{}}
-  toastOptions={{
-    // Default options for all toasts
-    duration: 4000,
-    style: {
-      maxWidth: '350px',
-      margin: '0 auto',
-    },
-  }}
-/>
+        position="top-center" 
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            maxWidth: '350px',
+            margin: '0 auto',
+          },
+        }}
+      />
       
-      {/* Existing style jsx */}
-      <style jsx>{`
-        /* Fix for autofill background in Chrome, Safari, and Edge */
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover, 
-        input:-webkit-autofill:focus,
-        input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 30px rgba(30, 58, 138, 0.3) inset !important;
-          -webkit-text-fill-color: white !important;
-          transition: background-color 5000s ease-in-out 0s;
-          caret-color: white;
-        }
+      <div className="min-h-screen flex">
+        {/* Left Side - Login Form */}
+        <div className="flex-1 flex items-center justify-center p-8 bg-white">
+          <div className="w-full max-w-md">
+            {/* Back to dashboard link */}
+            {user && (
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors mb-8 group"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:-translate-x-1 transition-transform">
+                  <path d="m12 19-7-7 7-7"/>
+                  <path d="M19 12H5"/>
+                </svg>
+                <span className="text-sm">Back to dashboard</span>
+              </button>
+            )}
 
-        /* Fix for Firefox */
-        @-moz-document url-prefix() {
-          input:-moz-autofill,
-          input:-moz-autofill:focus {
-            background-color: rgba(30, 58, 138, 0.3) !important;
-            color: white !important;
-          }
-        }
-      `}</style>
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-slate-800 mb-2">
+                {isResettingPassword ? 'Reset Password' : 'Sign In'}
+              </h1>
+              <p className="text-slate-600">
+                {isResettingPassword 
+                  ? 'Enter your email to receive reset instructions' 
+                  : 'Enter your email and password to sign in!'}
+              </p>
+            </div>
 
-      <div className="min-h-screen bg-indigo-200 flex flex-col justify-center py-6 sm:px-6 lg:px-8">
-        {/* Loading indicator remains unchanged */}
-        {isPageLoading && (
-          <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200">
-            <div className="h-full bg-indigo-600 animate-pulse-slow" style={{ width: '30%' }}></div>
-          </div>
-        )}
-
-
-        <div className={`mt-2 sm:mx-auto sm:w-full sm:max-w-lg transition-all duration-700 ${fadeIn ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
-          <div className="bg-indigo-200 overflow-hidden rounded-lg">
-            <div className="flex flex-col">
-              {/* Login Form - Now takes full width */}
-              <div className="p-8 flex items-center justify-center">
-                <div
-                  style={{ animation: "slideInFromLeft 1s ease-out" }}
-                  className="max-w-md w-full bg-gradient-to-r from-blue-800 to-purple-600 rounded-xl shadow-2xl overflow-hidden p-8 space-y-8"
-                >
-                  {/* Remove the error div since we're using toast */}
-                  
-                  {/* Keep the success message div */}
-                  {message && (
-                    <div className="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded-md animate-fadeIn">
-                      <div className="flex">
-                        <div className="ml-3">
-                          <p className="text-sm text-green-700">{message}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Replace the separate heading and paragraph with this grouped div */}
-                  <div className="mb-6">
-                    <h2
-                      style={{ animation: "appear 2s ease-out" }}
-                      className="text-left text-4xl font-extrabold text-white mb-0"
-                    >
-                      OPTIMA Dashboard
-                    </h2>
-                    <p style={{ animation: "appear 3s ease-out" }} className="text-left text-gray-200 -mt-1 pl-1">
-                      {isResettingPassword ? 'Reset your password' : 'Sign in to your account'}
-                    </p>
-                  </div>
-
-                  {/* Login form and reset password form remain unchanged */}
-                  {!isResettingPassword ? (
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="relative mb-6">
-                        <input
-                          placeholder="joey@example.com"
-                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
-                          required
-                          id="email"
-                          name="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                        <label
-                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
-                          htmlFor="email"
-                        >
-                          Email address
-                        </label>
-                      </div>
-                      <div className="relative mb-6">
-                        <input
-                          placeholder="Password"
-                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
-                          required
-                          id="password"
-                          name="password"
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <label
-                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
-                          htmlFor="password"
-                        >
-                          Password
-                        </label>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center text-sm text-gray-200">
-                          <input
-                            className="form-checkbox h-4 w-4 text-purple-600 bg-gray-800 border-gray-300 rounded"
-                            type="checkbox"
-                          />
-                          <span className="ml-2">Remember me</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setIsResettingPassword(true)}
-                          className="text-sm text-purple-200 hover:underline"
-                        >
-                          Forgot your password?
-                        </button>
-                      </div>
-<button
-  className="relative w-full py-3 px-8 text-white text-base font-semibold overflow-hidden bg-purple-600 rounded-md transition-all duration-400 ease-in-out shadow-md hover:scale-105 hover:text-white hover:shadow-lg active:scale-95 before:absolute before:top-0 before:-left-full before:w-full before:h-full before:bg-gradient-to-r before:from-blue-800 before:to-purple-700 before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-md hover:before:left-0 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
-  type="submit"
-  disabled={loading}
->
-  {loading ? (
-    <>
-      <svg className="animate-spin inline -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      Signing in...
-    </>
-  ) : 'Sign In'}
-</button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handlePasswordReset} className="space-y-6">
-                      <div className="relative mb-6">
-                        <input
-                          placeholder="john@example.com"
-                          className="peer h-14 w-full bg-blue-900/30 border-0 rounded-md px-4 pt-6 pb-2 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                          style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}
-                          required
-                          id="reset-email"
-                          name="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                        <label
-                          className="absolute left-4 top-2 text-xs text-purple-300/80 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-300/60 peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-purple-300 peer-focus:text-xs"
-                          htmlFor="reset-email"
-                        >
-                          Email address
-                        </label>
-                      </div>
-<button
-  className="relative w-full py-3 px-8 text-white text-base font-semibold overflow-hidden bg-purple-600 rounded-md transition-all duration-400 ease-in-out shadow-md hover:scale-105 hover:text-white hover:shadow-lg active:scale-95 before:absolute before:top-0 before:-left-full before:w-full before:h-full before:bg-gradient-to-r before:from-blue-800 before:to-purple-700 before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-md hover:before:left-0 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
-  type="submit"
-  disabled={loading}
->
-  {loading ? (
-    <>
-      <svg className="animate-spin inline -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      Sending...
-    </>
-  ) : 'Send Reset Instructions'}
-</button>
-                    </form>
-                  )}
-
-                  <div className="text-center text-gray-300">
-                    {isResettingPassword ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsResettingPassword(false)}
-                        className="text-purple-300 hover:underline"
-                      >
-                        Back to login
-                      </button>
-                    ) : (
-                      "To create an account, please contact the administrator"
-                    )}
+            {/* Success message */}
+            {message && (
+              <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-md animate-fadeIn">
+                <div className="flex">
+                  <div className="ml-3">
+                    <p className="text-sm text-green-700">{message}</p>
                   </div>
                 </div>
               </div>
-              
-              {/* Person In Charge section - Now appears below login */}
-              <div className="p-4 bg-indigo-200 flex flex-col">
-                <h2 className="text-xs font-bold text-black mb-6 text-center marquee_header">Person In Charge</h2>
-                
-                {loadingPic ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+            )}
+
+            {/* Login Form */}
+            {!isResettingPassword ? (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Email Field */}
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                    Email<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="info@example.com"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none hover:border-slate-300"
+                    required
+                  />
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                    Password<span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="w-full px-4 py-3 pr-12 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none hover:border-slate-300"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                          <line x1="2" x2="22" y1="2" y2="22"/>
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
-                ) : (
-                  <div className="marquee">
-                    <div className="marquee__inner">
-                      <div className="marquee__group">
-                        {picData.map((person, index) => (
-                          <span key={index}>{person.nama} - {person.posisi} - {person.status}</span>
-                        ))}
-                      </div>
-                      <div className="marquee__group">
-                        {picData.map((person, index) => (
-                          <span key={`repeat-${index}`}>{person.nama} - {person.posisi} - {person.status}</span>
-                        ))}
-                      </div>
+                </div>
+
+                {/* Keep me logged in & Forgot password */}
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={keepLoggedIn}
+                      onChange={(e) => setKeepLoggedIn(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 focus:ring-2"
+                    />
+                    <span className="text-slate-700">Remember me</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsResettingPassword(true)}
+                    className="text-indigo-600 hover:text-indigo-700 transition-colors font-medium"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {/* Sign In Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Signing in...
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                  ) : 'Sign In'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handlePasswordReset} className="space-y-6">
+                {/* Email Field */}
+                <div>
+                  <label htmlFor="reset-email" className="block text-sm font-medium text-slate-700 mb-2">
+                    Email<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="reset-email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="info@example.com"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all outline-none hover:border-slate-300"
+                    required
+                  />
+                </div>
+
+                {/* Send Reset Instructions Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sending...
+                    </div>
+                  ) : 'Send Reset Instructions'}
+                </button>
+                
+                {/* Back to login */}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsResettingPassword(false)}
+                    className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
+                  >
+                    Back to login
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Account creation note */}
+            <p className="text-center text-sm text-slate-600 mt-6">
+              Don't have an account?{' '}
+              <span className="text-indigo-600 font-semibold">
+                Contact administrator
+              </span>
+            </p>
           </div>
         </div>
-        
-        <div className="mt-6 text-center text-sm text-gray-500">
-          OPTIMA Internal Audit © 2025
+
+        {/* Right Side - Branding */}
+        <div className="flex-1 relative bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center p-8">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{ animationDelay: '4s' }}></div>
+          </div>
+
+          {/* Content */}
+          <div className="relative z-10 text-center max-w-md">
+            <div className="mb-2 flex justify-center">
+              <Logo size="lg" />
+            </div>
+            <h2 className="text-s text-slate-300 leading-relaxed">
+              Operational Performance and Internal Audit Management Application
+            </h2>
+
+            {/* PIC Section - Integrated in the right panel */}
+            <div className="mt-2 pt-2 border-t border-white/10">
+              <h3 className="text-sm font-semibold text-white/70 mb-3 text-left">PERSON IN CHARGE</h3>
+              
+              {loadingPic ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white/50"></div>
+                </div>
+              ) : (
+                <div className="space-y-1 text-left">
+                  {picData.map((person, index) => (
+                    <div key={index} className="text-white/70 text-sm">
+                      {person.nama} as {person.posisi} {person.status.toLowerCase().includes('active') 
+                        ? 'currently Active' 
+                        : `on ${person.status}`}{index < picData.length - 1 ? ',' : '.'}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="absolute bottom-8 right-8 p-3 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all transform hover:scale-110"
+          >
+            {isDarkMode ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2"/>
+                <path d="M12 20v2"/>
+                <path d="m4.93 4.93 1.41 1.41"/>
+                <path d="m17.66 17.66 1.41 1.41"/>
+                <path d="M2 12h2"/>
+                <path d="M20 12h2"/>
+                <path d="m6.34 17.66-1.41 1.41"/>
+                <path d="m19.07 4.93-1.41 1.41"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+              </svg>
+            )}
+          </button>
+          
+          {/* Footer */}
+          <div className="absolute bottom-4 text-center w-full text-white/40 text-xs">
+            OPTIMA Internal Audit © 2025
+          </div>
         </div>
       </div>
     </>
@@ -405,7 +439,6 @@ function ResetPassword() {
     </form>
   );
 }
-
 
 export default Login;
 export { ResetPassword };
