@@ -1,5 +1,8 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { useState } from 'react';
+import { ThemeSelector } from '../components/ThemeSelector';
 import { TutorialCard } from '../components/TutorialCard';
-import '../styles/download-button.css';
+import { ThemeProvider } from '../contexts/ThemeContext';
 
 const tutorials = [
 	{
@@ -36,24 +39,52 @@ const tutorials = [
 ];
 
 export default function Tutorials() {
+	const [showThemeSelector, setShowThemeSelector] = useState(false);
+
+	const toggleThemeSelector = () => {
+		setShowThemeSelector((prev) => !prev);
+	};
+
 	return (
-		<div className="container mx-auto px-4 py-8">
-			<div className="mb-8">
-				<h1 className="text-2xl font-bold text-gray-900">Tutorials</h1>
-				<p className="text-gray-600">
-					Download tutorial documents for various features
-				</p>
+		<ThemeProvider>
+			<div className="container mx-auto px-4 py-8">
+				<div className="mb-8">
+					<h1
+						className="text-2xl font-bold text-gray-900 cursor-pointer inline-flex items-center"
+						onClick={toggleThemeSelector}
+					>
+						Tutorials
+					</h1>
+					<p className="text-gray-600">
+						Download tutorial documents for various features
+					</p>
+				</div>
+
+				<AnimatePresence>
+					{showThemeSelector && (
+						<motion.div
+							initial={{ opacity: 0, height: 0 }}
+							animate={{ opacity: 1, height: 'auto' }}
+							exit={{ opacity: 0, height: 0 }}
+							transition={{ duration: 0.3 }}
+							className="overflow-hidden mb-6"
+						>
+							<ThemeSelector />
+						</motion.div>
+					)}
+				</AnimatePresence>
+
+				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+					{tutorials.map((tutorial, index) => (
+						<TutorialCard
+							key={index}
+							title={tutorial.title}
+							description={tutorial.description}
+							url={tutorial.url}
+						/>
+					))}
+				</div>
 			</div>
-			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-				{tutorials.map((tutorial, index) => (
-					<TutorialCard
-						key={index}
-						title={tutorial.title}
-						description={tutorial.description}
-						url={tutorial.url}
-					/>
-				))}
-			</div>
-		</div>
+		</ThemeProvider>
 	);
 }

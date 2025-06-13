@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis } from 'recharts';
-import { BranchLocationTable, BranchRow } from "../components/dashboard/BranchLocationTable";
+import { BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
 import { FraudRow } from "../components/dashboard/TopFraudTable";
 import { Card, CardContent } from '../components/ui/card';
@@ -555,206 +555,182 @@ const Dashboard = () => {
 
       {/* Main Dashboard Content */}
       {activeSection === 'main' && (
-        <div className="grid grid-cols-1 lg:grid-cols-[0.5fr_1.1fr] gap-2">
-          {/* Branch Locations */}
-          <Card className="bg-white shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
-                <h2 className="text-sm font-semibold mb-2 sm:mb-0">Branch Locations</h2>
-                <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search branch name or region..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs border rounded-md w-full sm:w-56 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="max-h-[470px] overflow-y-auto">
-                <BranchLocationTable data={branchTableData} />
-              </div>
-            </CardContent>
-          </Card>
+        // Changed from grid to a single card with full width
+        <Card className="bg-white shadow-sm">
+          <CardContent className="p-4">
+            <h2 className="text-xl font-semibold pt-1 mb-4">Audit Performance Summary</h2>
+            
+            {/* Charts - Stack on mobile AND tablet, 2 columns ONLY on large screens */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
+              {/* Pie Chart */}
+              <Card className="flex flex-col bg-white shadow-sm">
+                <CardContent className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2 mt-3 text-center">Composition Regular and Annual</h3>
+                  <ChartContainer
+                    config={chartConfig}
+                    className="mx-auto aspect-square max-h-[400px]"
+                  >
+                    <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent hideLabel />}
+                      />
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        stroke="0"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
 
-          {/* Performance Summary */}
-          <Card className="bg-white shadow-sm">
-            <CardContent className="p-4">
-              <h2 className="text-sm font-semibold pt-1 mb-4">Audit Performance Summary</h2>
+              {/* Bar Chart */}
+              <Card>
+                <CardContent className="pt-5 pb-5">
+                  <ChartContainer config={barChartConfig}>
+                    <BarChart data={monthlyData}
+                      margin={{ top: 5, right: 5, left: 5, bottom:0}}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={15}
+                        axisLine={false}
+                        tick={{ 
+                          fontSize: 10,
+                          angle: -90,
+                          textAnchor: 'end',
+                          dy: 10
+                        }}
+                        height={80}
+                        interval={0}
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="dashed" />}
+                      />
+                      <Bar dataKey="annualAudits" fill="#50C878" radius={3} />
+                      <Bar dataKey="fraudAudits" fill="#e74c3c" radius={3} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Audit Summary by Region - Responsive version */}
+            <div className="mt-2">
+              <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
               
-              {/* Charts - Stack on mobile AND tablet, 2 columns ONLY on large screens */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
-                {/* Pie Chart */}
-                <Card className="flex flex-col bg-white shadow-sm">
-                  <CardContent className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2 mt-3 text-center">Composition Regular and Annual</h3>
-                    <ChartContainer
-                      config={chartConfig}
-                      className="mx-auto aspect-square max-h-[250px]"
-                    >
-                      <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent hideLabel />}
-                        />
-                        <Pie
-                          data={pieData}
-                          dataKey="value"
-                          nameKey="name"
-                          stroke="0"
-                        />
-                      </PieChart>
-                    </ChartContainer>
-                  </CardContent>
-                </Card>
-
-                {/* Bar Chart */}
-                <Card>
-                  <CardContent className="pt-5 pb-5">
-                    <ChartContainer config={barChartConfig}>
-                      <BarChart data={monthlyData}
-                        margin={{ top: 5, right: 5, left: 5, bottom:0}}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                          dataKey="month"
-                          tickLine={false}
-                          tickMargin={15}
-                          axisLine={false}
-                          tick={{ 
-                            fontSize: 10,
-                            angle: -90,
-                            textAnchor: 'end',
-                            dy: 10
-                          }}
-                          height={80}
-                          interval={0}
-                        />
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent indicator="dashed" />}
-                        />
-                        <Bar dataKey="annualAudits" fill="#50C878" radius={3} />
-                        <Bar dataKey="fraudAudits" fill="#e74c3c" radius={3} />
-                      </BarChart>
-                    </ChartContainer>
-                  </CardContent>
-                </Card>
+              {/* Mobile & Tablet View: Simple stacked layout */}
+              <div className="overflow-y-auto max-h-[300px] border rounded block lg:hidden">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-white shadow-sm">
+                    <tr className="text-gray-500 border-b">
+                      <th className="text-left py-1 px-2 font-medium">Region</th>
+                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getRegionAuditData().map((item, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-1 px-2 font-medium">{item.region}</td>
+                        <td className="text-right py-1 px-2">
+                          <span className="text-green-600">{item.regular}</span>
+                        </td>
+                        <td className="text-right py-1 px-2">
+                          <span className="text-red-600">{item.fraud}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {/* Audit Summary by Region - Responsive version */}
-              <div className="mt-2">
-                <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
-                
-                {/* Mobile & Tablet View: Simple stacked layout */}
-                <div className="overflow-y-auto max-h-[300px] border rounded block lg:hidden">
+              
+              {/* Desktop View: Multi-column layout */}
+              <div className="overflow-x-auto hidden lg:block">
+                <div className="overflow-y-auto max-h-[200px] border rounded">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-white shadow-sm">
                       <tr className="text-gray-500 border-b">
+                        {/* First group of columns */}
                         <th className="text-left py-1 px-2 font-medium">Region</th>
+                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
+                        {/* Second group of columns */}
+                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
+                        {/* Third group of columns */}
+                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
+                        {/* Fourth group of columns */}
+                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
+                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
+                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
+                        {/* Fifth group of columns */}
+                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
                         <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
                         <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {getRegionAuditData().map((item, index) => (
-                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-1 px-2 font-medium">{item.region}</td>
-                          <td className="text-right py-1 px-2">
-                            <span className="text-green-600">{item.regular}</span>
-                          </td>
-                          <td className="text-right py-1 px-2">
-                            <span className="text-red-600">{item.fraud}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        const regionData = getRegionAuditData();
+                        const rows = [];
+                        const regionsPerRow = 5;
+                        
+                        // Create rows based on the total number of regions
+                        for (let i = 0; i < Math.ceil(regionData.length / regionsPerRow); i++) {
+                          rows.push(
+                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                              {/* Map each group of 5 regions */}
+                              {[0, 1, 2, 3, 4].map(colIndex => {
+                                const dataIndex = i * regionsPerRow + colIndex;
+                                const item = regionData[dataIndex];
+                                
+                                if (!item) {
+                                  // Return empty cells if no data
+                                  return (
+                                    <React.Fragment key={colIndex}>
+                                      <td className="py-1 px-2 font-medium"></td>
+                                      <td className="text-right py-1 px-2"></td>
+                                      <td className="text-right py-1 px-2"></td>
+                                    </React.Fragment>
+                                  );
+                                }
+                                
+                                // Return cells with data
+                                return (
+                                  <React.Fragment key={colIndex}>
+                                    <td className={`py-1 px-2 font-medium ${colIndex > 0 ? 'border-l' : ''}`}>
+                                      {item.region}
+                                    </td>
+                                    <td className="text-right py-1 px-2">
+                                      <span className="text-green-600">{item.regular}</span>
+                                    </td>
+                                    <td className="text-right py-1 px-2">
+                                      <span className="text-red-600">{item.fraud}</span>
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tr>
+                          );
+                        }
+                        
+                        return rows;
+                      })()}
                     </tbody>
                   </table>
                 </div>
-                
-                {/* Desktop View: Multi-column layout */}
-                <div className="overflow-x-auto hidden lg:block">
-                  <div className="overflow-y-auto max-h-[200px] border rounded">
-                    <table className="w-full text-xs">
-                      <thead className="sticky top-0 bg-white shadow-sm">
-                        <tr className="text-gray-500 border-b">
-                          {/* First group of columns */}
-                          <th className="text-left py-1 px-2 font-medium">Region</th>
-                          <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                          <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                          {/* Second group of columns */}
-                          <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                          <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                          <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                          {/* Third group of columns */}
-                          <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                          <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                          <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                          {/* Fourth group of columns */}
-                          <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                          <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                          <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                          {/* Fifth group of columns */}
-                          <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                          <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                          <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const regionData = getRegionAuditData();
-                          const rows = [];
-                          const regionsPerRow = 5;
-                          
-                          // Create rows based on the total number of regions
-                          for (let i = 0; i < Math.ceil(regionData.length / regionsPerRow); i++) {
-                            rows.push(
-                              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                                {/* Map each group of 5 regions */}
-                                {[0, 1, 2, 3, 4].map(colIndex => {
-                                  const dataIndex = i * regionsPerRow + colIndex;
-                                  const item = regionData[dataIndex];
-                                  
-                                  if (!item) {
-                                    // Return empty cells if no data
-                                    return (
-                                      <React.Fragment key={colIndex}>
-                                        <td className="py-1 px-2 font-medium"></td>
-                                        <td className="text-right py-1 px-2"></td>
-                                        <td className="text-right py-1 px-2"></td>
-                                      </React.Fragment>
-                                    );
-                                  }
-                                  
-                                  // Return cells with data
-                                  return (
-                                    <React.Fragment key={colIndex}>
-                                      <td className={`py-1 px-2 font-medium ${colIndex > 0 ? 'border-l' : ''}`}>
-                                        {item.region}
-                                      </td>
-                                      <td className="text-right py-1 px-2">
-                                        <span className="text-green-600">{item.regular}</span>
-                                      </td>
-                                      <td className="text-right py-1 px-2">
-                                        <span className="text-red-600">{item.fraud}</span>
-                                      </td>
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          }
-                          
-                          return rows;
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Administration Section - Full width/page when active */}

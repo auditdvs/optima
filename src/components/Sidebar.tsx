@@ -35,13 +35,13 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
+    { path: '/update-location', icon: MapPinPlus, label: 'Branch Location' },
     { path: '/email-address', icon: Mail, label: 'Email Address Branch' },
   ];
   
   // super admin, qa, manager dan dvs
   if (userRole === 'superadmin' || userRole === 'qa'|| userRole === 'dvs' || userRole === 'manager') { 
     menuItems.push(
-      { path: '/update-location', icon: MapPinPlus, label: 'Update Location' },
       { path: '/qa-section', icon: FilePenLine, label: 'Update Audits' },
       { path: '/broadcast', icon: Megaphone, label: 'Broadcast Message' }
     );
