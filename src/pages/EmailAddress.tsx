@@ -1,5 +1,5 @@
 import { ArrowUpDown, Pencil, Trash2 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -89,45 +89,94 @@ const EditEmailModal: React.FC<EditEmailModalProps> = ({ isOpen, onClose, emailD
 };
 
 const CopyEmailButton: React.FC<{ email: string }> = ({ email }) => {
-  const btnRef = useRef<HTMLButtonElement>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(email);
-    setCopied(true);
-    if (btnRef.current) btnRef.current.focus();
-    setTimeout(() => {
-      setCopied(false);
-      btnRef.current?.blur(); // hilangkan focus agar animasi kembali normal
-    }, 1000);
+  const handleCopy = async () => {
+    try {
+      // Use the modern clipboard API
+      await navigator.clipboard.writeText(email);
+      setCopied(true);
+      
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      // Fallback method for older browsers
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = email;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopied(true);
+        setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      } catch (fallbackError) {
+        console.error('Fallback copy failed: ', fallbackError);
+      }
+    }
   };
 
   return (
     <button
-      ref={btnRef}
-      className="copy-email-btn"
-      type="button"
+      className="relative w-9 h-9 bg-white text-pink-600 rounded-[10px] border-none cursor-pointer hover:bg-pink-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-pink-300 group transition-all duration-200"
       onClick={handleCopy}
-      tabIndex={0}
     >
-      <span style={{ opacity: copied ? 0 : 1, pointerEvents: copied ? 'none' : 'auto' }}>
+      {/* Tooltip */}
+      <span
+        className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap text-[12px] font-mono text-pink-800 bg-pink-50 px-[7px] py-[7px] rounded-[4px] border border-pink-200 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.68,-0.55,0.265,1.55)] ${
+          copied 
+            ? 'opacity-100 visible -top-2.5' 
+            : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:-top-2.5'
+        }`}
+      >
+        {copied ? "Copied!" : "Copy to clipboard"}
+      </span>
+
+      {/* Tooltip arrow */}
+      <span
+        className={`absolute -bottom-[3.5px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-pink-50 border-r border-b border-pink-200 rotate-45 z-[-10] pointer-events-none transition-opacity duration-300 ${
+          copied 
+            ? 'opacity-100' 
+            : 'opacity-0 group-hover:opacity-100'
+        }`}
+      ></span>
+
+      {/* Icons */}
+      <span>
         <svg
-          width="14"
-          height="14"
-          fill="currentColor"
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-current transition-all duration-200 ${
+            copied ? 'opacity-0 scale-0' : 'opacity-100 scale-100'
+          }`}
           xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 467 512.22"
-          style={{ marginRight: 4, display: 'inline-block', verticalAlign: 'middle' }}
+          viewBox="0 0 6.35 6.35"
+          width="20"
+          height="20"
+          fill="currentColor"
         >
           <path
-            fillRule="nonzero"
-            d="M131.07 372.11c.37 1 .57 2.08.57 3.2 0 1.13-.2 2.21-.57 3.21v75.91c0 10.74 4.41 20.53 11.5 27.62s16.87 11.49 27.62 11.49h239.02c10.75 0 20.53-4.4 27.62-11.49s11.49-16.88 11.49-27.62V152.42c0-10.55-4.21-20.15-11.02-27.18l-.47-.43c-7.09-7.09-16.87-11.5-27.62-11.5H170.19c-10.75 0-20.53 4.41-27.62 11.5s-11.5 16.87-11.5 27.61v219.69zm-18.67 12.54H57.23c-15.82 0-30.1-6.58-40.45-17.11C6.41 356.97 0 342.4 0 326.52V57.79c0-15.86 6.5-30.3 16.97-40.78l.04-.04C27.51 6.49 41.94 0 57.79 0h243.63c15.87 0 30.3 6.51 40.77 16.98l.03.03c10.48 10.48 16.99 24.93 16.99 40.78v36.85h50c15.9 0 30.36 6.5 40.82 16.96l.54.58c10.15 10.44 16.43 24.66 16.43 40.24v302.01c0 15.9-6.5 30.36-16.96 40.82-10.47 10.47-24.93 16.97-40.83 16.97H170.19c-15.9 0-30.35-6.5-40.82-16.97-10.47-10.46-16.97-24.92-16.97-40.82v-69.78zM340.54 94.64V57.79c0-10.74-4.41-20.53-11.5-27.63-7.09-7.08-16.86-11.48-27.62-11.48H57.79c-10.78 0-20.56 4.38-27.62 11.45l-.04.04c-7.06 7.06-11.45 16.84-11.45 27.62v268.73c0 10.86 4.34 20.79 11.38 27.97 6.95 7.07 16.54 11.49 27.17 11.49h55.17V152.42c0-15.9 6.5-30.35 16.97-40.82 10.47-10.47 24.92-16.96 40.82-16.96h170.35z"
-          ></path>
+            d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z"
+          />
         </svg>
-        Copy Email
-      </span>
-      <span style={{ opacity: copied ? 1 : 0, pointerEvents: 'none' }}>
-        Copied
+
+        <svg
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-current transition-all duration-200 ${
+            copied ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
+          }`}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="currentColor"
+        >
+          <path
+            d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z"
+          />
+        </svg>
       </span>
     </button>
   );
@@ -368,7 +417,7 @@ const EmailAddress = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">No.</TableHead>
+                  <TableHead className="w-20 pl-5">No.</TableHead>
                   <TableHead 
                     className="cursor-pointer"
                     onClick={() => handleSort('branch_name')}
@@ -387,41 +436,43 @@ const EmailAddress = () => {
                       <ArrowUpDown className="h-4 w-4" />
                     </div>
                   </TableHead>
-                  {userRole === 'superadmin' && (
-                    <TableHead>Actions</TableHead>
-                  )}
+                  {/* Actions column now visible for all users */}
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredAndSortedEmails.map((email, index) => (
                   <TableRow key={email.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className="pl-6">{index + 1}</TableCell>
                     <TableCell>{email.branch_name}</TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      {email.email}
-                      <CopyEmailButton email={email.email} />
+                    <TableCell>{email.email}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        {/* Copy button visible for all users */}
+                        <CopyEmailButton email={email.email} />
+                        
+                        {/* Edit and delete buttons only for superadmin */}
+                        {userRole === 'superadmin' && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedEmail(email);
+                                setShowEditModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(email.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
-                    {userRole === 'superadmin' && (
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedEmail(email);
-                              setShowEditModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => confirmDelete(email.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    )}
                   </TableRow>
                 ))}
               </TableBody>

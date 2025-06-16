@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Send, Upload, X } from 'lucide-react';
+import { LoaderCircle, Plus, Send, Upload, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,11 +12,10 @@ import { Label } from "../components/ui/label";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
 
@@ -239,17 +238,25 @@ function Broadcast() {
           <Button 
             variant="outline" 
             size="sm"
+            className='bg-yellow-400 hover:bg-yellow-300 text-yellow-900 hover:text-yellow-800 transition-colors duration-300'
             onClick={fetchNotifications}
             disabled={refreshing}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh"}
+            {refreshing ? (
+              <>
+                <LoaderCircle className="h-4 w-4 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              "Refresh"
+            )}
           </Button>
           
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" 
+                className="bg-indigo-600 hover:bg-indigo-400 text-white transition-colors duration-400">
+                <Plus className="h-4 w-4 mx-auto" />
                 New Broadcast
               </Button>
             </DialogTrigger>
@@ -283,7 +290,7 @@ function Broadcast() {
                 <div className="space-y-2">
                   <Label>Attachment (optional)</Label>
                   <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" className="h-9" asChild>
+                    <Button type="button" variant="outline" className="h-9 bg-green-500 text-white hover:bg-green-400 hover:text-green-900" asChild>
                       <label>
                         <Upload className="h-4 w-4 mr-2" />
                         Upload
@@ -319,12 +326,18 @@ function Broadcast() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setDialogOpen(false)}
+                    className='bg-red-600 hover:bg-rose-500 text-white transition-colors duration-400'
+                  >
                     Cancel
                   </Button>
                   <Button 
                     type="submit"
                     disabled={loading || uploading}
+                    className='bg-indigo-600 hover:bg-indigo-500 text-white transition-colors duration-400 disabled:opacity-50 disabled:cursor-not-allowed'
                   >
                     <Send className="h-4 w-4 mr-2" />
                     {uploading ? 'Uploading...' : loading ? 'Sending...' : 'Send Message'}
