@@ -1,10 +1,17 @@
 import { Search } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis } from 'recharts';
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Label, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
 import { BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
 import { FraudRow } from "../components/dashboard/TopFraudTable";
-import { Card, CardContent } from '../components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '../components/ui/card';
 import {
   ChartConfig,
   ChartContainer,
@@ -12,7 +19,67 @@ import {
   ChartTooltipContent,
 } from "../components/ui/chart";
 import PasswordModal from '../components/ui/PasswordModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '../components/ui/table';
 import { supabase } from '../lib/supabaseClient';
+
+// sesuaikan path jika berbeda
+const auditorMapping = [
+  { label: 'Andre Perkasa Ginting', value: 'andre' },
+  { label: 'Sanjung', value: 'sanjung' },
+  { label: 'Abduloh', value: 'abduloh' },
+  { label: 'Fatir Anis Sabir', value: 'fatir' },
+  { label: 'Anwar Sadat, S.E', value: 'anwar' },
+  { label: 'Antoni', value: 'antoni' },
+  { label: 'Maya Lestari, S.E', value: 'maya' },
+  { label: 'Indah Marsita', value: 'indah' },
+  { label: 'Aditya Dwi Susanto', value: 'aditya' },
+  { label: 'Achmad Miftachul Huda, S.E', value: 'miftach' },
+  { label: 'Heri Hermawan', value: 'heri' },
+  { label: 'Aris Munandar', value: 'aris' },
+  { label: 'Sandi Mulyadi', value: 'sandi' },
+  { label: 'Ahmad', value: 'ahmad' },
+  { label: 'Widya Lestari', value: 'widya' },
+  { label: 'Retno Istiyanto, A.Md', value: 'retno' },
+  { label: 'Ade Yadi Heryadi', value: 'ade' },
+  { label: 'Muhamad Yunus', value: 'yunus' },
+  { label: 'Dara Fusvita Adityacakra, S.Tr.Akun', value: 'dara' },
+  { label: 'Lukman Yasir', value: 'lukman' },
+  { label: 'Ngadiman', value: 'ngadiman' },
+  { label: 'Solikhin, A.Md', value: 'solikhin' },
+  { label: 'Amriani', value: 'amriani' },
+  { label: 'Maria Sulistya Wati', value: 'maria' },
+  { label: "Muhammad Rifa'i", value: 'rifai' },
+  { label: 'Buldani', value: 'buldani' },
+  { label: 'Imam Kristiawan', value: 'imam' },
+  { label: 'Darmayani', value: 'darmayani' },
+  { label: 'Novi Dwi Juanda', value: 'novi' },
+  { label: 'Afdal Juanda', value: 'afdal' },
+  { label: 'Kandidus Yosef Banu', value: 'kandidus' },
+  { label: 'Muhammad Alfian Sidiq', value: 'alfian' },
+  { label: 'Fadhlika Sugeng Achmadani, S.E', value: 'fadhlika' },
+  { label: 'Hendra Hermawan', value: 'hendra' },
+  { label: 'Dadang Supriatna', value: 'dadang' },
+  { label: 'Yogi Nugraha', value: 'yogi' },
+  { label: 'Iqbal Darmazi', value: 'iqbal' },
+  { label: 'Ganjar Raharja', value: 'ganjar' },
+  { label: 'Dede Yudha Nersanto', value: 'dede' },
+  { label: 'Ayu Sri Erian Agustin', value: 'eri' },
+  { label: 'Lise Roswati Rochendi MP', value: 'lise' },
+];
+
+// Buat fungsi helper untuk mengambil label/nama lengkap dari value
+const getAuditorName = (value) => {
+  const auditor = auditorMapping.find(a => a.value === value);
+  return auditor ? auditor.label : value;
+};
 
 interface WorkPaper {
   id: string;
@@ -43,6 +110,7 @@ const getMonthlyAuditData = (workPapers: WorkPaper[]) => {
     annualAudits: 0
   }));
 
+  // Pastikan semua data dipetakan dengan benar
   workPapers.forEach(wp => {
     const startDate = new Date(wp.audit_start_date);
     const monthIndex = startDate.getMonth();
@@ -57,14 +125,27 @@ const getMonthlyAuditData = (workPapers: WorkPaper[]) => {
   return monthlyData;
 };
 
+// Update your barChartConfig to include colors for the line chart
 const barChartConfig = {
   annualAudits: {
     label: "Annual Audits",
     color: "#50C878",
   },
   fraudAudits: {
-    label: "Fraud Audits",
+    label: "Special Audits",
     color: "#e74c3c",
+  },
+} satisfies ChartConfig;
+
+// Add this after your other chart configs
+const auditorChartConfig = {
+  regular: {
+    label: "Regular Audits",
+    color: "#50C878",  // Same green as used elsewhere
+  },
+  fraud: {
+    label: "Special Audits",
+    color: "#e74c3c",  // Same red as used elsewhere
   },
 } satisfies ChartConfig;
 
@@ -83,6 +164,15 @@ const Dashboard = () => {
   const [passwordError, setPasswordError] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   
+
+  const [auditorCounts, setAuditorCounts] = useState<Array<{
+  auditor_id: string; // Tambahkan auditor_id yang akan digunakan untuk key
+  auditor_name: string;
+  regular: number;
+  fraud: number;
+  total: number;
+}>>([]);
+
   // Add this new state for the administration section
   const [activeSection, setActiveSection] = useState<'main' | 'administration'>('main');
   const [regionFilter, setRegionFilter] = useState<string>('all');
@@ -98,6 +188,8 @@ const Dashboard = () => {
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState(false);
   
+  const [months] = useState(['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+
   const fetchData = async () => {
     try {
       const { data: branchesData, error: branchesError } = await supabase
@@ -281,13 +373,152 @@ const Dashboard = () => {
     }
   };
 
+  // Ganti fungsi fetchAuditorCounts dengan fungsi baru ini:
+
+  const fetchAuditorCounts = async () => {
+    try {
+      // Ambil semua data audit_counts
+      const { data: auditCounts, error } = await supabase
+        .from('audit_counts')
+        .select('auditor_name, branch_name, audit_end_date, audit_type');
+        
+      if (error) throw error;
+      
+      // Buat kamus untuk memetakan nama auditor ke format standar
+      const auditorNameMap = {};
+      const auditorIdMap = {};
+      
+      // Inisialisasi pemetaan
+      auditorMapping.forEach(auditor => {
+        // Nama lengkap sebagai key
+        auditorNameMap[auditor.label.toLowerCase()] = auditor.label;
+        auditorIdMap[auditor.label.toLowerCase()] = auditor.value;
+        
+        // Value/id sebagai key
+        auditorNameMap[auditor.value.toLowerCase()] = auditor.label;
+        auditorIdMap[auditor.value.toLowerCase()] = auditor.value;
+        
+        // First name sebagai key (untuk nama seperti "yogi")
+        const firstName = auditor.label.split(' ')[0].toLowerCase();
+        if (!auditorNameMap[firstName]) {
+          auditorNameMap[firstName] = auditor.label;
+          auditorIdMap[firstName] = auditor.value;
+        }
+      });
+      
+      // Struktur untuk menghitung jumlah audit unik per auditor
+      const uniqueAudits = new Map(); // Map(auditorId -> { name, regularSet, fraudSet })
+      
+      // Proses data audit_counts
+      auditCounts?.forEach(record => {
+        const auditorName = record.auditor_name?.toLowerCase();
+        if (!auditorName) return;
+        
+        // Cari id dan nama standar auditor
+        const auditorId = auditorIdMap[auditorName];
+        const standardName = auditorNameMap[auditorName];
+        
+        if (!auditorId || !standardName) return;
+        
+        // Buat kunci unik audit
+        const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
+        
+        // Buat atau update data auditor
+        if (!uniqueAudits.has(auditorId)) {
+          uniqueAudits.set(auditorId, {
+            auditor_id: auditorId,
+            auditor_name: standardName,
+            regular: new Set(),
+            fraud: new Set()
+          });
+        }
+        
+        const auditorData = uniqueAudits.get(auditorId);
+        
+        // Tambahkan audit ke set yang sesuai
+        if (record.audit_type === 'regular') {
+          auditorData.regular.add(uniqueKey);
+        } else if (record.audit_type === 'fraud') {
+          auditorData.fraud.add(uniqueKey);
+        }
+      });
+      
+      // Konversi ke array dan hitung total
+      const countsArray = Array.from(uniqueAudits.values())
+        .map(auditor => ({
+          auditor_id: auditor.auditor_id,
+          auditor_name: auditor.auditor_name, // Nama lengkap
+          regular: auditor.regular.size,
+          fraud: auditor.fraud.size,
+          total: auditor.regular.size + auditor.fraud.size
+        }))
+        .filter(auditor => auditor.total > 0)
+        .sort((a, b) => b.total - a.total);
+    
+      // Simpan hasil ke state
+      setAuditorCounts(countsArray);
+    
+    } catch (error) {
+      console.error('Error fetching auditor counts:', error);
+    }
+  };
+
+  // Tambahkan fungsi fetchAuditorAuditCounts
+  const fetchAuditorAuditCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_counts')
+        .select('auditor_name, branch_name, audit_end_date, audit_type');
+
+      if (error) throw error;
+
+      // Struktur untuk melacak audit unik per auditor
+      const auditorMap = {};
+      
+      // Process all audit counts
+      data?.forEach(record => {
+        const auditor = record.auditor_name;
+        if (!auditor) return;
+        
+        // Buat kunci unik dari branch_name dan audit_end_date
+        const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
+        
+        if (!auditorMap[auditor]) {
+          auditorMap[auditor] = { 
+            auditor_name: auditor, 
+            regular: new Set(), 
+            fraud: new Set() 
+          };
+        }
+        
+        // Kategorikan berdasarkan audit_type
+        if (record.audit_type === 'regular') {
+          auditorMap[auditor].regular.add(uniqueKey);
+        } else if (record.audit_type === 'fraud') {
+          auditorMap[auditor].fraud.add(uniqueKey);
+        }
+      });
+
+      // Convert ke array dan hitung total
+      const result = Object.values(auditorMap).map(auditor => ({
+        auditor_name: auditor.auditor_name,
+        regular: auditor.regular.size,
+        fraud: auditor.fraud.size,
+        total: auditor.regular.size + auditor.fraud.size,
+      })).sort((a, b) => b.total - a.total);
+
+      setAuditorCounts(result);
+    } catch (err) {
+      console.error('Error fetching auditor counts:', err);
+    }
+  };
+
   useEffect(() => {
     fetchData();
-    
-    // Add this call to fetch admin audit data
     fetchAdminRegularAudits();
     fetchAdminFraudAudits();
-    fetchAuditScheduleData(); // Add this line
+    fetchAuditScheduleData();
+    fetchAuditorCounts();
   }, []);
 
   // Update the handleUncensorFraud function to accept the password
@@ -389,86 +620,56 @@ const Dashboard = () => {
 
   const chartConfig = {
     value: { label: "Audits" },
-    "Annual Audits": { label: "Annual Audits: ", color: "#50C878" },
-    "Fraud Audits": { label: "Special Audits: ", color: "#e74c3c" },
+    annualAudits: { 
+      label: "Annual Audits", 
+      color: "#50C878" 
+    },
+    fraudAudits: { 
+      label: "Special Audits", 
+      color: "#e74c3c" 
+    },
+    // Keep month colors for select dropdown
+    "all": { color: "#6b7280" },
+    "jan": { color: "#3b82f6" },
+    "feb": { color: "#06b6d4" },
+    "mar": { color: "#10b981" },
+    "apr": { color: "#84cc16" },
+    "may": { color: "#eab308" },
+    "jun": { color: "#f97316" },
+    "jul": { color: "#f97316" },
+    "aug": { color: "#ec4899" },
+    "sep": { color: "#8b5cf6" },
+    "oct": { color: "#6366f1" },
+    "nov": { color: "#0ea5e9" },
+    "dec": { color: "#14b8a6" },
   } satisfies ChartConfig;
 
-  // Add this function to process region audit data
-  const getRegionAuditData = () => {
-    const regionData: Record<string, { regular: number, fraud: number }> = {};
+  // Update the getFilteredRadialData function
+  const getFilteredRadialData = () => {
+    if (selectedMonth === 'All') {
+      return [{
+        month: "all",
+        annualAudits: stats.annualAudits,
+        fraudAudits: stats.fraudAudits
+      }];
+    }
     
-    // Count regular and fraud audits per region
-    workPapers.forEach(wp => {
-      // Find the branch to get its region
-      const branch = branches.find(b => b.name === wp.branch_name);
-      if (!branch) return;
-      
-      const region = branch.region;
-      
-      // Initialize region data if not exists
-      if (!regionData[region]) {
-        regionData[region] = { regular: 0, fraud: 0 };
-      }
-      
-      // Increment the appropriate counter
-      if (wp.audit_type === 'regular') {
-        regionData[region].regular++;
-      } else if (wp.audit_type === 'fraud') {
-        regionData[region].fraud++;
-      }
+    const monthIndex = months.indexOf(selectedMonth) - 1;
+    if (monthIndex < 0) return [{ month: "all", annualAudits: 0, fraudAudits: 0 }];
+    
+    const filteredData = workPapers.filter(wp => {
+      const endDate = new Date(wp.audit_end_date);
+      return endDate.getMonth() === monthIndex;
     });
     
-    // Convert to array and sort alphabetically by region name
-    return Object.entries(regionData)
-      .map(([region, counts]) => ({ region, ...counts }))
-      .sort((a, b) => a.region.localeCompare(b.region));
-  };
-
-  // Function to get failed checks with aliases (excluding DAPA Perubahan)
-  const getFailedChecksWithAliases = (audit: any) => {
-    const regularAuditAliases = {
-      dapa: "DAPA",
-      revised_dapa: "DAPA Perubahan", // Will be excluded from failed checks
-      dapa_supporting_data: "Data Dukung DAPA",
-      assignment_letter: "Surat Tugas",
-      entrance_agenda: "Entrance Agenda",
-      entrance_attendance: "Absensi Entrance",
-      audit_working_papers: "KK Pemeriksaan",
-      exit_meeting_minutes: "BA Exit Meeting",
-      exit_attendance_list: "Absensi Exit",
-      audit_result_letter: "LHA",
-      rta: "RTA"
-    };
+    const annualCount = filteredData.filter(wp => wp.audit_type === 'regular').length;
+    const fraudCount = filteredData.filter(wp => wp.audit_type === 'fraud').length;
     
-    return Object.entries(audit)
-      .filter(([key, value]) => 
-        typeof value === 'boolean' && 
-        !value && 
-        regularAuditAliases[key] &&
-        key !== 'revised_dapa' // Exclude DAPA Perubahan from failed checks
-      )
-      .map(([key]) => regularAuditAliases[key])
-      .join(', ');
-  };
-
-  // Add this function to get failed checks for fraud audits
-  const getFraudFailedChecksWithAliases = (audit: any) => {
-    const fraudAuditAliases = {
-      data_preparation: "Data Persiapan",
-      assignment_letter: "Surat Tugas",
-      audit_working_papers: "KK Pemeriksaan",
-      audit_report: "SHA",
-      detailed_findings: "RTA"
-    };
-    
-    return Object.entries(audit)
-      .filter(([key, value]) => 
-        typeof value === 'boolean' && 
-        !value && 
-        fraudAuditAliases[key]
-      )
-      .map(([key]) => fraudAuditAliases[key])
-      .join(', ');
+    return [{
+      month: selectedMonth.toLowerCase(),
+      annualAudits: annualCount,
+      fraudAudits: fraudCount
+    }];
   };
 
   // Update the handleAdminPasswordVerification function to accept the password
@@ -483,6 +684,131 @@ const Dashboard = () => {
     }
     setAdminPasswordInput('');
   };
+
+  // State to manage selected month for the pie chart
+  const [selectedMonth, setSelectedMonth] = useState('All');
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Add this function to filter data by selected month
+  const getFilteredPieData = () => {
+    if (selectedMonth === 'All') {
+      return [
+        { name: "Annual Audits", value: stats.annualAudits, fill: "#50C878" },
+        { name: "Special Audits", value: stats.fraudAudits, fill: "#e74c3c" },
+      ];
+    }
+    
+    const monthIndex = months.indexOf(selectedMonth) - 1; // -1 because 'All' is at index 0
+    if (monthIndex < 0) return [];
+    
+    const filteredData = workPapers.filter(wp => {
+      const endDate = new Date(wp.audit_end_date);
+      return endDate.getMonth() === monthIndex;
+    });
+    
+    const annualCount = filteredData.filter(wp => wp.audit_type === 'regular').length;
+    const fraudCount = filteredData.filter(wp => wp.audit_type === 'fraud').length;
+    
+    return [
+      { name: "Annual Audits", value: annualCount, fill: "#50C878" },
+      { name: "Special Audits", value: fraudCount, fill: "#e74c3c" },
+    ];
+  };
+
+  // Add variable to store the filtered data
+  const filteredPieData = getFilteredPieData();
+
+  // Add effect to reset activeIndex when the filtered data changes
+  useEffect(() => {
+    if (filteredPieData.length > 0) {
+      setActiveIndex(0);
+    }
+  }, [selectedMonth]);
+
+  // Add this function before the return statement in Dashboard component
+  const getRegionAuditData = () => {
+    // Create a map to store region data
+    const regionMap: Record<string, { regular: number; fraud: number }> = {};
+    
+    // Initialize regions from branches
+    branches.forEach(branch => {
+      regionMap[branch.region] = { regular: 0, fraud: 0 };
+    });
+
+    // Count audits by region
+    workPapers.forEach(wp => {
+      // Find the branch to get its region
+      const branch = branches.find(b => b.name === wp.branch_name);
+      if (!branch) return;
+
+      const region = branch.region;
+      if (!regionMap[region]) {
+        regionMap[region] = { regular: 0, fraud: 0 };
+      }
+
+      if (wp.audit_type === 'regular') {
+        regionMap[region].regular += 1;
+      } else if (wp.audit_type === 'fraud') {
+        regionMap[region].fraud += 1;
+      }
+    });
+
+    // Convert map to array and sort by region name
+    return Object.entries(regionMap)
+      .map(([region, counts]) => ({
+        region,
+        regular: counts.regular,
+        fraud: counts.fraud
+      }))
+      .sort((a, b) => a.region.localeCompare(b.region));
+  };
+
+  // Tambahkan sebelum deklarasi komponen Dashboard
+  function getFailedChecksWithAliases(audit: any) {
+    const regularAuditAliases = {
+      dapa: "DAPA",
+      revised_dapa: "DAPA Perubahan", // Akan di-exclude
+      dapa_supporting_data: "Data Dukung DAPA",
+      assignment_letter: "Surat Tugas",
+      entrance_agenda: "Entrance Agenda",
+      entrance_attendance: "Absensi Entrance",
+      audit_working_papers: "KK Pemeriksaan",
+      exit_meeting_minutes: "BA Exit Meeting",
+      exit_attendance_list: "Absensi Exit",
+      audit_result_letter: "LHA",
+      rta: "RTA"
+    };
+
+    return Object.entries(audit)
+      .filter(([key, value]) =>
+        typeof value === 'boolean' &&
+        !value &&
+        regularAuditAliases[key] &&
+        key !== 'revised_dapa' // Exclude DAPA Perubahan
+      )
+      .map(([key]) => regularAuditAliases[key])
+      .join(', ');
+  }
+
+  // Jika Anda juga butuh untuk audit fraud:
+  function getFraudFailedChecksWithAliases(audit: any) {
+    const fraudAuditAliases = {
+      data_preparation: "Data Persiapan",
+      assignment_letter: "Surat Tugas",
+      audit_working_papers: "KK Pemeriksaan",
+      audit_report: "SHA",
+      detailed_findings: "RTA"
+    };
+
+    return Object.entries(audit)
+      .filter(([key, value]) =>
+        typeof value === 'boolean' &&
+        !value &&
+        fraudAuditAliases[key]
+      )
+      .map(([key]) => fraudAuditAliases[key])
+      .join(', ');
+  }
 
   return (
     <div className="space-y-4 p-0">
@@ -560,175 +886,271 @@ const Dashboard = () => {
           <CardContent className="p-4">
             <h2 className="text-xl font-semibold pt-1 mb-4">Audit Performance Summary</h2>
             
-            {/* Charts - Stack on mobile AND tablet, 2 columns ONLY on large screens */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-2">
-              {/* Pie Chart */}
-              <Card className="flex flex-col bg-white shadow-sm">
-                <CardContent className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2 mt-3 text-center">Composition Regular and Annual</h3>
-                  <ChartContainer
-                    config={chartConfig}
-                    className="mx-auto aspect-square max-h-[400px]"
-                  >
-                    <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                      <ChartTooltip
-                        cursor={false}
-                        content={<ChartTooltipContent hideLabel />}
-                      />
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        stroke="0"
-                      />
-                    </PieChart>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-
-              {/* Bar Chart */}
-              <Card>
-                <CardContent className="pt-5 pb-5">
-                  <ChartContainer config={barChartConfig}>
-                    <BarChart data={monthlyData}
-                      margin={{ top: 5, right: 5, left: 5, bottom:0}}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="month"
-                        tickLine={false}
-                        tickMargin={15}
-                        axisLine={false}
-                        tick={{ 
-                          fontSize: 10,
-                          angle: -90,
-                          textAnchor: 'end',
-                          dy: 10
-                        }}
-                        height={80}
-                        interval={0}
-                      />
-                      <ChartTooltip
-                        cursor={false}
-                        content={<ChartTooltipContent indicator="dashed" />}
-                      />
-                      <Bar dataKey="annualAudits" fill="#50C878" radius={3} />
-                      <Bar dataKey="fraudAudits" fill="#e74c3c" radius={3} />
-                    </BarChart>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Audit Summary by Region - Responsive version */}
-            <div className="mt-2">
-              <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
-              
-              {/* Mobile & Tablet View: Simple stacked layout */}
-              <div className="overflow-y-auto max-h-[300px] border rounded block lg:hidden">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white shadow-sm">
-                    <tr className="text-gray-500 border-b">
-                      <th className="text-left py-1 px-2 font-medium">Region</th>
-                      <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                      <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getRegionAuditData().map((item, index) => (
-                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-1 px-2 font-medium">{item.region}</td>
-                        <td className="text-right py-1 px-2">
-                          <span className="text-green-600">{item.regular}</span>
-                        </td>
-                        <td className="text-right py-1 px-2">
-                          <span className="text-red-600">{item.fraud}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Desktop View: Multi-column layout */}
-              <div className="overflow-x-auto hidden lg:block">
-                <div className="overflow-y-auto max-h-[200px] border rounded">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-white shadow-sm">
-                      <tr className="text-gray-500 border-b">
-                        {/* First group of columns */}
-                        <th className="text-left py-1 px-2 font-medium">Region</th>
-                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                        {/* Second group of columns */}
-                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                        {/* Third group of columns */}
-                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                        {/* Fourth group of columns */}
-                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                        {/* Fifth group of columns */}
-                        <th className="text-left py-1 px-2 font-medium border-l">Region</th>
-                        <th className="text-right py-1 px-2 font-medium text-green-600">Regular</th>
-                        <th className="text-right py-1 px-2 font-medium text-red-600">Special</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const regionData = getRegionAuditData();
-                        const rows = [];
-                        const regionsPerRow = 5;
-                        
-                        // Create rows based on the total number of regions
-                        for (let i = 0; i < Math.ceil(regionData.length / regionsPerRow); i++) {
-                          rows.push(
-                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                              {/* Map each group of 5 regions */}
-                              {[0, 1, 2, 3, 4].map(colIndex => {
-                                const dataIndex = i * regionsPerRow + colIndex;
-                                const item = regionData[dataIndex];
-                                
-                                if (!item) {
-                                  // Return empty cells if no data
-                                  return (
-                                    <React.Fragment key={colIndex}>
-                                      <td className="py-1 px-2 font-medium"></td>
-                                      <td className="text-right py-1 px-2"></td>
-                                      <td className="text-right py-1 px-2"></td>
-                                    </React.Fragment>
-                                  );
-                                }
-                                
-                                // Return cells with data
+            {/* Charts and tables layout - updated to place charts at top */}
+            <div className="flex flex-col gap-2 mb-2">
+              {/* TOP ROW: Both charts side by side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* LEFT: Audit Composition (Radial Bar Chart) */}
+                <Card className="flex flex-col bg-white shadow-sm border">
+                  <CardHeader className="items-center pb-2">
+                    <div className="flex flex-row items-center justify-between w-full">
+                      <CardTitle className="text-lg font-semibold text-gray-700">Audit Composition</CardTitle>
+                      <Select 
+                        value={selectedMonth} 
+                        onValueChange={setSelectedMonth}
+                      >
+                        <SelectTrigger
+                          className="h-8 w-[150px] rounded-lg pl-2.5"
+                          aria-label="Select month"
+                        >
+                          <SelectValue placeholder="Select month" />
+                        </SelectTrigger>
+                        <SelectContent align="end" className="rounded-xl">
+                          {months.map((month) => (
+                            <SelectItem key={month} value={month} className="rounded-lg">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span
+                                  className="flex h-3 w-3 shrink-0 rounded-full"
+                                  style={{
+                                    backgroundColor: month === 'All' ? '#0284c7' : `var(--color-${month.toLowerCase()})`
+                                  }}
+                                />
+                                {month}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <CardDescription className="text-sm text-slate-500">
+                      {selectedMonth === 'All' ? 'All Months' : `${selectedMonth} 2025`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 items-center pb-0 pt-0">
+                    <ChartContainer
+                      config={chartConfig}
+                      className="mx-auto my-auto aspect-square w-full max-w-[250px]"
+                    >
+                      <RadialBarChart
+                        data={getFilteredRadialData()}
+                        endAngle={180}
+                        innerRadius={80}
+                        outerRadius={130}
+                      >
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent hideLabel />}
+                        />
+                        <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                          <Label
+                            content={({ viewBox }) => {
+                              if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                                const data = getFilteredRadialData()[0];
+                                const totalAudits = data.annualAudits + data.fraudAudits;
                                 return (
-                                  <React.Fragment key={colIndex}>
-                                    <td className={`py-1 px-2 font-medium ${colIndex > 0 ? 'border-l' : ''}`}>
-                                      {item.region}
-                                    </td>
-                                    <td className="text-right py-1 px-2">
-                                      <span className="text-green-600">{item.regular}</span>
-                                    </td>
-                                    <td className="text-right py-1 px-2">
-                                      <span className="text-red-600">{item.fraud}</span>
-                                    </td>
-                                  </React.Fragment>
+                                  <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                                    <tspan
+                                      x={viewBox.cx}
+                                      y={(viewBox.cy || 0) - 16}
+                                      className="fill-foreground text-2xl font-bold"
+                                    >
+                                      {totalAudits.toLocaleString()}
+                                    </tspan>
+                                    <tspan
+                                      x={viewBox.cx}
+                                      y={(viewBox.cy || 0) + 4}
+                                      className="fill-muted-foreground"
+                                    >
+                                      Total Audits
+                                    </tspan>
+                                  </text>
                                 );
-                              })}
-                            </tr>
-                          );
-                        }
-                        
-                        return rows;
-                      })()}
-                    </tbody>
-                  </table>
+                              }
+                            }}
+                          />
+                        </PolarRadiusAxis>
+                        <RadialBar
+                          dataKey="annualAudits"
+                          stackId="a"
+                          cornerRadius={5}
+                          fill="var(--color-annualAudits)"
+                          className="stroke-transparent stroke-2"
+                        />
+                        <RadialBar
+                          dataKey="fraudAudits"
+                          fill="var(--color-fraudAudits)"
+                          stackId="a"
+                          cornerRadius={5}
+                          className="stroke-transparent stroke-2"
+                        />
+                      </RadialBarChart>
+                    </ChartContainer>
+                  </CardContent>
+                  <CardFooter className="flex-col gap-2 text-sm">
+                    <div className="flex items-center justify-center gap-4 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-[#50C878]"></div>
+                        <span>Annual: {getFilteredRadialData()[0]?.annualAudits || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-[#e74c3c]"></div>
+                        <span>Special: {getFilteredRadialData()[0]?.fraudAudits || 0}</span>
+                      </div>
+                    </div>
+                  </CardFooter>
+                </Card>
+
+                {/* RIGHT: Monthly Audit Trends (Line Chart) */}
+                <Card className="flex flex-col bg-white shadow-sm border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-semibold text-gray-700">Monthly Audit Trends</CardTitle>
+                    <CardDescription className="text-sm text-gray-500">Annual and Special Audits</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 pt-0">
+                    <ChartContainer 
+                      config={barChartConfig}
+                      className="mx-auto h-[300px] w-full" // Tinggi ditambah dari 200px ke 300px
+                    >
+                      <LineChart
+                        accessibilityLayer
+                        data={monthlyData}
+                        margin={{
+                          top: 20,
+                          left: 20, // Tambahkan margin kiri
+                          right: 20,
+                          bottom: 40, // Tambahkan space di bawah untuk label
+                        }}
+                      >
+                        <CartesianGrid vertical={false} />
+                        <XAxis
+                          dataKey="month"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={10} // Tambah margin untuk label
+                          height={40} // Tambahkan height untuk XAxis
+                          tick={{ fontSize: 12 }} // Pastikan ukuran font sesuai
+                        />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <Line
+                          dataKey="annualAudits"
+                          type="monotone"
+                          stroke="var(--color-annualAudits)"
+                          strokeWidth={2}
+                          dot={true} // Tambahkan dot untuk melihat data points
+                        />
+                        <Line
+                          dataKey="fraudAudits"
+                          type="monotone"
+                          stroke="var(--color-fraudAudits)"
+                          strokeWidth={2}
+                          dot={true} // Tambahkan dot untuk melihat data points
+                        />
+                      </LineChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* BOTTOM ROW: Both tables side by side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                {/* LEFT: Audit Count per Auditor */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Audit Count per Auditor</h3>
+                  
+                  <div className="overflow-x-auto h-full">
+                    <div className="overflow-y-auto max-h-[300px] border rounded h-full">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-white shadow-sm">
+                          <TableRow className="border-b">
+                            <TableHead className="text-left py-1 px-2 font-medium w-12">No.</TableHead>
+                            <TableHead className="text-left py-1 px-2 font-medium">Auditor Name</TableHead>
+                            <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
+                            <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
+                            <TableHead className="text-right py-1 px-2 font-medium text-blue-600">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {auditorCounts
+                            .filter(auditor => 
+                              !['lise', 'ganjar', 'dede', 'eri'].includes(auditor.auditor_id)
+                            )
+                            .map((auditor, idx) => (
+                              <TableRow key={`auditor-${auditor.auditor_id || idx}`}>
+                                <TableCell>{idx + 1}</TableCell>
+                                <TableCell>{auditor.auditor_name}</TableCell>
+                                <TableCell className="text-right">{auditor.regular}</TableCell>
+                                <TableCell className="text-right">{auditor.fraud}</TableCell>
+                                <TableCell className="text-right">{auditor.total}</TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT: Audit Summary by Region */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
+                  
+                  {/* Desktop View: Shadcn table for region summary */}
+                  <div className="overflow-x-auto hidden lg:block h-full">
+                    <div className="overflow-y-auto max-h-[300px] border rounded h-full">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-white shadow-sm">
+                          <TableRow className="border-b">
+                            <TableHead className="text-left py-1 px-2 font-medium">Region</TableHead>
+                            <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
+                            <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getRegionAuditData().map((item, index) => (
+                            <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                              <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
+                              <TableCell className="text-right py-1 px-2">
+                                <span className="text-green-600">{item.regular}</span>
+                              </TableCell>
+                              <TableCell className="text-right py-1 px-2">
+                                <span className="text-red-600">{item.fraud}</span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {/* Mobile & Tablet View */}
+                  <div className="overflow-y-auto max-h-[300px] border rounded block lg:hidden">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-white shadow-sm">
+                        <TableRow className="text-gray-500 border-b">
+                          <TableHead className="text-left py-1 px-2 font-medium">Region</TableHead>
+                          <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
+                          <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getRegionAuditData().map((item, index) => (
+                          <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                            <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
+                            <TableCell className="text-right py-1 px-2">
+                              <span className="text-green-600">{item.regular}</span>
+                            </TableCell>
+                            <TableCell className="text-right py-1 px-2">
+                              <span className="text-red-600">{item.fraud}</span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
             </div>
+
+            
           </CardContent>
         </Card>
       )}
@@ -932,6 +1354,17 @@ const Dashboard = () => {
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-900">
                               {failedChecks}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs">
+                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                                audit.review === 'Completed' 
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {audit.review || 'Not Reviewed'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-xs">
                               <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
