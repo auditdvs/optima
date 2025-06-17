@@ -1135,7 +1135,13 @@ const ManagerDashboard = () => {
       });
       
       // Convert to array and sort - ini tetap sama
-      const countsArray = Object.values(auditorCounts);
+      const countsArray = Object.values(auditorCounts).map(auditor => ({
+        auditor_id: auditor.auditor_id,
+        name: auditor.name, // <-- PASTIKAN INI DARI MAPPING, BUKAN DARI DB
+        regular_count: auditor.regular_count,
+        fraud_count: auditor.fraud_count,
+        total: auditor.regular_count + auditor.fraud_count
+      }));
       
       // Filter auditors with counts and sort by total
       const filteredCounts = countsArray

@@ -27,21 +27,21 @@ const DashboardStats = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* Total Branches Card */}
       <Card className="bg-white">
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Building2 className="w-4 h-4 text-blue-500" />
+            <div className="p-2 bg-sky-50 rounded-lg">
+              <Building2 className="w-8 h-8 text-sky-500" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-gray-600 mb-0.5">Total Branches</p>
+              <p className="text-xm text-gray-600 mt-2 mb-0.5">Total Branches</p>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-semibold">{stats.totalBranches}</span>
+                <span className="text-2xl font-semibold">{stats.totalBranches}</span>
                 <div className="flex flex-col leading-tight">
-                  <span className="text-[11px] text-blue-600">{stats.auditedBranches} audited</span>
-                  <span className="text-[11px] text-gray-500">{stats.unauditedBranches} unaudited</span>
+                  <span className="text-[11px] text-sky-600">{stats.auditedBranches} audited</span>
+                  <span className="text-[11px] text-rose-600">{stats.unauditedBranches} unaudited</span>
                 </div>
               </div>
             </div>
@@ -49,26 +49,7 @@ const DashboardStats = ({
         </CardContent>
       </Card>
 
-      {/* Audit Types Card */}
-      <Card className="bg-white">
-        <CardContent className="p-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <ClipboardCheck className="w-4 h-4 text-yellow-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-gray-600 mb-0.5">Audit Types</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-semibold">{stats.totalAudits}</span>
-                <div className="flex flex-col leading-tight">
-                  <span className="text-[11px] text-red-600">{stats.fraudAudits} Special</span>
-                  <span className="text-[11px] text-green-600">{stats.annualAudits} Annual</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Total Fraud Card with Censoring */}
       <Card 
@@ -77,16 +58,15 @@ const DashboardStats = ({
       >
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+            <div className="p-2 bg-rose-50 rounded-lg mt-2">
+              <AlertTriangle className="w-7 h-7 text-rose-500" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-gray-600 mb-0.5">Total Fraud</p>
+              <p className="text-xm text-gray-600 mt-2">Total Fraud</p>
               <div className="flex flex-col leading-tight">
                 {isFraudAmountCensored ? (
                   <>
-                    <span className="text-xl font-semibold">Rp ***.***.***</span>
-                    <span className="text-[11px] text-gray-500">Click to reveal</span>
+                    <span className="text-xl font-semibold">Click to reveal</span>
                   </>
                 ) : (
                   <span className="text-lg font-semibold text-gray-900">
@@ -103,14 +83,14 @@ const DashboardStats = ({
       <Card className="bg-white">
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <Users className="w-4 h-4 text-green-500" />
+            <div className="p-2 bg-amber-50 rounded-lg">
+              <Users className="w-7 h-7 text-amber-500" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-gray-600 mb-0.5">Total fraud cases (staff)</p>
+              <p className="text-xm text-gray-600">Total fraud cases (staff)</p>
               <div className="flex flex-col leading-tight">
                 <span className="text-xl font-semibold">{stats.totalFraudulentBranches}</span>
-                <span className="text-[11px] text-gray-500">branches involved</span>
+                <span className="text-[10px] text-gray-500">branches involved</span>
               </div>
             </div>
           </div>
