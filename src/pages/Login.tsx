@@ -326,9 +326,12 @@ function Login() {
             {/* Account creation note */}
             <p className="text-center text-sm text-slate-600 mt-6">
               Don't have an account?{' '}
-              <span className="text-indigo-600 font-semibold">
+                <a
+                href="https://wa.me/6281288172775?text=Hello%20OPTIMA%20Admin,%20I%20want%20to%20create%20an%20account."
+                className="text-indigo-600 font-semibold hover:underline"
+                >
                 Contact administrator
-              </span>
+                </a>
             </p>
           </div>
         </div>
