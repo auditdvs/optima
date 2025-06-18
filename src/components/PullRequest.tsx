@@ -336,13 +336,12 @@ const PullRequest = () => {
   };
 
   return (
-    <div className="w-full h-full px-4 py-2 overflow-hidden">
+    <div className="w-full h-full flex flex-col px-4 py-2">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-2xl font-bold">Data Pull Requests</h1>
-            <p className="text-sm text-gray-500 mt-1">Request data only 1 per input to minimize errors and a maximum of 5 data per-week. If there are problems in retrieving data, please coordinate with DVS.
-</p>
+            <p className="text-sm text-gray-500 mt-1">Request data only 1 per input to minimize errors and a maximum of 5 data per-week. If there are problems in retrieving data, please coordinate with DVS.</p>
           </div>
           <button
             onClick={() => {
@@ -369,7 +368,7 @@ const PullRequest = () => {
       {/* Status Legend */}
       <div className="mb-4 flex flex-wrap gap-4 items-center">
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-semibold">Pending</span>
+          <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">Pending</span>
           <span className="text-sm text-gray-600">: Menunggu persetujuan admin</span>
         </div>
         <div className="flex items-center gap-2">
@@ -377,14 +376,226 @@ const PullRequest = () => {
           <span className="text-sm text-gray-600">: Sedang diproses/diterima admin</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Done</span>
+          <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Done</span>
           <span className="text-sm text-gray-600">: Selesai, data sudah diberikan</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Rejected</span>
+          <span className="px-2 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-semibold">Rejected</span>
           <span className="text-sm text-gray-600">: Ditolak admin</span>
         </div>
       </div>
+
+      {/* Loading or No Data */}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="loader">
+            <div className="loader-ring loader-ring-a"></div>
+            <div className="loader-ring loader-ring-b"></div>
+            <div className="loader-ring loader-ring-c"></div>
+          </div>
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="text-center text-gray-500 py-8">
+          No requests found.
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto">
+          <div className="min-w-full border rounded-lg shadow-sm">
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Request Type
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Auditor
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Message
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Admin Response
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Uploader
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {requests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{request.request_type}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{request.profiles?.full_name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                          ${request.status === 'Done'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : request.status === 'Rejected'
+                            ? 'bg-rose-100 text-rose-800'
+                            : request.status === 'Pending'
+                            ? 'bg-amber-100 text-amber-800'
+                            : request.status === 'Waiting List'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-stone-100 text-stone-800'
+                        }`}
+                      >
+                        {request.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs text-gray-900 whitespace-normal break-words max-w-xs">
+                        {request.message}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {request.admin_response ? (
+                        <div className="text-xs text-gray-900 whitespace-normal break-words max-w-xs">
+                          {request.admin_response}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {request.uploader ? (
+                        <div className="text-sm text-gray-900">
+                          {request.uploader}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-stone-900">
+                      <div className="flex flex-col">
+                        <div className="whitespace-nowrap">
+                          {(() => {
+                            const date = new Date(request.created_at);
+                            const day = date.getDate().toString().padStart(2, '0');
+                            const month = date.toLocaleDateString('id-ID', { month: 'long' });
+                            const year = date.getFullYear();
+                            
+                            return `${day} ${month} ${year}`;
+                          })()}
+                        </div>
+                        <div className="whitespace-nowrap text-xs text-stone-700">
+                          {(() => {
+                            const date = new Date(request.created_at);
+                            const hours = date.getHours();
+                            const minutes = date.getMinutes().toString().padStart(2, '0');
+                            const seconds = date.getSeconds().toString().padStart(2, '0');
+                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                            const displayHours = hours % 12 || 12;
+                            
+                            return `${displayHours.toString().padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+                          })()}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex gap-2">
+                        {request.status === 'Done' && request.file_urls && Array.isArray(request.file_urls) && request.file_urls.length > 0 && (
+                          <div className="flex gap-2">
+                            {request.file_urls.map((url: string, idx: number) => (
+                              <a 
+                                key={idx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => {
+                                  // Prevent default action to handle manually
+                                  e.preventDefault();
+                                  
+                                  // Try to download using fetch API first
+                                  fetch(url)
+                                    .then(response => {
+                                      if (!response.ok) {
+                                        throw new Error('Network response was not ok');
+                                      }
+                                      return response.blob();
+                                    })
+                                    .then(blob => {
+                                      // Create a download link
+                                      const downloadUrl = window.URL.createObjectURL(blob);
+                                      
+                                      // Extract filename from URL
+                                      const urlParts = url.split('/');
+                                      const fileName = urlParts[urlParts.length - 1].split('?')[0];
+                                      const decodedFileName = decodeURIComponent(fileName);
+                                      
+                                      // Create temporary link and click it
+                                      const tempLink = document.createElement('a');
+                                      tempLink.href = downloadUrl;
+                                      tempLink.setAttribute('download', decodedFileName);
+                                      document.body.appendChild(tempLink);
+                                      tempLink.click();
+                                      document.body.removeChild(tempLink);
+                                      
+                                      // Clean up
+                                      window.URL.revokeObjectURL(downloadUrl);
+                                    })
+                                    .catch(error => {
+                                      console.error('Download error details:', error);
+                                      console.error('URL tried:', url);
+                                      // Fallback to direct link if fetch fails
+                                      window.open(url, '_blank');
+                                      toast.error('Error downloading file. Trying direct link.');
+                                    });
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
+                                title={`Download file ${idx + 1}`}
+                              >
+                                <Download className='text-emerald-600' size={18} />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setAdminResponse(request.admin_response || '');
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-full hover:bg-indigo-50"
+                            title="Respond to request"
+                          >
+                            <MessageSquare className='text-sky-600' size={18} />
+                          </button>
+                        )}
+
+                        {/* Delete action for superadmin */}
+                        {userRole === 'superadmin' && (
+                          <button
+                            onClick={() => setDeleteTarget(request)}
+                            className="text-rose-600 hover:text-rose-800 p-1.5 rounded-full hover:bg-rose-50"
+                            title="Delete request and files"
+                          >
+                            <Trash2 className='text-rose-600' size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Request Form */}
       {showForm && !isAdmin && (
@@ -611,197 +822,6 @@ const PullRequest = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Request List */}
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="loader">
-            <div className="loader-ring loader-ring-a"></div>
-            <div className="loader-ring loader-ring-b"></div>
-            <div className="loader-ring loader-ring-c"></div>
-          </div>
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="text-center text-gray-500 py-8">
-          No requests found.
-        </div>
-      ) : (
-        <div className="w-full overflow-x-auto border rounded-lg shadow-sm">
-          <table className="w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Request Type
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Auditor
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Message
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Admin Response
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Uploader
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {requests.map((request) => (
-                <tr key={request.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{request.request_type}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{request.profiles?.full_name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        ${request.status === 'Done'
-                          ? 'bg-green-100 text-green-800'
-                          : request.status === 'Rejected'
-                          ? 'bg-red-100 text-red-800'
-                          : request.status === 'Pending'
-                          ? 'bg-orange-100 text-orange-800'
-                          : request.status === 'Waiting List'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}
-                    >
-                      {request.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate" title={request.message}>
-                      {request.message}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {request.admin_response ? (
-                      <div className="text-sm text-gray-900 max-w-xs truncate" title={request.admin_response}>
-                        {request.admin_response}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {request.uploader ? (
-                      <div className="text-sm text-gray-900">
-                        {request.uploader}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(request.created_at).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: '2-digit'
-                    })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex gap-2">
-                      {request.status === 'Done' && request.file_urls && Array.isArray(request.file_urls) && request.file_urls.length > 0 && (
-                        <div className="flex gap-2">
-                          {request.file_urls.map((url: string, idx: number) => (
-                            <a 
-                              key={idx}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => {
-                                // Prevent default action to handle manually
-                                e.preventDefault();
-                                
-                                // Try to download using fetch API first
-                                fetch(url)
-                                  .then(response => {
-                                    if (!response.ok) {
-                                      throw new Error('Network response was not ok');
-                                    }
-                                    return response.blob();
-                                  })
-                                  .then(blob => {
-                                    // Create a download link
-                                    const downloadUrl = window.URL.createObjectURL(blob);
-                                    
-                                    // Extract filename from URL
-                                    const urlParts = url.split('/');
-                                    const fileName = urlParts[urlParts.length - 1].split('?')[0];
-                                    const decodedFileName = decodeURIComponent(fileName);
-                                    
-                                    // Create temporary link and click it
-                                    const tempLink = document.createElement('a');
-                                    tempLink.href = downloadUrl;
-                                    tempLink.setAttribute('download', decodedFileName);
-                                    document.body.appendChild(tempLink);
-                                    tempLink.click();
-                                    document.body.removeChild(tempLink);
-                                    
-                                    // Clean up
-                                    window.URL.revokeObjectURL(downloadUrl);
-                                  })
-                                  .catch(error => {
-                                    console.error('Download error details:', error);
-                                    console.error('URL tried:', url);
-                                    // Fallback to direct link if fetch fails
-                                    window.open(url, '_blank');
-                                    toast.error('Error downloading file. Trying direct link.');
-                                  });
-                              }}
-                              className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
-                              title={`Download file ${idx + 1}`}
-                            >
-                              <Download size={18} />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            setSelectedRequest(request);
-                            setAdminResponse(request.admin_response || '');
-                          }}
-                          className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-full hover:bg-indigo-50"
-                          title="Respond to request"
-                        >
-                          <MessageSquare size={18} />
-                        </button>
-                      )}
-
-                      {/* Delete action for superadmin */}
-                      {userRole === 'superadmin' && (
-                        <button
-                          onClick={() => setDeleteTarget(request)}
-                          className="text-red-600 hover:text-red-800 p-1.5 rounded-full hover:bg-red-50"
-                          title="Delete request and files"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </div>

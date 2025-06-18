@@ -333,41 +333,244 @@ const EditPICModal: React.FC<EditPICModalProps> = ({ isOpen, onClose, pic, onSub
 const BackupLoader = () => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-50">
-      <div className="loader"></div>
-      <p className="text-white mt-4 font-medium">Creating Backup...</p>
-      <style jsx>{`
-        .loader {
-          height: 15px;
-          aspect-ratio: 4;
-          --_g: no-repeat radial-gradient(farthest-side, #4319ec 90%, #3604ff);
-          background:
-            var(--_g) left,
-            var(--_g) right;
-          background-size: 25% 100%;
-          display: grid;
-        }
-        .loader:before,
-        .loader:after {
-          content: "";
-          height: inherit;
-          aspect-ratio: 1;
-          grid-area: 1/1;
-          margin: auto;
-          border-radius: 50%;
-          transform-origin: -100% 50%;
-          background: #2600fff8;
-          animation: l49 1s infinite linear;
-        }
-        .loader:after {
-          transform-origin: 200% 50%;
-          --s: -1;
-          animation-delay: -0.5s;
+      {/* Orbit Loader */}
+      <div className="container-loader">
+        <div className="slice"></div>
+        <div className="slice"></div>
+        <div className="slice"></div>
+        <div className="slice"></div>
+        <div className="slice"></div>
+        <div className="slice"></div>
+      </div>
+      
+      {/* Text Loader with new style */}
+      <div className="textWrapper mt-16">
+        <p className="text">Creating Backup...</p>
+        <div className="invertbox"></div>
+      </div>
+      
+      <style>{`
+        .container-loader {
+          --uib-size: 150px;
+          --uib-speed: 2.5s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: var(--uib-size);
+          width: var(--uib-size);
         }
 
-        @keyframes l49 {
-          58%,
+        .slice {
+          position: relative;
+          height: calc(var(--uib-size) / 6);
+          width: 100%;
+        }
+
+        .slice::before,
+        .slice::after {
+          --uib-a: calc(var(--uib-speed) / -2);
+          --uib-b: calc(var(--uib-speed) / -6);
+          content: "";
+          position: absolute;
+          top: 0;
+          left: calc(50% - var(--uib-size) / 12);
+          height: 100%;
+          width: calc(100% / 6);
+          border-radius: 50%;
+          flex-shrink: 0;
+          animation: orbit var(--uib-speed) linear infinite;
+          transition: background-color 0.3s ease;
+        }
+
+        .slice:nth-child(1)::after {
+          animation-delay: var(--uib-a);
+        }
+
+        .slice:nth-child(2)::before {
+          animation-delay: var(--uib-b);
+        }
+
+        .slice:nth-child(2)::after {
+          animation-delay: calc(var(--uib-a) + var(--uib-b));
+        }
+
+        .slice:nth-child(3)::before {
+          animation-delay: calc(var(--uib-b) * 2);
+        }
+
+        .slice:nth-child(3)::after {
+          animation-delay: calc(var(--uib-a) + var(--uib-b) * 2);
+        }
+
+        .slice:nth-child(4)::before {
+          animation-delay: calc(var(--uib-b) * 3);
+        }
+
+        .slice:nth-child(4)::after {
+          animation-delay: calc(var(--uib-a) + var(--uib-b) * 3);
+        }
+
+        .slice:nth-child(5)::before {
+          animation-delay: calc(var(--uib-b) * 4);
+        }
+
+        .slice:nth-child(5)::after {
+          animation-delay: calc(var(--uib-a) + var(--uib-b) * 4);
+        }
+
+        .slice:nth-child(6)::before {
+          animation-delay: calc(var(--uib-b) * 5);
+        }
+
+        .slice:nth-child(6)::after {
+          animation-delay: calc(var(--uib-a) + var(--uib-b) * 5);
+        }
+
+        .slice:nth-child(1)::before,
+        .slice:nth-child(1)::after {
+          background-color: #334dff;
+        }
+
+        .slice:nth-child(2)::before,
+        .slice:nth-child(2)::after {
+          background-color: #333eff;
+        }
+
+        .slice:nth-child(3)::before,
+        .slice:nth-child(3)::after {
+          background-color: #3334ff;
+        }
+
+        .slice:nth-child(4)::before,
+        .slice:nth-child(4)::after {
+          background-color: #4433ff;
+        }
+
+        .slice:nth-child(5)::before,
+        .slice:nth-child(5)::after {
+          background-color: #6633ff;
+        }
+
+        .slice:nth-child(6)::before,
+        .slice:nth-child(6)::after {
+          background-color: #9933ff;
+        }
+
+        @keyframes orbit {
+          0% {
+            transform: translateX(calc(var(--uib-size) * 0.25)) scale(0.73684);
+            opacity: 0.65;
+          }
+          5% {
+            transform: translateX(calc(var(--uib-size) * 0.235)) scale(0.684208);
+            opacity: 0.58;
+          }
+          10% {
+            transform: translateX(calc(var(--uib-size) * 0.182)) scale(0.631576);
+            opacity: 0.51;
+          }
+          15% {
+            transform: translateX(calc(var(--uib-size) * 0.129)) scale(0.578944);
+            opacity: 0.44;
+          }
+          20% {
+            transform: translateX(calc(var(--uib-size) * 0.076)) scale(0.526312);
+            opacity: 0.37;
+          }
+          25% {
+            transform: translateX(0%) scale(0.47368);
+            opacity: 0.3;
+          }
+          30% {
+            transform: translateX(calc(var(--uib-size) * -0.076)) scale(0.526312);
+            opacity: 0.37;
+          }
+          35% {
+            transform: translateX(calc(var(--uib-size) * -0.129)) scale(0.578944);
+            opacity: 0.44;
+          }
+          40% {
+            transform: translateX(calc(var(--uib-size) * -0.182)) scale(0.631576);
+            opacity: 0.51;
+          }
+          45% {
+            transform: translateX(calc(var(--uib-size) * -0.235)) scale(0.684208);
+            opacity: 0.58;
+          }
+          50% {
+            transform: translateX(calc(var(--uib-size) * -0.25)) scale(0.73684);
+            opacity: 0.65;
+          }
+          55% {
+            transform: translateX(calc(var(--uib-size) * -0.235)) scale(0.789472);
+            opacity: 0.72;
+          }
+          60% {
+            transform: translateX(calc(var(--uib-size) * -0.182)) scale(0.842104);
+            opacity: 0.79;
+          }
+          65% {
+            transform: translateX(calc(var(--uib-size) * -0.129)) scale(0.894736);
+            opacity: 0.86;
+          }
+          70% {
+            transform: translateX(calc(var(--uib-size) * -0.076)) scale(0.947368);
+            opacity: 0.93;
+          }
+          75% {
+            transform: translateX(0%) scale(1);
+            opacity: 1;
+          }
+          80% {
+            transform: translateX(calc(var(--uib-size) * 0.076)) scale(0.947368);
+            opacity: 0.93;
+          }
+          85% {
+            transform: translateX(calc(var(--uib-size) * 0.129)) scale(0.894736);
+            opacity: 0.86;
+          }
+          90% {
+            transform: translateX(calc(var(--uib-size) * 0.182)) scale(0.842104);
+            opacity: 0.79;
+          }
+          95% {
+            transform: translateX(calc(var(--uib-size) * 0.235)) scale(0.789472);
+            opacity: 0.72;
+          }
           100% {
-            transform: rotate(calc(var(--s, 1) * 1turn));
+            transform: translateX(calc(var(--uib-size) * 0.25)) scale(0.73684);
+            opacity: 0.65;
+          }
+        }
+
+        .textWrapper {
+          height: fit-content;
+          min-width: 3rem;
+          width: fit-content;
+          font-size: 1.8rem;
+          font-weight: 700;
+          letter-spacing: 0.15ch;
+          position: relative;
+          z-index: 0;
+          color: #6633ff;
+        }
+
+        .invertbox {
+          position: absolute;
+          height: 100%;
+          aspect-ratio: 1/1;
+          left: 0;
+          top: 0;
+          border-radius: 20%;
+          background-color: rgba(102, 51, 255, 0.2);
+          backdrop-filter: invert(100%);
+          animation: move 2s ease-in-out infinite;
+        }
+
+        @keyframes move {
+          50% {
+            left: calc(100% - 3rem);
           }
         }
       `}</style>
@@ -530,12 +733,12 @@ function UserControlPanel() {
   const handleBackupData = async () => {
     try {
       setLoading(true);
-      // We won't show toasts during the process since we have the visual loader now
       
       const zip = new JSZip();
       
       // Backup all tables
       const tables = [
+        'audit_counts',
         'audit_fraud',
         'audit_regular',
         'audit_schedule',
@@ -543,9 +746,10 @@ function UserControlPanel() {
         'auditors',
         'audits',
         'branches',
+        'documents',
+        'email',
         'fraud_cases',
         'fraud_payments',
-        'fraud_payments_auditors',
         'fraud_payments_audits',
         'matriks',
         'matriks_table_names',
@@ -553,6 +757,7 @@ function UserControlPanel() {
         'notifications',
         'pic',
         'profiles',
+        'pull_requests',
         'rpm_letters',
         'user_roles',
         'user_status',
@@ -564,94 +769,100 @@ function UserControlPanel() {
       const dbJsonFolder = zip.folder("database/json");
       const dbCsvFolder = zip.folder("database/csv");
       
+      // Backup database tables
+      console.log('Starting database backup...');
       for (const table of tables) {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*');
-        
-        if (error) {
-          console.error(`Error fetching ${table}:`, error);
-          continue;
-        }
+        try {
+          const { data, error } = await supabase
+            .from(table)
+            .select('*');
+          
+          if (error) {
+            console.error(`Error fetching ${table}:`, error);
+            // Create empty files for failed tables
+            dbJsonFolder.file(`${table}.json`, JSON.stringify([], null, 2));
+            dbCsvFolder.file(`${table}.csv`, '');
+            continue;
+          }
 
-        if (!data || data.length === 0) {
-          // Create empty files for empty tables
+          if (!data || data.length === 0) {
+            dbJsonFolder.file(`${table}.json`, JSON.stringify([], null, 2));
+            dbCsvFolder.file(`${table}.csv`, '');
+            continue;
+          }
+
+          dbJsonFolder.file(`${table}.json`, JSON.stringify(data, null, 2));
+          const csvContent = convertJsonToCsv(data);
+          dbCsvFolder.file(`${table}.csv`, csvContent);
+          console.log(`✓ Backed up table: ${table} (${data.length} records)`);
+        } catch (tableError) {
+          console.error(`Error processing table ${table}:`, tableError);
           dbJsonFolder.file(`${table}.json`, JSON.stringify([], null, 2));
           dbCsvFolder.file(`${table}.csv`, '');
-          continue;
         }
-
-        // Save as JSON
-        dbJsonFolder.file(`${table}.json`, JSON.stringify(data, null, 2));
-        
-        // Convert to CSV and save
-        const csvContent = convertJsonToCsv(data);
-        dbCsvFolder.file(`${table}.csv`, csvContent);
       }
 
       // Get users from auth
-      const { data: { users }, error: usersError } = await supabaseService.auth.admin.listUsers();
-      if (!usersError && users) {
-        dbJsonFolder.file('auth_users.json', JSON.stringify(users, null, 2));
-        const csvContent = convertJsonToCsv(users);
-        dbCsvFolder.file('auth_users.csv', csvContent);
+      try {
+        const { data: { users }, error: usersError } = await supabaseService.auth.admin.listUsers();
+        if (!usersError && users) {
+          dbJsonFolder.file('auth_users.json', JSON.stringify(users, null, 2));
+          const csvContent = convertJsonToCsv(users);
+          dbCsvFolder.file('auth_users.csv', csvContent);
+          console.log(`✓ Backed up auth users: ${users.length} users`);
+        }
+      } catch (authError) {
+        console.error('Error backing up auth users:', authError);
       }
       
-      // Backup storage files
+      // Backup storage files dengan debugging yang lebih detail
+      console.log('Starting storage backup...');
       const storageFolder = zip.folder("storage");
       
-      // Get all buckets
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-      
-      if (bucketsError) {
-        console.error('Error fetching storage buckets:', bucketsError);
-      } else {
-        // Process each bucket
-        for (const bucket of buckets) {
-          const bucketFolder = storageFolder.folder(bucket.name);
+      try {
+        // Test storage connection first
+        console.log('Testing storage connection...');
+        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+        
+        if (bucketsError) {
+          console.error('Error fetching storage buckets:', bucketsError);
+          toast.error('Cannot access storage. Backup will continue without files.');
           
-          // List all files in the bucket
-          const { data: files, error: filesError } = await supabase.storage.from(bucket.name).list();
+          // Create empty storage info file
+          storageFolder.file('storage_error.txt', `Storage backup failed: ${bucketsError.message}`);
+        } else {
+          console.log('Available buckets:', buckets.map(b => b.name));
           
-          if (filesError) {
-            console.error(`Error listing files in bucket ${bucket.name}:`, filesError);
-            continue;
-          }
-          
-          // Download each file and add to zip
-          for (const file of files) {
-            if (!file.id) { // It's a folder
-              await processFolder(supabase, bucket.name, file.name, bucketFolder);
-            } else { // It's a file
-              try {
-                // Download file
-                const { data: fileData, error: downloadError } = await supabase.storage
-                  .from(bucket.name)
-                  .download(file.name);
-                  
-                if (downloadError) {
-                  console.error(`Error downloading file ${file.name}:`, downloadError);
-                  continue;
-                }
-                
-                // Add file to zip
-                bucketFolder.file(file.name, fileData);
-              } catch (error) {
-                console.error(`Error processing file ${file.name}:`, error);
-              }
-            }
+          // Process each bucket
+          for (const bucket of buckets) {
+            console.log(`\n=== Processing bucket: ${bucket.name} ===`);
+            await backupBucket(bucket.name, storageFolder, supabase);
           }
         }
+      } catch (storageError) {
+        console.error('Storage backup error:', storageError);
+        storageFolder.file('storage_error.txt', `Storage backup failed: ${storageError.message}`);
+        toast.error('Some storage files may not be included in backup');
       }
 
+      console.log('Generating ZIP file...');
       const content = await zip.generateAsync({ 
         type: 'blob',
         compression: "DEFLATE",
         compressionOptions: { level: 5 }
       });
       
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      saveAs(content, `optima_full_backup_${timestamp}.zip`);
+      // Format penamaan file: OPTIMA_BACKUP-DDMMYY-HH:MM:SS
+      const now = new Date();
+      const day = now.getDate().toString().padStart(2, '0');
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const year = now.getFullYear().toString().slice(-2);
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const seconds = now.getSeconds().toString().padStart(2, '0');
+
+      const filename = `OPTIMA-${day}${month}${year}-${hours}${minutes}${seconds}-BACKUP.zip`;
+      saveAs(content, filename);
 
       toast.success('Backup completed! Data has been downloaded.');
     } catch (error) {
@@ -662,83 +873,147 @@ function UserControlPanel() {
     }
   };
 
-  // Add this helper function to convert JSON to CSV
-  function convertJsonToCsv(jsonData) {
-    if (!jsonData || jsonData.length === 0) {
-      return '';
-    }
-
-    // Get headers from the first object
-    const headers = Object.keys(jsonData[0]);
-    
-    // Create CSV header row
-    const headerRow = headers.join(',');
-    
-    // Create content rows
-    const rows = jsonData.map(item => {
-      return headers.map(header => {
-        const value = item[header];
-        
-        // Handle null, undefined, or empty values
-        if (value === null || value === undefined) {
-          return '';
-        }
-        
-        // Handle objects and arrays by stringifying them
-        if (typeof value === 'object') {
-          // Escape quotes and format as a proper CSV string
-          return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
-        }
-        
-        // Handle strings with commas or quotes
-        if (typeof value === 'string') {
-          // Escape quotes and wrap in quotes
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        
-        // Return other values as-is
-        return value;
-      }).join(',');
-    });
-    
-    // Combine header and rows
-    return [headerRow, ...rows].join('\n');
-  }
-
-  async function processFolder(supabase, bucketName, path, parentFolder) {
-    const { data: files, error } = await supabase.storage.from(bucketName).list(path);
-    
-    if (error) {
-      console.error(`Error listing files in path ${path}:`, error);
-      return;
-    }
-    
-    if (!files || files.length === 0) return;
-    
-    const folderName = path.split('/').pop();
-    const folder = parentFolder.folder(folderName);
-    
-    for (const file of files) {
-      const filePath = `${path}/${file.name}`;
+  // Perbaiki fungsi backupBucket dengan debugging yang lebih detail
+  async function backupBucket(bucketName, storageFolder, supabase) {
+    try {
+      console.log(`📁 Backing up bucket: ${bucketName}`);
+      const bucketFolder = storageFolder.folder(bucketName);
       
-      if (!file.id) { // It's a subfolder
-        await processFolder(supabase, bucketName, filePath, folder);
-      } else { // It's a file
-        try {
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from(bucketName)
-            .download(filePath);
-            
-          if (downloadError) {
-            console.error(`Error downloading file ${filePath}:`, downloadError);
-            continue;
+      // List all files in the bucket root
+      const { data: files, error: filesError } = await supabase.storage
+        .from(bucketName)
+        .list('', {
+          limit: 1000,
+          sortBy: { column: 'name', order: 'asc' }
+        });
+      
+      if (filesError) {
+        console.error(`❌ Error listing files in bucket ${bucketName}:`, filesError);
+        bucketFolder.file('error.txt', `Failed to list files: ${filesError.message}`);
+        return;
+      }
+      
+      if (!files || files.length === 0) {
+        console.log(`📂 No files found in bucket ${bucketName}`);
+        bucketFolder.file('empty_bucket.txt', 'This bucket is empty');
+        return;
+      }
+      
+      console.log(`📄 Found ${files.length} items in bucket ${bucketName}`);
+      
+      // Process each file/folder
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const file of files) {
+        if (!file.id) { 
+          // It's a folder
+          console.log(`📁 Processing folder: ${file.name}`);
+          try {
+            const subFolder = bucketFolder.folder(file.name);
+            await processFolder(supabase, bucketName, file.name, subFolder);
+            successCount++;
+          } catch (folderError) {
+            console.error(`❌ Error processing folder ${file.name}:`, folderError);
+            errorCount++;
           }
-          
-          folder.file(file.name, fileData);
-        } catch (error) {
-          console.error(`Error processing file ${filePath}:`, error);
+        } else { 
+          // It's a file in root
+          console.log(`📄 Processing file: ${file.name} (${file.metadata?.size || 'unknown size'})`);
+          try {
+            const { data: fileData, error: downloadError } = await supabase.storage
+              .from(bucketName)
+              .download(file.name);
+              
+            if (downloadError) {
+              console.error(`❌ Error downloading file ${file.name}:`, downloadError);
+              errorCount++;
+              continue;
+            }
+            
+            if (fileData) {
+              bucketFolder.file(file.name, fileData);
+              console.log(`✅ Successfully backed up: ${file.name}`);
+              successCount++;
+            }
+          } catch (error) {
+            console.error(`❌ Error processing file ${file.name}:`, error);
+            errorCount++;
+          }
         }
       }
+      
+      console.log(`✅ Bucket ${bucketName} backup complete: ${successCount} success, ${errorCount} errors`);
+      
+      // Create summary file
+      bucketFolder.file('backup_summary.txt', 
+        `Backup Summary for ${bucketName}\n` +
+        `Total items: ${files.length}\n` +
+        `Successful: ${successCount}\n` +
+        `Errors: ${errorCount}\n` +
+        `Backup time: ${new Date().toISOString()}`
+      );
+      
+    } catch (error) {
+      console.error(`❌ Fatal error backing up bucket ${bucketName}:`, error);
+      const bucketFolder = storageFolder.folder(bucketName);
+      bucketFolder.file('fatal_error.txt', `Fatal backup error: ${error.message}`);
+    }
+  }
+
+  // Perbaiki fungsi processFolder dengan debugging
+  async function processFolder(supabase, bucketName, path, parentFolder) {
+    try {
+      console.log(`  📁 Processing folder path: ${path}`);
+      const { data: files, error } = await supabase.storage.from(bucketName).list(path);
+      
+      if (error) {
+        console.error(`  ❌ Error listing files in path ${path}:`, error);
+        parentFolder.file('folder_error.txt', `Error listing folder: ${error.message}`);
+        return;
+      }
+      
+      if (!files || files.length === 0) {
+        console.log(`  📂 Empty folder: ${path}`);
+        parentFolder.file('empty_folder.txt', 'This folder is empty');
+        return;
+      }
+      
+      console.log(`  📄 Found ${files.length} items in folder ${path}`);
+      
+      for (const file of files) {
+        const filePath = path ? `${path}/${file.name}` : file.name;
+        
+        if (!file.id) { 
+          // It's a subfolder
+          console.log(`    📁 Processing subfolder: ${file.name}`);
+          const subFolder = parentFolder.folder(file.name);
+          await processFolder(supabase, bucketName, filePath, subFolder);
+        } else { 
+          // It's a file
+          console.log(`    📄 Processing file: ${file.name}`);
+          try {
+            const { data: fileData, error: downloadError } = await supabase.storage
+              .from(bucketName)
+              .download(filePath);
+              
+            if (downloadError) {
+              console.error(`    ❌ Error downloading file ${filePath}:`, downloadError);
+              continue;
+            }
+            
+            if (fileData) {
+              parentFolder.file(file.name, fileData);
+              console.log(`    ✅ Successfully backed up: ${file.name}`);
+            }
+          } catch (error) {
+            console.error(`    ❌ Error processing file ${filePath}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`  ❌ Fatal error in processFolder for ${path}:`, error);
+      parentFolder.file('process_error.txt', `Process error: ${error.message}`);
     }
   }
 
@@ -769,17 +1044,10 @@ function UserControlPanel() {
           <button
             onClick={handleBackupData}
             disabled={loading}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             <Database className="h-5 w-5" />
             {loading ? 'Backing up...' : 'Backup All Data'}
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
-          >
-            <RefreshCw className="h-5 w-5" />
-            Refresh
           </button>
         </div>
       </div>
