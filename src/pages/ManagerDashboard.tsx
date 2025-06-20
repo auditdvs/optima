@@ -757,14 +757,30 @@ const ManagerDashboard = () => {
       XLSX.utils.book_append_sheet(workbook, trendsWorksheet, 'Audit Trends');
       
       // 3. Audit Counts Per Auditor sheet
-      const auditorCountsWorksheet = XLSX.utils.json_to_sheet(auditorAuditCounts);
+      const auditorCountsForExport = auditorAuditCounts.map(auditor => ({
+        No: auditorAuditCounts.indexOf(auditor) + 1,
+        Auditor_Name: auditor.name,
+        Regular_Audits: auditor.regular_count,
+        Special_Audits: auditor.fraud_count,
+        Total_Audits: auditor.regular_count + auditor.fraud_count
+      }));
+      const auditorCountsWorksheet = XLSX.utils.json_to_sheet(auditorCountsForExport);
       XLSX.utils.book_append_sheet(workbook, auditorCountsWorksheet, 'Audit Counts Per Auditor');
       
-      // 4. Regular Audits sheet
-      const regularAuditsForExport = regularAudits.map(audit => {
-        const formattedAudit = { ...audit };
-        // Add a new field with a list of failed checks using aliases
-        formattedAudit['failed_checks'] = Object.entries(audit)
+      // 4. Support Auditor Summary sheet
+      const supportAuditorForExport = supportAuditorSummary.map((summary, index) => ({
+        No: index + 1,
+        Auditor: summary.auditor,
+        Input_Audit: summary.inputAudit,
+        Supporting_Data: summary.supportingData,
+        Total: summary.inputAudit + summary.supportingData
+      }));
+      const supportAuditorWorksheet = XLSX.utils.json_to_sheet(supportAuditorForExport);
+      XLSX.utils.book_append_sheet(workbook, supportAuditorWorksheet, 'Support Auditor Summary');
+      
+      // 5. Regular Audits sheet (Incomplete Documentation)
+      const regularAuditsForExport = regularAudits.map((audit, index) => {
+        const failedChecks = Object.entries(audit)
           .filter(([key, value]) => 
             typeof value === 'boolean' && 
             !value && 
@@ -773,16 +789,32 @@ const ManagerDashboard = () => {
           .map(([key]) => regularAuditAliases[key])
           .join(', ');
         
-        return formattedAudit;
+        return {
+          No: index + 1,
+          Branch_Name: audit.branch_name,
+          Region: audit.region,
+          Monitoring: audit.monitoring,
+          PIC: audit.pic || 'N/A',
+          Failed_Checks: failedChecks,
+          DAPA: audit.dapa ? 'Complete' : 'Incomplete',
+          DAPA_Perubahan: audit.revised_dapa ? 'Complete' : 'Incomplete',
+          Data_Dukung_DAPA: audit.dapa_supporting_data ? 'Complete' : 'Incomplete',
+          Surat_Tugas: audit.assignment_letter ? 'Complete' : 'Incomplete',
+          Entrance_Agenda: audit.entrance_agenda ? 'Complete' : 'Incomplete',
+          Absensi_Entrance: audit.entrance_attendance ? 'Complete' : 'Incomplete',
+          KK_Pemeriksaan: audit.audit_working_papers ? 'Complete' : 'Incomplete',
+          BA_Exit_Meeting: audit.exit_meeting_minutes ? 'Complete' : 'Incomplete',
+          Absensi_Exit: audit.exit_attendance_list ? 'Complete' : 'Incomplete',
+          LHA: audit.audit_result_letter ? 'Complete' : 'Incomplete',
+          RTA: audit.rta ? 'Complete' : 'Incomplete'
+        };
       });
       const regularWorksheet = XLSX.utils.json_to_sheet(regularAuditsForExport);
-      XLSX.utils.book_append_sheet(workbook, regularWorksheet, 'Regular Audits');
+      XLSX.utils.book_append_sheet(workbook, regularWorksheet, 'Regular Audits - Incomplete');
       
-      // 5. Fraud Audits sheet
-      const fraudAuditsForExport = fraudAudits.map(audit => {
-        const formattedAudit = { ...audit };
-        // Add a new field with a list of failed checks using aliases
-        formattedAudit['failed_checks'] = Object.entries(audit)
+      // 6. Fraud Audits sheet (Incomplete Documentation)
+      const fraudAuditsForExport = fraudAudits.map((audit, index) => {
+        const failedChecks = Object.entries(audit)
           .filter(([key, value]) => 
             typeof value === 'boolean' && 
             !value && 
@@ -791,33 +823,82 @@ const ManagerDashboard = () => {
           .map(([key]) => fraudAuditAliases[key])
           .join(', ');
         
-        return formattedAudit;
+        return {
+          No: index + 1,
+          Branch_Name: audit.branch_name,
+          Region: audit.region,
+          PIC: audit.pic || 'N/A',
+          Review: audit.review,
+          Failed_Checks: failedChecks,
+          Data_Persiapan: audit.data_preparation ? 'Complete' : 'Incomplete',
+          Surat_Tugas: audit.assignment_letter ? 'Complete' : 'Incomplete',
+          KK_Pemeriksaan: audit.audit_working_papers ? 'Complete' : 'Incomplete',
+          SHA: audit.audit_report ? 'Complete' : 'Incomplete',
+          RTA: audit.detailed_findings ? 'Complete' : 'Incomplete'
+        };
       });
       const fraudAuditWorksheet = XLSX.utils.json_to_sheet(fraudAuditsForExport);
-      XLSX.utils.book_append_sheet(workbook, fraudAuditWorksheet, 'Fraud Audits');
+      XLSX.utils.book_append_sheet(workbook, fraudAuditWorksheet, 'Special Audits - Incomplete');
       
-      // 6. Fraud Data sheet
-      const fraudDataForExport = fraudCases.map(fraud => ({
-        branch_name: fraud.branch_name,
-        region: fraud.region,
-        fraud_staff: fraud.fraud_staff,
-        fraud_amount: fraud.fraud_amount,
-        hkp_amount: fraud.fraud_payments_audits?.[0]?.hkp_amount || 0,
-        payment_date: fraud.fraud_payments_audits?.[0]?.payment_date || '',
-        from_salary: fraud.fraud_payments_audits?.[0]?.from_salary ? 'Yes' : 'No',
-        notes: fraud.fraud_payments_audits?.[0]?.notes || '',
-        payment_status: isPaymentComplete(fraud) ? 'Complete' : 'Incomplete'
+      // 7. Fraud Cases Data sheet
+      const fraudDataForExport = fraudCases.map((fraud, index) => ({
+        No: index + 1,
+        Region: fraud.region,
+        Branch_Name: fraud.branch_name,
+        Fraud_Staff: fraud.fraud_staff,
+        Fraud_Amount: fraud.fraud_amount,
+        HKP_Amount: fraud.fraud_payments_audits?.[0]?.hkp_amount || 0,
+        Payment_Date: fraud.fraud_payments_audits?.[0]?.payment_date || '',
+        From_Salary: fraud.fraud_payments_audits?.[0]?.from_salary ? 'Yes' : 'No',
+        Notes: fraud.fraud_payments_audits?.[0]?.notes || '',
+        Payment_Status: isPaymentComplete(fraud) ? 'Complete' : 'Incomplete',
+        Outstanding_Amount: fraud.fraud_amount - (fraud.fraud_payments_audits?.[0]?.hkp_amount || 0)
       }));
       const fraudDataWorksheet = XLSX.utils.json_to_sheet(fraudDataForExport);
-      XLSX.utils.book_append_sheet(workbook, fraudDataWorksheet, 'Fraud Data');
+      XLSX.utils.book_append_sheet(workbook, fraudDataWorksheet, 'Fraud Cases Data');
+      
+      // 8. Fraud by Region sheet
+      const fraudByRegionForExport = fraudDetailsByRegion.map((detail, index) => ({
+        No: index + 1,
+        Region: detail.region,
+        Total_Fraud_Amount: detail.totalFraudAmount,
+        Fraud_Recovery: detail.totalRecoveryAmount,
+        Outstanding_Fraud: detail.totalFraudAmount - detail.totalRecoveryAmount,
+        Total_Regular_Audit: detail.totalRegularAudit,
+        Total_Special_Audit: detail.totalSpecialAudit,
+        Total_Fraud_Staff: detail.totalFraudStaff,
+        Recovery_Percentage: detail.totalFraudAmount > 0 ? 
+          ((detail.totalRecoveryAmount / detail.totalFraudAmount) * 100).toFixed(2) + '%' : '0%'
+      }));
+      const fraudByRegionWorksheet = XLSX.utils.json_to_sheet(fraudByRegionForExport);
+      XLSX.utils.book_append_sheet(workbook, fraudByRegionWorksheet, 'Fraud by Region');
+      
+      // 9. Dashboard Statistics sheet
+      const dashboardStatsForExport = [
+        { Metric: 'Total Branches', Value: stats.totalBranches },
+        { Metric: 'Regular Audits', Value: stats.regularAudits },
+        { Metric: 'Special Audits', Value: stats.specialAudits },
+        { Metric: 'Fraud Cases', Value: stats.fraudAudits },
+        { Metric: 'Total Auditors', Value: stats.totalAuditors },
+        { Metric: 'Total Fraud Amount', Value: stats.totalFraud },
+        { Metric: 'Fraud Recovery', Value: stats.fraudRecovery },
+        { Metric: 'Outstanding Fraud', Value: stats.outstandingFraud },
+        { Metric: 'Recovery Percentage', Value: stats.totalFraud > 0 ? 
+          ((stats.fraudRecovery / stats.totalFraud) * 100).toFixed(2) + '%' : '0%' }
+      ];
+      const dashboardStatsWorksheet = XLSX.utils.json_to_sheet(dashboardStatsForExport);
+      XLSX.utils.book_append_sheet(workbook, dashboardStatsWorksheet, 'Dashboard Statistics');
       
       // Generate and download the Excel file
-      const fileName = `manager_dashboard_all_reports_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      const fileName = `manager_dashboard_complete_report_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`;
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(dataBlob, fileName);
+      
+      console.log('Complete report downloaded successfully with all data sheets');
     } catch (error) {
       console.error('Error generating complete report:', error);
+      alert('Error generating report. Please try again.');
     }
   };
 
@@ -1231,50 +1312,74 @@ const ManagerDashboard = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="radio-inputs mt-2 mb-4 py-2">
-        <label className="radio">
+      <div className="relative flex w-full overflow-hidden rounded-[10px] border border-[#35343439] bg-white text-black mb-10">
+        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
           <input
             type="radio"
             name="managerTab"
+            value="auditorCounts"
             checked={activeSection === 'auditorCounts'}
             onChange={() => setActiveSection('auditorCounts')}
+            className="hidden peer"
           />
-          <span className="name">Auditor Performa</span>
+          <span className={activeSection === 'auditorCounts' ? 'text-white' : 'text-gray-700'}>
+            Auditor Performa
+          </span>
         </label>
-        <label className="radio">
+        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
           <input
             type="radio"
             name="managerTab"
+            value="auditSummary"
             checked={activeSection === 'auditSummary'}
             onChange={() => setActiveSection('auditSummary')}
+            className="hidden peer"
           />
-          <span className="name">Audit Summary</span>
+          <span className={activeSection === 'auditSummary' ? 'text-white' : 'text-gray-700'}>
+            Audit Summary
+          </span>
         </label>
-        <label className="radio">
+        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
           <input
             type="radio"
             name="managerTab"
+            value="fraudData"
             checked={activeSection === 'fraudData'}
             onChange={() => setActiveSection('fraudData')}
+            className="hidden peer"
           />
-          <span className="name">Fraud Data</span>
+          <span className={activeSection === 'fraudData' ? 'text-white' : 'text-gray-700'}>
+            Fraud Data
+          </span>
         </label>
-        <label className="radio">
+        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
           <input
             type="radio"
             name="managerTab"
+            value="main"
             checked={activeSection === 'main'}
             onChange={() => setActiveSection('main')}
+            className="hidden peer"
           />
-          <span className="name">Overview</span>
+          <span className={activeSection === 'main' ? 'text-white' : 'text-gray-700'}>
+            Overview
+          </span>
         </label>
+        <span 
+          className={`absolute top-0 h-full w-1/4 bg-indigo-600 transition-all duration-300 ease-in-out z-0 ${
+            activeSection === 'auditorCounts' ? 'left-0' : 
+            activeSection === 'auditSummary' ? 'left-1/4' : 
+            activeSection === 'fraudData' ? 'left-2/4' : 
+            'left-3/4'
+          }`}
+        />
       </div>
 
       {/* Main Dashboard Section - Always visible */}
       {activeSection === 'main' && (
         <>
           {/* Stats Cards */}
-          <div className="grid grid-cols-9 gap-2">
+          <div className="grid grid-cols-9 gap-2 mt-">
             <Card className="col-span-3 min-h-[80px] flex items-center">
               <CardContent className="p-3 flex items-center gap-x-3 h-full">
                 <div className="p-2 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -1676,7 +1781,7 @@ const ManagerDashboard = () => {
                           </div>
                         </th>
                         <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-normal break-words max-w-[300px]"
                           onClick={() => requestSort('review')}
                         >
                           <div className="flex items-center">
@@ -1707,30 +1812,30 @@ const ManagerDashboard = () => {
                       {activeTab === 'regular' ? (
                         <>
                           <td className="px-3 py-2 whitespace-nowrap text-xs">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
                               audit.monitoring === 'Adequate' 
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                                ? 'bg-lime-100 text-lime-800'
+                                : 'bg-rose-100 text-rose-800'
                             }`}>
                               {audit.monitoring}
-                              </span>
-                            </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
                             {getFailedChecksWithAliases(audit, true)}
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
                             {audit.pic || 'N/A'}
                           </td>
                         </>
                       ) : (
                         <>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
                             {getFailedChecksWithAliases(audit, false)}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                             {(audit as FraudAudit).review}
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
                             {audit.pic || 'N/A'}
                           </td>
                         </>
@@ -1752,7 +1857,8 @@ const ManagerDashboard = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Fraud Data</h2>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <
+Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
                   value={fraudSearchTerm}
@@ -1798,6 +1904,7 @@ const ManagerDashboard = () => {
                       >
                         <div className="flex items-center">
                           Region
+
                           <ArrowUpDown className="ml-1 h-4 w-4" />
                         </div>
                       </TableHead>
