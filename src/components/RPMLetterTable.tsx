@@ -1,6 +1,3 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { Download, Search, ArrowUpDown } from 'lucide-react';
 import {
   createColumnHelper,
   flexRender,
@@ -10,9 +7,12 @@ import {
   SortingState,
   useReactTable
 } from '@tanstack/react-table';
+import { saveAs } from 'file-saver';
+import { ArrowUpDown, Download, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import { supabase } from '../lib/supabaseClient';
 
 interface RPMLetter {
   id?: string;
@@ -145,6 +145,25 @@ export const RPMLetterTable: React.FC = () => {
     return '';
   };
 
+  const handleSubjectChange = async (id: string, value: string) => {
+    try {
+      const { error } = await supabase
+        .from('rpm_letters')
+        .update({ subject: value })
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Failed to update subject');
+        return;
+      }
+
+      fetchLetters();
+    } catch (error) {
+      console.error('Error updating subject:', error);
+      toast.error('Failed to update subject');
+    }
+  };
+
   const columns = [
     columnHelper.accessor('letter_number', {
       header: ({ column }) => {
@@ -174,7 +193,11 @@ export const RPMLetterTable: React.FC = () => {
     }),
     columnHelper.accessor('subject', {
       header: 'Subject',
-      cell: info => info.getValue(),
+      cell: info => (
+        <div className="whitespace-normal break-words max-w-xs">
+          {info.getValue()}
+        </div>
+      ),
     }),
     columnHelper.accessor('status', {
       header: 'Status',

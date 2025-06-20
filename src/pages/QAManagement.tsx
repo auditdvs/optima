@@ -658,6 +658,18 @@ const QAManagement: React.FC = () => {
     }
   };
 
+  // Add a function to get the selection indicator position
+  const getSelectionPosition = () => {
+    const tabs = ['auditors', 'excel', 'fraud', 'recap', 'rpm', 'matriks'];
+    const index = tabs.indexOf(activeTab);
+    return `${(index * 100) / tabs.length}%`;
+  };
+
+  const getSelectionWidth = () => {
+    const tabs = ['auditors', 'excel', 'fraud', 'recap', 'rpm', 'matriks'];
+    return `${100 / tabs.length}%`;
+  };
+
   if (loading && auditors.length === 0) {
     return <LoadingAnimation />;
   }
@@ -678,67 +690,87 @@ const QAManagement: React.FC = () => {
             </button>
           </div>
           
-          {/* Radio buttons */}
-          <div className="radio-inputs">
-            <label className="radio">
+          {/* New Radio Buttons Style */}
+          <div className="relative flex w-[600px] overflow-hidden rounded-[10px] border border-[#35343439] bg-white text-black">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="auditors"
                 checked={activeTab === 'auditors'} 
                 onChange={() => switchTab('auditors')}
+                className="hidden peer"
               />
-              <span className="name">Auditors</span>
+              <span className={activeTab === 'auditors' ? 'text-white' : 'text-black'}>Auditors</span>
             </label>
             
-            <label className="radio">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="excel"
                 checked={activeTab === 'excel'} 
                 onChange={() => switchTab('excel')}
+                className="hidden peer"
               />
-              <span className="name">Regular</span>
+              <span className={activeTab === 'excel' ? 'text-white' : 'text-black'}>Regular</span>
             </label>
             
-            <label className="radio">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="fraud"
                 checked={activeTab === 'fraud'} 
                 onChange={() => switchTab('fraud')}
+                className="hidden peer"
               />
-              <span className="name">Special</span>
+              <span className={activeTab === 'fraud' ? 'text-white' : 'text-black'}>Special</span>
             </label>
             
-            <label className="radio">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="recap"
                 checked={activeTab === 'recap'} 
                 onChange={() => switchTab('recap')}
+                className="hidden peer"
               />
-              <span className="name">Rating</span>
+              <span className={activeTab === 'recap' ? 'text-white' : 'text-black'}>Rating</span>
             </label>
             
-            <label className="radio">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="rpm"
                 checked={activeTab === 'rpm'} 
                 onChange={() => switchTab('rpm')}
+                className="hidden peer"
               />
-              <span className="name">RPM Letter</span>
+              <span className={activeTab === 'rpm' ? 'text-white' : 'text-black'}>RPM Letter</span>
             </label>
             
-            <label className="radio">
+            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
                 name="qaTab" 
+                value="matriks"
                 checked={activeTab === 'matriks'} 
                 onChange={() => switchTab('matriks')}
+                className="hidden peer"
               />
-              <span className="name">Matriks</span>
+              <span className={activeTab === 'matriks' ? 'text-white' : 'text-black'}>Matriks</span>
             </label>
+            
+            <span 
+              className="absolute top-0 h-full bg-indigo-600 transition-all duration-300 z-0" 
+              style={{
+                left: getSelectionPosition(),
+                width: getSelectionWidth()
+              }}
+            />
           </div>
         </div>
         
