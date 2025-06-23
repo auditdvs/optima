@@ -1,370 +1,377 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
+import Papa from 'papaparse';
 import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
+import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'; // pastikan ada komponen dialog shadcn
+import { Skeleton } from './ui/skeleton'; // pastikan ada komponen skeleton shadcn
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
-const kategoriOptions = ['major', 'moderate', 'minor'];
-const perbaikanOptions = ['null', 'sudah selesai'];
+interface MatriksData {
+  id: number;
+  kc_kr_kp: string;
+  judul_temuan: string;
+  kode_risk_issue: string;
+  judul_risk_issue: string;
+  kategori: string;
+  penyebab: string;
+  dampak: string;
+  kelemahan: string;
+  rekomendasi: string;
+  poin: number | null;
+  perbaikan_temuan: string;
+  jatuh_tempo: string;
+}
 
-export const MatriksSection: React.FC = () => {
-  const [tableNames, setTableNames] = useState<string[]>([]);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>('');
-  const [rows, setRows] = useState<any[]>([]);
-  const [showInput, setShowInput] = useState(false);
-  const [editRow, setEditRow] = useState<any | null>(null);
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'created_at' | 'poin'>('created_at');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+interface MatriksSectionProps {
+  data?: any; // Keep for backward compatibility but won't be used
+}
+
+export const MatriksSection: React.FC<MatriksSectionProps> = () => {
+  const [matriksData, setMatriksData] = useState<MatriksData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   useEffect(() => {
-    fetchTableNames();
-    fetchBranches();
+    fetchMatriksData();
   }, []);
 
-  useEffect(() => {
-    if (selectedTable) fetchRows(selectedTable, search, sortBy, sortDir);
-  }, [selectedTable, search, sortBy, sortDir]);
+  const fetchMatriksData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('matriks')
+        .select('*')
+        .order('id');
 
-  const fetchTableNames = async () => {
-    const { data } = await supabase.from('matriks_table_names').select('name');
-    setTableNames(data?.map((d) => d.name) || []);
-    setSelectedTable(data?.[0]?.name || '');
-  };
+      if (error) {
+        console.error('Error fetching matriks data:', error);
+        toast.error('Failed to fetch matriks data');
+        return;
+      }
 
-  const fetchBranches = async () => {
-    const { data } = await supabase.from('branches').select('name');
-    setBranches(data?.map((d) => d.name) || []);
-  };
-
-  const fetchRows = async (
-    tableName: string,
-    searchValue: string = '',
-    sortByField: string = 'created_at',
-    sortDirection: 'asc' | 'desc' = 'asc'
-  ) => {
-    let query = supabase
-      .from('matriks')
-      .select('*')
-      .eq('table_name', tableName)
-      .order(sortByField, { ascending: sortDirection === 'asc' });
-
-    if (searchValue) {
-      query = query.ilike('judul_temuan', `%${searchValue}%`);
-    }
-
-    const { data } = await query;
-    setRows(data || []);
-  };
-
-  const handleAddRow = async (row: any) => {
-    if (editRow) {
-      // Edit mode
-      await supabase.from('matriks').update(row).eq('id', editRow.id);
-      setEditRow(null);
-    } else {
-      // Add mode
-      await supabase.from('matriks').insert([{ ...row, table_name: selectedTable }]);
-    }
-    fetchRows(selectedTable, search, sortBy, sortDir);
-    setShowInput(false);
-  };
-
-  const handleDeleteRow = async (id: string) => {
-    if (window.confirm('Yakin ingin menghapus data ini?')) {
-      await supabase.from('matriks').delete().eq('id', id);
-      fetchRows(selectedTable, search, sortBy, sortDir);
+      setMatriksData(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to fetch matriks data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEditRow = (row: any) => {
-    setEditRow(row);
-    setShowInput(true);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file');
+      return;
+    }
+
+    setUploading(true);
+    toast.loading('Uploading CSV file...', { id: 'upload-toast' });
+
+    try {
+      // 1. Ambil data existing dari Supabase
+      const { data: existingData, error: fetchError } = await supabase
+        .from('matriks')
+        .select('*');
+      if (fetchError) throw fetchError;
+
+      // 2. Parse CSV
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          const csvData = results.data as any[];
+
+          // Mapping kolom agar sesuai dengan struktur MatriksData
+          const mappedData = csvData.map((row) => ({
+            kc_kr_kp: row.kc_kr_kp || row['kc_kr_kp'] || '',
+            judul_temuan: row.judul_temuan || row['judul_temuan'] || '',
+            kode_risk_issue: row.kode_risk_issue || row['kode_risk_issue'] || '',
+            judul_risk_issue: row.judul_risk_issue || row['judul_risk_issue'] || '',
+            kategori: row.kategori || row['kategori'] || '',
+            penyebab: row.penyebab || row['penyebab'] || '',
+            dampak: row.dampak || row['dampak'] || '',
+            kelemahan: row.kelemahan || row['kelemahan'] || '',
+            rekomendasi: row.rekomendasi || row['rekomendasi'] || '',
+            poin: row.poin ? parseInt(row.poin) : null,
+            perbaikan_temuan: row.perbaikan_temuan || row['perbaikan_temuan'] || '',
+            jatuh_tempo: row.jatuh_tempo || row['jatuh_tempo'] || '',
+          }));
+
+          if (mappedData.length === 0) {
+            throw new Error('No valid data rows found in CSV');
+          }
+
+          // 3. Remove duplikat: hanya insert data yang belum ada di Supabase
+          // Bandingkan berdasarkan seluruh field kecuali id
+          const isSameRow = (a: Omit<MatriksData, 'id'>, b: Omit<MatriksData, 'id'>) =>
+            a.kc_kr_kp === b.kc_kr_kp &&
+            a.judul_temuan === b.judul_temuan &&
+            a.kode_risk_issue === b.kode_risk_issue &&
+            a.judul_risk_issue === b.judul_risk_issue &&
+            a.kategori === b.kategori &&
+            a.penyebab === b.penyebab &&
+            a.dampak === b.dampak &&
+            a.kelemahan === b.kelemahan &&
+            a.rekomendasi === b.rekomendasi &&
+            (a.poin ?? null) === (b.poin ?? null) &&
+            a.perbaikan_temuan === b.perbaikan_temuan &&
+            a.jatuh_tempo === b.jatuh_tempo;
+
+          const filteredData = mappedData.filter((row) => {
+            return !existingData?.some((exist: MatriksData) =>
+              isSameRow(row, exist)
+            );
+          });
+
+          if (filteredData.length === 0) {
+            toast.success('No new data to upload (all rows are duplicates)', { id: 'upload-toast' });
+            setUploading(false);
+            event.target.value = '';
+            return;
+          }
+
+          // 4. Insert batch hanya data yang belum ada
+          const batchSize = 100;
+          for (let i = 0; i < filteredData.length; i += batchSize) {
+            const batch = filteredData.slice(i, i + batchSize);
+            const { error: insertError } = await supabase
+              .from('matriks')
+              .insert(batch);
+            if (insertError) throw insertError;
+          }
+
+          toast.success(`Successfully uploaded ${filteredData.length} new records`, { id: 'upload-toast' });
+          await fetchMatriksData();
+        },
+        error: (error) => {
+          toast.error(`Failed to parse CSV: ${error.message}`, { id: 'upload-toast' });
+        },
+      });
+    } catch (error: any) {
+      console.error('Error uploading CSV:', error);
+      toast.error(`Failed to upload CSV file: ${error.message}`, { id: 'upload-toast' });
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
   };
 
-  return (
-    <div>
-      <div className="flex gap-4 mb-4 items-center">
-        <select
-          value={selectedTable}
-          onChange={e => setSelectedTable(e.target.value)}
-          className="border rounded px-2 py-1"
-        >
-          {tableNames.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Cari Judul Temuan..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border rounded px-2 py-1"
-        />
-        <select
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value as 'created_at' | 'poin')}
-          className="border rounded px-2 py-1"
-        >
-          <option value="created_at">Tanggal Input</option>
-          <option value="poin">Poin</option>
-        </select>
-        <button
-          className="border rounded px-2 py-1 flex items-center"
-          onClick={() => setSortDir(dir => (dir === 'asc' ? 'desc' : 'asc'))}
-        >
-          {sortDir === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
-        </button>
-        <button
-          className="px-4 py-2 bg-indigo-600 text-white rounded"
-          onClick={() => {
-            setShowInput(true);
-            setEditRow(null);
-          }}
-        >
-          Tambah Data
-        </button>
-      </div>
-      {showInput && (
-        <MatriksInputCard
-          branches={branches}
-          onSubmit={handleAddRow}
-          onCancel={() => {
-            setShowInput(false);
-            setEditRow(null);
-          }}
-          initialData={editRow}
-        />
-      )}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="align-top text-left">No.</TableHead>
-              <TableHead className="align-top text-left">KC/KR/KP</TableHead>
-              <TableHead className="align-top text-left">Judul Temuan</TableHead>
-              <TableHead className="align-top text-left">Kode Risk Issue</TableHead>
-              <TableHead className="align-top text-left">Judul Risk Issue</TableHead>
-              <TableHead className="align-top text-left">Kategori</TableHead>
-              <TableHead className="align-top text-left">Penyebab</TableHead>
-              <TableHead className="align-top text-left">Dampak</TableHead>
-              <TableHead className="align-top text-left">Kelemahan</TableHead>
-              <TableHead className="align-top text-left">Rekomendasi</TableHead>
-              <TableHead className="align-top text-left">Poin</TableHead>
-              <TableHead className="align-top text-left">Jatuh Tempo</TableHead>
-              <TableHead className="align-top text-left">Perbaikan Temuan</TableHead>
-              <TableHead className="align-top text-left">Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, idx) => {
-              const perbaikan = (row.perbaikan_temuan || '').toLowerCase();
-              const isHijau =
-                perbaikan.includes('sudah selesai') ||
-                perbaikan.includes('sudah') ||
-                perbaikan.includes('selesai');
-              return (
-                <TableRow
-                  key={row.id}
-                  className={isHijau ? 'bg-green-500' : ''}
-                >
-                  <TableCell className="align-top text-left">{idx + 1}</TableCell>
-                  <TableCell className="align-top text-left">{row.branch_name}</TableCell>
-                  <TableCell className="align-top text-left">{row.judul_temuan}</TableCell>
-                  <TableCell className="align-top text-left">{row.kode_risk_issue}</TableCell>
-                  <TableCell className="align-top text-left">{row.judul_risk_issue}</TableCell>
-                  <TableCell className="align-top text-left">{row.kategori}</TableCell>
-                  <TableCell className="align-top text-left">{row.penyebab}</TableCell>
-                  <TableCell className="align-top text-left">{row.dampak}</TableCell>
-                  <TableCell className="align-top text-left">{row.kelemahan}</TableCell>
-                  <TableCell className="align-top text-left">{row.rekomendasi}</TableCell>
-                  <TableCell className="align-top text-left">{row.poin}</TableCell>
-                  <TableCell className="align-top text-left">{row.jatuh_tempo}</TableCell>
-                  <TableCell className="align-top text-left">{row.perbaikan_temuan || ''}</TableCell>
-                  <TableCell className="align-top text-left">
-                    <button
-                      className="text-blue-600 hover:text-blue-900 mr-2"
-                      onClick={() => handleEditRow(row)}
-                      title="Edit"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900"
-                      onClick={() => handleDeleteRow(row.id)}
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-            {rows.length === 0 && (
+  const handleRemoveAllData = async () => {
+    setShowConfirmDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setShowConfirmDelete(false); // Tutup dialog dulu agar UI responsif
+    setDeleting(true);
+
+    toast.loading('Removing all data...', { id: 'delete-toast' });
+
+    try {
+      const { error } = await supabase
+        .from('matriks')
+        .delete()
+        .neq('id', 0);
+
+      if (error) throw error;
+
+      toast.success('All data removed successfully', { id: 'delete-toast' });
+      setMatriksData([]);
+    } catch (error) {
+      console.error('Error removing data:', error);
+      toast.error('Failed to remove data', { id: 'delete-toast' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Skeleton Table
+  const SkeletonTable = () => (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-4 text-gray-500 align-top text-left">
-                  Tidak ada data
-                </TableCell>
+                <TableHead className="w-12"><Skeleton className="h-4 w-8" /></TableHead>
+                <TableHead className="min-w-[120px]"><Skeleton className="h-4 w-24" /></TableHead>
+                <TableHead className="min-w-[200px]"><Skeleton className="h-4 w-32" /></TableHead>
+                <TableHead className="min-w-[120px]"><Skeleton className="h-4 w-20" /></TableHead>
+                <TableHead className="min-w-[200px]"><Skeleton className="h-4 w-32" /></TableHead>
+                <TableHead className="min-w-[100px]"><Skeleton className="h-4 w-16" /></TableHead>
+                <TableHead className="min-w-[250px]"><Skeleton className="h-4 w-40" /></TableHead>
+                <TableHead className="min-w-[250px]"><Skeleton className="h-4 w-40" /></TableHead>
+                <TableHead className="min-w-[250px]"><Skeleton className="h-4 w-40" /></TableHead>
+                <TableHead className="min-w-[250px]"><Skeleton className="h-4 w-40" /></TableHead>
+                <TableHead className="min-w-[80px]"><Skeleton className="h-4 w-12" /></TableHead>
+                <TableHead className="min-w-[200px]"><Skeleton className="h-4 w-32" /></TableHead>
+                <TableHead className="min-w-[120px]"><Skeleton className="h-4 w-20" /></TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-};
-
-const MatriksInputCard: React.FC<{
-  branches: string[];
-  onSubmit: (row: any) => void;
-  onCancel: () => void;
-  initialData?: any;
-  selectedTable?: string;
-}> = ({ branches, onSubmit, onCancel, initialData }) => {
-  const [form, setForm] = useState<any>(
-    initialData || {
-      branch_name: '',
-      judul_temuan: '',
-      kode_risk_issue: '',
-      judul_risk_issue: '',
-      kategori: 'major',
-      penyebab: '',
-      dampak: '',
-      kelemahan: '',
-      rekomendasi: '',
-      poin: 0,
-      jatuh_tempo: '',
-      perbaikan_temuan: '',
-    }
+            </TableHeader>
+            <TableBody>
+              {[...Array(8)].map((_, idx) => (
+                <TableRow key={idx}>
+                  {[...Array(13)].map((_, colIdx) => (
+                    <TableCell key={colIdx}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   );
 
-  useEffect(() => {
-    if (initialData) setForm(initialData);
-  }, [initialData]);
-
-  // Deteksi apakah table sekarang adalah Ayu khs atau Lise khs
-  const isKhs = (form.table_name || initialData?.table_name || '').toLowerCase().includes('khs');
+  if (loading) {
+    return <SkeletonTable />;
+  }
 
   return (
-    <div className="bg-white p-4 rounded shadow mb-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label>KC/KR/KP</label>
-          <input
-            type="text"
-            value={form.branch_name}
-            onChange={e => setForm(f => ({ ...f, branch_name: e.target.value }))}
-            className="w-full border rounded"
-            placeholder="Masukkan nama cabang"
-          />
-        </div>
-        <div>
-          <label>Judul Temuan</label>
-          <textarea
-            value={form.judul_temuan}
-            onChange={e => setForm(f => ({ ...f, judul_temuan: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Judul Temuan"
-          />
-        </div>
-        <div>
-          <label>Kode Risk Issue</label>
-          <input
-            value={form.kode_risk_issue}
-            onChange={e => setForm(f => ({ ...f, kode_risk_issue: e.target.value }))}
-            className="w-full border rounded"
-            placeholder="Kode Risk Issue"
-          />
-        </div>
-        <div>
-          <label>Judul Risk Issue</label>
-          <textarea
-            value={form.judul_risk_issue}
-            onChange={e => setForm(f => ({ ...f, judul_risk_issue: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Judul Risk Issue"
-          />
-        </div>
-        <div>
-          <label>Kategori</label>
-          <select value={form.kategori} onChange={e => setForm(f => ({ ...f, kategori: e.target.value }))} className="w-full border rounded">
-            {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
-          </select>
-        </div>
-        <div>
-          <label>Penyebab</label>
-          <textarea
-            value={form.penyebab}
-            onChange={e => setForm(f => ({ ...f, penyebab: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Penyebab"
-          />
-        </div>
-        <div>
-          <label>Dampak</label>
-          <textarea
-            value={form.dampak}
-            onChange={e => setForm(f => ({ ...f, dampak: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Dampak"
-          />
-        </div>
-        <div>
-          <label>Kelemahan</label>
-          <textarea
-            value={form.kelemahan}
-            onChange={e => setForm(f => ({ ...f, kelemahan: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Kelemahan"
-          />
-        </div>
-        <div>
-          <label>Rekomendasi</label>
-          <textarea
-            value={form.rekomendasi}
-            onChange={e => setForm(f => ({ ...f, rekomendasi: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Rekomendasi"
-          />
-        </div>
-        <div>
-          <label>Poin</label>
-          <input type="number" value={form.poin} onChange={e => setForm(f => ({ ...f, poin: Number(e.target.value) }))} className="w-full border rounded" />
-        </div>
-        <div>
-          <label>Jatuh Tempo</label>
-          <input type="date" value={form.jatuh_tempo} onChange={e => setForm(f => ({ ...f, jatuh_tempo: e.target.value }))} className="w-full border rounded" />
-        </div>
-        <div>
-          <label>Perbaikan Temuan</label>
-          <textarea
-            value={form.perbaikan_temuan || ''}
-            onChange={e => setForm(f => ({ ...f, perbaikan_temuan: e.target.value }))}
-            className="w-full border rounded resize"
-            rows={2}
-            placeholder="Isi jika sudah ada perbaikan"
-          />
+    <div className="space-y-4">
+      {/* Confirm Delete Dialog */}
+      <Dialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove All Matriks Data?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p>Are you sure you want to remove <b>all matriks data</b>? This action cannot be undone.</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDelete(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? 'Removing...' : 'Yes, Remove All'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Matriks Data</h3>
+        <div className="flex items-center gap-2">
+          {/* Remove All Data Button */}
+          {matriksData.length > 0 && (
+            <Button
+              onClick={handleRemoveAllData}
+              disabled={deleting || uploading}
+              variant="destructive"
+              size="sm"
+              className="flex items-center gap-2 h-10"
+            >
+              <Trash2 className="h-4 w-4" />
+              Remove All
+            </Button>
+          )}
+          {/* Upload CSV Button */}
+          <label className="cursor-pointer bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 h-10">
+            <Upload className="h-4 w-4" />
+            {uploading ? 'Uploading...' : 'Upload CSV'}
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              disabled={uploading || deleting}
+              className="hidden"
+            />
+          </label>
         </div>
       </div>
-      <div className="flex gap-2 mt-4">
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded" onClick={() => onSubmit(form)}>
-          {initialData ? 'Update' : 'Simpan'}
-        </button>
-        <button className="bg-gray-300 px-4 py-2 rounded" onClick={onCancel}>Batal</button>
-      </div>
+
+      {/* Skeleton saat deleting */}
+      {deleting ? (
+        <SkeletonTable />
+      ) : matriksData.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-500">No matriks data available. Upload a CSV file to get started.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">No</TableHead>
+                    <TableHead className="min-w-[120px]">KC/KR/KP</TableHead>
+                    <TableHead className="min-w-[200px]">Judul Temuan</TableHead>
+                    <TableHead className="min-w-[120px]">Kode Risk Issue</TableHead>
+                    <TableHead className="min-w-[200px]">Judul Risk Issue</TableHead>
+                    <TableHead className="min-w-[100px]">Kategori</TableHead>
+                    <TableHead className="min-w-[250px]">Penyebab</TableHead>
+                    <TableHead className="min-w-[250px]">Dampak</TableHead>
+                    <TableHead className="min-w-[250px]">Kelemahan</TableHead>
+                    <TableHead className="min-w-[250px]">Rekomendasi</TableHead>
+                    <TableHead className="min-w-[80px]">Poin</TableHead>
+                    <TableHead className="min-w-[200px]">Perbaikan Temuan</TableHead>
+                    <TableHead className="min-w-[120px]">Jatuh Tempo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {matriksData.map((item, index) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-center align-top">{index + 1}</TableCell>
+                      <TableCell className="align-top whitespace-normal break-words">
+                        {item.kc_kr_kp}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[200px]">
+                        {item.judul_temuan}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words">
+                        {item.kode_risk_issue}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[200px]">
+                        {item.judul_risk_issue}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words">
+                        {item.kategori}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[250px]">
+                        {item.penyebab}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[250px]">
+                        {item.dampak}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[250px]">
+                        {item.kelemahan}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[250px]">
+                        {item.rekomendasi}
+                      </TableCell>
+                      <TableCell className="text-center align-top">{item.poin || '-'}</TableCell>
+                      <TableCell className="align-top whitespace-normal break-words max-w-[200px]">
+                        {item.perbaikan_temuan}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-normal break-words">
+                        {item.jatuh_tempo}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
