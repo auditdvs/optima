@@ -35,6 +35,7 @@ export const MatriksSection: React.FC<MatriksSectionProps> = () => {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null); // Tambahkan state ini
 
   useEffect(() => {
     fetchMatriksData();
@@ -55,6 +56,16 @@ export const MatriksSection: React.FC<MatriksSectionProps> = () => {
       }
 
       setMatriksData(data || []);
+
+      // Ambil last_updated terbaru dari seluruh data
+      if (data && data.length > 0) {
+        const sorted = [...data].sort((a, b) =>
+          new Date(b.last_updated || 0).getTime() - new Date(a.last_updated || 0).getTime()
+        );
+        setLastUpdated(sorted[0].last_updated || null);
+      } else {
+        setLastUpdated(null);
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to fetch matriks data');
@@ -103,6 +114,7 @@ export const MatriksSection: React.FC<MatriksSectionProps> = () => {
             poin: row.poin ? parseInt(row.poin) : null,
             perbaikan_temuan: row.perbaikan_temuan || row['perbaikan_temuan'] || '',
             jatuh_tempo: row.jatuh_tempo || row['jatuh_tempo'] || '',
+            last_updated: new Date().toISOString(), // tambahkan ini
           }));
 
           if (mappedData.length === 0) {
@@ -265,7 +277,14 @@ export const MatriksSection: React.FC<MatriksSectionProps> = () => {
       </Dialog>
 
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Matriks Data</h3>
+        <div>
+          <h3 className="text-lg font-semibold">Matriks Data</h3>
+          {lastUpdated && (
+            <div className="text-xs text-gray-500 mt-1">
+              Terakhir update: {new Date(lastUpdated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {/* Remove All Data Button */}
           {matriksData.length > 0 && (
