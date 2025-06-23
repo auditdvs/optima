@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { ChevronDown, ChevronUp, Database, RefreshCw, Trash2, UserPen, UserPlus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, DatabaseBackup, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import {
@@ -752,7 +752,6 @@ function UserControlPanel() {
         'fraud_payments',
         'fraud_payments_audits',
         'matriks',
-        'matriks_table_names',
         'notification_reads',
         'notifications',
         'pic',
@@ -1046,7 +1045,7 @@ function UserControlPanel() {
             disabled={loading}
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
-            <Database className="h-5 w-5" />
+            <DatabaseBackup className="h-5 w-5" />
             {loading ? 'Backing up...' : 'Backup All Data'}
           </button>
         </div>

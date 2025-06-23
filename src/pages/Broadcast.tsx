@@ -238,7 +238,7 @@ function Broadcast() {
           <Button 
             variant="outline" 
             size="sm"
-            className='bg-yellow-400 hover:bg-yellow-300 text-yellow-900 hover:text-yellow-800 transition-colors duration-300'
+            className='bg-green-400 hover:bg-green-300 text-green-900 hover:text-green-800 transition-colors duration-300'
             onClick={fetchNotifications}
             disabled={refreshing}
           >
