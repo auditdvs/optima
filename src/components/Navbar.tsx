@@ -1,4 +1,5 @@
-import { AlignStartVertical, ChartNoAxesColumn, Users } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { AlignStartVertical, ChartNoAxesColumn, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import dvs1Icon from '../assets/dvs-1.png';
@@ -233,22 +234,28 @@ function Navbar() {
     setRcmResults([]);
     
     try {
-      // Get search results from Supabase
+      // Use existing 'matriks' table with updated search fields
       const { data, error } = await supabase
-        .from('matriks')
+        .from('matriks') // Using existing 'matriks' table
         .select('*')
         .or([
           `judul_temuan.ilike.%${rcmQuery}%`,
           `kode_risk_issue.ilike.%${rcmQuery}%`,
           `judul_risk_issue.ilike.%${rcmQuery}%`,
+          `kategori.ilike.%${rcmQuery}%`,
           `penyebab.ilike.%${rcmQuery}%`,
           `dampak.ilike.%${rcmQuery}%`,
-          `kelemahan.ilike.%${rcmQuery}%`,
           `rekomendasi.ilike.%${rcmQuery}%`,
-          `branch_name.ilike.%${rcmQuery}%`
+          `kc_kr_kp.ilike.%${rcmQuery}%`,
+          `kelemahan.ilike.%${rcmQuery}%`,
+          `perbaikan_temuan.ilike.%${rcmQuery}%`
         ].join(','));
         
-      if (error) toast.error('Search failed');
+      if (error) {
+        console.error('Search error:', error);
+        toast.error('Search failed');
+        return;
+      }
       
       // Add a minimum 2-second delay for loader to be visible
       const minLoadTime = 2000; // 2 seconds
@@ -260,6 +267,9 @@ function Navbar() {
       }
       
       setRcmResults(data || []);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Search failed');
     } finally {
       setRcmLoading(false);
     }
@@ -399,32 +409,14 @@ function Navbar() {
                     Mark all as read
                   </button>
                 )}
-                <button
+                <Button
                   onClick={() => setShowNotifications(false)}
-                  className="group flex items-center justify-center transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+                  variant="ghost"
+                  size="sm"
+                  className="p-1"
                 >
-                  <svg
-                    fill="currentColor"
-                    stroke="none"
-                    strokeWidth="0"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-                  >
-                    <path
-                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                      d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                    ></path>
-                    <path
-                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                      d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                    ></path>
-                    <path
-                      className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                      d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                    ></path>
-                  </svg>
-                </button>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             <div className="max-h-[calc(80vh-4rem)] overflow-y-auto">
@@ -587,32 +579,14 @@ function Navbar() {
                       Mark all as read
                     </button>
                   )}
-                  <button
+                  <Button
                     onClick={() => setShowNotifications(false)}
-                    className="group flex items-center justify-center transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+                    variant="ghost"
+                    size="sm"
+                    className="p-1"
                   >
-                    <svg
-                      fill="currentColor"
-                      stroke="none"
-                      strokeWidth="0"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-                    >
-                      <path
-                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                        d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                      ></path>
-                      <path
-                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                        d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                      ></path>
-                      <path
-                        className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                        d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                      ></path>
-                    </svg>
-                  </button>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               <div className="max-h-96 overflow-y-auto">
@@ -701,32 +675,14 @@ function Navbar() {
       {showFullMessage && selectedNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
-            <button
+            <Button
               onClick={handleCloseFullMessage}
-              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 p-1"
             >
-              <svg
-                fill="currentColor"
-                stroke="none"
-                strokeWidth="0"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-              >
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                ></path>
-              </svg>
-            </button>
+              <X className="h-4 w-4" />
+            </Button>
             <h4 className="font-semibold text-lg mb-2">{selectedNotification.title}</h4>
             <div className="overflow-y-auto max-h-[400px]">
               <p className="text-sm text-gray-700 whitespace-pre-line">{selectedNotification.message}</p>
@@ -747,71 +703,71 @@ function Navbar() {
 
       {showRCMSearch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
-            <button
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 relative mx-4">
+            <Button
               onClick={() => setShowRCMSearch(false)}
-              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 p-1"
             >
-              <svg
-                fill="currentColor"
-                stroke="none"
-                strokeWidth="0"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-              >
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                ></path>
-              </svg>
-            </button>
+              <X className="h-4 w-4" />
+            </Button>
             <h4 className="font-semibold text-lg mb-4">Search Matriks</h4>
-            <form onSubmit={handleRCMSearch} className="mb-4">
-              <div className="relative">
-                <input
-                  ref={rcmInputRef}
-                  type="search"
-                  value={rcmQuery}
-                  onChange={e => setRcmQuery(e.target.value)}
-                  className="input shadow-lg focus:border-2 border-gray-300 px-5 py-3 rounded-xl w-full md:w-96 transition-all focus:w-full md:focus:w-[28rem] outline-none"
-                  placeholder="Search..."
-                  name="search"
-                />
-                <button
-                  type="submit"
-                  className="absolute top-3 right-3 text-gray-500"
-                  disabled={rcmLoading}
-                >
-                  {rcmLoading ? (
-                    <span className="sr-only">Loading...</span>
-                  ) : (
-                    <svg
-                      className="size-6"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      ></path>
+            
+            {/* Updated search form with new style */}
+            <form 
+              onSubmit={handleRCMSearch} 
+              className={`relative flex items-center w-full max-w-lg mx-auto h-[40px] px-3 bg-gray-50 rounded-[120px] transition-all duration-500 focus-within:rounded-[1px] group mb-4 ${rcmQuery ? 'has-text' : ''}`}
+            >
+              {/* Search Button */}
+              <button 
+                type="submit" 
+                className="text-[#8b8ba7] hover:text-indigo-600 transition-colors duration-200"
+                disabled={rcmLoading}
+              >
+                {rcmLoading ? (
+                  <div className="animate-spin w-[17px] h-[17px]">
+                    <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="32" strokeDashoffset="32">
+                        <animate attributeName="stroke-dasharray" dur="2s" values="0 64;32 32;0 64" repeatCount="indefinite"/>
+                        <animate attributeName="stroke-dashoffset" dur="2s" values="0;-32;-64" repeatCount="indefinite"/>
+                      </circle>
                     </svg>
-                  )}
-                </button>
-              </div>
+                  </div>
+                ) : (
+                  <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="search">
+                    <path d="M7.667 12.667A5.333 5.333 0 107.667 2a5.333 5.333 0 000 10.667zM14.334 14l-2.9-2.9" stroke="currentColor" strokeWidth="1.333" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                )}
+              </button>
+
+              {/* Input */}
+              <input
+                ref={rcmInputRef}
+                type="text"
+                value={rcmQuery}
+                onChange={e => setRcmQuery(e.target.value)}
+                required
+                placeholder="Search matriks data..."
+                className="flex-1 h-full px-2 py-[0.7em] text-sm bg-transparent border-none placeholder-gray-400 focus:outline-none"
+                disabled={rcmLoading}
+              />
+
+              {/* Reset Button */}
+              <button 
+                type="button"
+                onClick={() => setRcmQuery('')}
+                className={`opacity-0 invisible transition-opacity duration-200 ${rcmQuery ? 'opacity-100 visible' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-[17px] h-[17px] mt-[3px] text-gray-400 hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+
+              {/* Animated Border */}
+              <span className="absolute bottom-0 left-0 w-full h-[2px] bg-indigo-500 scale-x-0 origin-center transition-transform duration-300 group-focus-within:scale-x-100 rounded-sm"></span>
             </form>
+
             <div className="max-h-96 overflow-y-auto">
               {rcmLoading ? (
                 <div className="flex justify-center items-center py-10">
@@ -838,13 +794,49 @@ function Navbar() {
                 rcmResults.map((row, idx) => (
                   <div key={row.id} className="border-b py-2 px-1">
                     <div className="font-semibold">{row.judul_temuan}</div>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {row.branch_name} | {row.jatuh_tempo}
+                    <div className="text-xs mb-1">
+                      <span className="text-blue-500">{row.kc_kr_kp}</span>
+                      {" | "}
+                      <span
+                        className={
+                          row.kategori?.toLowerCase() === "major"
+                            ? "text-red-500"
+                            : row.kategori?.toLowerCase() === "moderate"
+                            ? "text-yellow-500"
+                            : row.kategori?.toLowerCase() === "minor"
+                            ? "text-green-500"
+                            : ""
+                        }
+                      >
+                        {row.kategori}
+                      </span>
                     </div>
                     <div className="text-xs text-gray-600 mb-1">
-                      <span className="font-semibold">Kode Risk Issue:</span> {row.kode_risk_issue}
+                      <span className="font-semibold">Kode:</span> {row.kode_risk_issue}
                     </div>
-                    <div className="text-sm">{row.kelemahan}</div>
+                    <div className="text-sm text-gray-700 mb-1">{row.judul_risk_issue}</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      <span className="font-semibold">Penyebab:</span> {row.penyebab}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      <span className="font-semibold">Dampak:</span> {row.dampak}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      <span className="font-semibold">Kelemahan:</span> {row.kelemahan}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      <span className="font-semibold">Rekomendasi:</span> {row.rekomendasi}
+                    </div>
+                    {row.poin && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        <span className="font-semibold">Poin:</span> {row.poin}
+                      </div>
+                    )}
+                    {row.jatuh_tempo && (
+                      <div className="text-xs text-gray-600">
+                        <span className="font-semibold">Jatuh Tempo:</span> {row.jatuh_tempo}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -855,33 +847,15 @@ function Navbar() {
 
       {showAuditRating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
-            <button
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 relative">
+            <Button
               onClick={() => setShowAuditRating(false)}
-              className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 p-1"
             >
-              <svg
-                fill="currentColor"
-                stroke="none"
-                strokeWidth="0"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-              >
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                  d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                  d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                ></path>
-                <path
-                  className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                  d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                ></path>
-              </svg>
-            </button>
+              <X className="h-4 w-4" />
+            </Button>
             <AuditRatingCalculator />
           </div>
         </div>
@@ -899,32 +873,14 @@ function Navbar() {
             {/* Modal content */}
             <div className="pic-content">
               {/* Replace the current close button in the PIC List modal */}
-              <button
+              <Button
                 onClick={() => setShowPICList(false)}
-                className="group flex items-center justify-center absolute top-2 right-2 z-10 transition-all duration-500 ease-in-out rounded-[0.375rem] p-[5px] cursor-pointer border border-[#999] outline-none focus-visible:outline-0 hover:border-indigo-500 hover:text-indigo-500"
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 p-1"
               >
-                <svg
-                  fill="currentColor"
-                  stroke="none"
-                  strokeWidth="0"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-7 h-7 overflow-visible transition-transform duration-350 ease-in-out group-hover:delay-250 group-hover:rotate-45"
-                >
-                  <path
-                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-27.2%,-80.2%)]"
-                    d="m3.45,8.83c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L14.71,2.08c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L3.84,8.75c-.13.05-.25.08-.38.08Z"
-                  ></path>
-                  <path
-                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(22.5deg)_translate(15.5%,-23%)]"
-                    d="m2.02,17.13c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31L21.6,6.94c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31L2.4,17.06c-.13.05-.25.08-.38.08Z"
-                  ></path>
-                  <path
-                    className="transition-transform duration-350 ease-in-out group-hover:[transform:rotate(112.5deg)_translate(-15%,-149.5%)]"
-                    d="m8.91,21.99c-.39,0-.76-.23-.92-.62-.21-.51.03-1.1.54-1.31l11.64-4.82c.51-.21,1.1.03,1.31.54.21.51-.03,1.1-.54,1.31l-11.64,4.82c-.13.05-.25.08-.38.08Z"
-                  ></path>
-                </svg>
-              </button>
+                <X className="h-4 w-4" />
+              </Button>
               <h4 className="font-semibold text-lg mb-4 text-indigo-900">PIC List</h4>
               
               {picLoading ? (

@@ -1018,13 +1018,9 @@ const QAManagement: React.FC = () => {
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Matriks</h2>
             </div>
-            {loadingMatriksTable ? (
-              <LoadingAnimation />
-            ) : (
-              <MatriksSection data={auditData} />
-            )}
+            {/* Hapus LoadingAnimation di sini, langsung render MatriksSection */}
+            <MatriksSection data={auditData} />
           </CardContent>
         </Card>
       ) : null}
