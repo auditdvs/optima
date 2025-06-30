@@ -27,5 +27,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+<<<<<<< HEAD
 .env.local
 .next/
+=======
+
+.next/.next/
+.next/
+>>>>>>> cc6a10c93fea76c080b580689e71cc2dc2c1dad0

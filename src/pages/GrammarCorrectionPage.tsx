@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { grammarService } from '../services/supabaseClient';
+import { grammarService } from '../services/grammarService';
 import '../styles/grammar-correction.css';
 
 interface GrammarRequest {
