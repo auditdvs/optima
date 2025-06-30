@@ -17,6 +17,7 @@ export default function GrammarCorrectionPage() {
   const [requests, setRequests] = useState<GrammarRequest[]>([]);
   const [activeRequest, setActiveRequest] = useState<GrammarRequest | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [showPopup, setShowPopup] = useState<boolean>(true); // Tambahkan state popup
 
   useEffect(() => {
     fetchRequests();
@@ -79,6 +80,14 @@ export default function GrammarCorrectionPage() {
 
   return (
     <div className="grammar-correction-container">
+      {/* Popup merah */}
+      {showPopup && (
+        <div className="popup-warning">
+          <strong>⚠️ Coming soon, under testing! ⚠️</strong>
+          <button className="close-btn" onClick={() => setShowPopup(false)}>×</button>
+        </div>
+      )}
+      
       <h1>Koreksi Tata Bahasa Laporan Audit</h1>
       
       <div className="input-section">
