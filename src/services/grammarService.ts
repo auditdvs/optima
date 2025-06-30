@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Grammar correction specific functions
 export const grammarService = {
   async submitText(text: string) {
     const { data: user } = await supabase.auth.getUser();
-    
     return supabase
       .from('grammar_requests')
       .insert({
@@ -18,14 +11,14 @@ export const grammarService = {
       })
       .select();
   },
-  
+
   async getRequests() {
     return supabase
       .from('grammar_requests')
       .select('*')
       .order('created_at', { ascending: false });
   },
-  
+
   subscribeToChanges(requestId: string, callback: (payload: any) => void) {
     return supabase
       .channel(`grammar_request_${requestId}`)
