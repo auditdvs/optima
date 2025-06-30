@@ -21,6 +21,7 @@ import RiskDashboard from './pages/RiskDashboard';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UpdateLocation from './pages/UpdateLocation';
+import GrammarCorrectionPage from './pages/GrammarCorrectionPage';
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,11 @@ function App() {
               <Route path="email-address" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
                   <EmailAddress />
+                </PrivateRoute>
+              } />
+              <Route path="grammar-correction" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
+                  <GrammarCorrectionPage />
                 </PrivateRoute>
               } />
             </Route>

@@ -73,7 +73,8 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
     menuItems.push(
       { path: '/tools', icon: Wrench, label: 'Tools' },
       { path: '/tutorials', icon: FileVideo, label: 'Tutorials' },
-      { path: '/notification-history', icon: History, label: 'Message History' }
+      { path: '/notification-history', icon: History, label: 'Message History' },
+      { path: '/grammar-correction', icon: FilePenLine, label: 'Grammar Correction' }
     );
   }
   
