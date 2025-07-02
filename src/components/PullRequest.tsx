@@ -1,4 +1,4 @@
-import { Download, MessageSquare, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, Info, MessageSquare, RefreshCw, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -27,15 +27,74 @@ const PullRequest = () => {
   // Tambahkan state uploading
   const [uploading, setUploading] = useState(false);
 
+  // State untuk enable/disable pull request
+  const [pullRequestEnabled, setPullRequestEnabled] = useState(true);
+  const [showDisableInfo, setShowDisableInfo] = useState(false);
+
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
+  const isSuperAdmin = userRole === 'superadmin';
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
       fetchRequests();
-      fetchUploaders(); // Tambahkan pemanggilan fungsi fetchUploaders
+      fetchUploaders();
+      fetchPullRequestStatus(); // Tambahkan fetch status
     }
   }, [user]);
+
+  // Fungsi untuk fetch status pull request
+  const fetchPullRequestStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'pull_request_enabled')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching pull request status:', error);
+        return;
+      }
+
+      if (data) {
+        setPullRequestEnabled(data.value === 'true');
+      }
+    } catch (error) {
+      console.error('Error fetching pull request status:', error);
+    }
+  };
+
+  // Fungsi untuk toggle enable/disable pull request
+  const togglePullRequestStatus = async () => {
+    try {
+      const newStatus = !pullRequestEnabled;
+      
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: 'pull_request_enabled',
+          value: newStatus.toString()
+        });
+
+      if (error) throw error;
+
+      setPullRequestEnabled(newStatus);
+      toast.success(`Pull Request ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
+    } catch (error) {
+      console.error('Error toggling pull request status:', error);
+      toast.error('Gagal mengubah status pull request');
+    }
+  };
+
+  // Handler untuk tombol New Request ketika disabled
+  const handleNewRequestClick = () => {
+    if (!pullRequestEnabled) {
+      setShowDisableInfo(true);
+      return;
+    }
+    setShowForm(true);
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -355,15 +414,62 @@ const PullRequest = () => {
             <RefreshCw size={18} className={`text-gray-500 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-        {!isAdmin && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-indigo-600 text-white mx-5 px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            New Request
-          </button>
-        )}
+        
+        <div className="flex items-center gap-3">
+          {/* Toggle untuk superadmin */}
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Pull Request:</span>
+              <button
+                onClick={togglePullRequestStatus}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  pullRequestEnabled 
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                }`}
+                title={`Click to ${pullRequestEnabled ? 'disable' : 'enable'} pull requests`}
+              >
+                {pullRequestEnabled ? (
+                  <>
+                    <ToggleRight size={16} />
+                    <span>Enabled</span>
+                  </>
+                ) : (
+                  <>
+                    <ToggleLeft size={16} />
+                    <span>Disabled</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Tombol New Request */}
+          {!isAdmin && (
+            <button
+              onClick={handleNewRequestClick}
+              className={`px-4 py-2 rounded transition-colors ${
+                pullRequestEnabled
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-400 text-white cursor-not-allowed'
+              }`}
+              title={pullRequestEnabled ? 'Create new request' : 'Pull request is currently disabled'}
+            >
+              New Request
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Status Banner ketika disabled */}
+      {!pullRequestEnabled && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <Info size={16} className="text-amber-600" />
+          <span className="text-amber-800 text-sm font-medium">
+            Pull Request sedang dinonaktifkan. DVS sedang melakukan proses penarikan data THC, mohon tunggu hingga proses selesai.
+          </span>
+        </div>
+      )}
 
       {/* Status Legend */}
       <div className="mb-4 flex flex-wrap gap-4 items-center">
@@ -598,7 +704,7 @@ const PullRequest = () => {
       )}
 
       {/* Request Form */}
-      {showForm && !isAdmin && (
+      {showForm && !isAdmin && pullRequestEnabled && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4">New Data Request</h2>
@@ -656,6 +762,36 @@ const PullRequest = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up info ketika pull request disabled */}
+      {showDisableInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <Info size={20} className="text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800">Pull Request Dinonaktifkan</h2>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 leading-relaxed">
+                Maaf, fitur Pull Request sedang dinonaktifkan sementara karena DVS sedang melakukan proses penarikan data THC. 
+                Silakan coba lagi nanti setelah proses selesai.
+              </p>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowDisableInfo(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Mengerti
+              </button>
+            </div>
           </div>
         </div>
       )}
