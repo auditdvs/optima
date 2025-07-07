@@ -1,0 +1,311 @@
+/* Audit Rating Calculator Styles */
+
+.audit-calculator-container {
+  width: 100%;
+  max-width: 450px;
+  background: linear-gradient(145deg, #ffffff, #f0f4ff);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(79, 70, 229, 0.1);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background effects */
+.audit-calculator-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background-color: rgba(99, 102, 241, 0.08);
+  border-radius: 50%;
+  transform: translate(30%, -30%);
+}
+
+.audit-calculator-container::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 120px;
+  height: 120px;
+  background-color: rgba(99, 102, 241, 0.06);
+  border-radius: 50%;
+  transform: translate(-30%, 30%);
+  z-index: 0;
+}
+
+/* Header */
+.audit-calculator-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.audit-calculator-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #4f46e5;
+  margin-bottom: 0.75rem;
+}
+
+.audit-calculator-header p {
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Form Styling */
+.audit-calculator-form {
+  position: relative;
+  z-index: 1;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #4b5563;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.rating-input {
+  width: 100%;
+  height: 40px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  font-size: 0.95rem;
+  transition: all 0.3s;
+  color: #374151;
+}
+
+.rating-input:focus {
+  outline: none;
+  border-color: #818cf8;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.input-focus-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #4f46e5;
+  transition: width 0.3s ease;
+  border-radius: 1px;
+}
+
+.rating-input:focus + .input-focus-bar {
+  width: 100%;
+}
+
+/* Checkbox Styling */
+.checkbox-group {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.custom-checkbox {
+  opacity: 0;
+  position: absolute;
+}
+
+.checkbox-label {
+  position: relative;
+  cursor: pointer;
+  padding-left: 30px;
+  font-size: 0.95rem;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-label:before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #c7d2fe;
+  background: #f5f7ff;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.custom-checkbox:checked + .checkbox-label:before {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.custom-checkbox:checked + .checkbox-label:after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Result Section */
+.rating-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 2rem;
+  position: relative;
+  z-index: 2;
+}
+
+.rating-label {
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: #374151;
+}
+
+.rating-badge {
+  font-weight: 600;
+  font-size: 1.25rem;
+  padding: 0.5rem 2rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  text-align: center;
+  min-width: 120px;
+  transition: all 0.3s ease;
+  animation: pulse 2s infinite;
+}
+
+/* Rating colors */
+.rating-badge.low {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.rating-badge.medium {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.rating-badge.high {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: white;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .audit-calculator-container {
+    padding: 1.5rem;
+  }
+  
+  .rating-badge {
+    font-size: 1.1rem;
+    padding: 0.4rem 1.5rem;
+  }
+}
+
+/* Tooltip Hints Styling - Fixed positioning */
+.item-hints {
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  position: relative;
+  z-index: 100; /* Tingkatkan z-index */
+}
+
+.item-hints .hint {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.item-hints .hint-dot {
+  z-index: 101; /* Tingkatkan z-index */
+  border-radius: 50%;
+  width: 36px; /* Sedikit lebih besar */
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+}
+
+.item-hints .hint:hover .hint-dot {
+  transform: scale(1.1); /* Efek hover */
+}
+
+.item-hints .hint-radius {
+  display: none; /* Hapus radius circle besar */
+}
+
+.item-hints .hint-content {
+  width: 320px;
+  position: fixed; /* Gunakan fixed alih-alih absolute */
+  left: 50%;
+  bottom: 70px; /* Posisi dari bawah layar */
+  transform: translateX(-50%);
+  z-index: 9999; /* Z-index sangat tinggi */
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.item-hints .hint:hover .hint-content {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.item-hints .hint-content:after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 16px;
+  height: 16px;
+  background: #1f2937;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}

@@ -1,17 +1,18 @@
-import { Button } from "@/components/ui/button";
-import { AlignStartVertical, ChartNoAxesColumn, Users, X } from 'lucide-react';
+import { AlignStartVertical, ChartNoAxesColumn, LogOut, Settings, User, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import dvs1Icon from '../assets/dvs-1.png';
 import dvs2Icon from '../assets/dvs-2.png';
 import managerIcon from '../assets/manager.png';
 import qaIcon from '../assets/qa.png';
+import { Button } from "../components/ui/button";
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import '../styles/bell.css';
 import '../styles/hamburger-menu.css';
 import '../styles/loaders.css';
 import '../styles/pic.css';
+import AccountSettings from './AccountSettings';
 import AuditRatingCalculator from './AuditRatingCalculator';
 
 interface Notification {
@@ -27,7 +28,7 @@ interface Notification {
 }
 
 function Navbar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, userRole } = useAuth();
   const [fullName, setFullName] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -46,6 +47,11 @@ function Navbar() {
   const [showPICList, setShowPICList] = useState(false);
   const [picList, setPicList] = useState<any[]>([]);
   const [picLoading, setPicLoading] = useState(false);
+
+  const [accountData, setAccountData] = useState<any>(null);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -301,17 +307,126 @@ function Navbar() {
     fetchPICList();
   };
 
+  // Update the fetchAccountData function
+  const fetchAccountData = async () => {
+    if (!user) return;
+
+    try {
+      console.log("Trying to fetch account data for user:", user.id);
+      
+      // Create default data that always works
+      const userInitials = (fullName || user.email?.split('@')[0] || 'U').charAt(0).toUpperCase();
+      
+      // Default data without using email
+      const defaultData = {
+        full_name: fullName || 'User',
+        nickname: 'Add your nickname',
+        role: userRole || 'user',
+        profile_pic: 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif'
+      };
+      
+      // Set default data first so UI is never empty
+      setAccountData(defaultData);
+      
+      // Fetch profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (profileError) {
+        console.error('Error fetching profile data:', profileError);
+        return;
+      }
+      
+      // Combine data from profile
+      if (profileData) {
+        console.log("PROFILE DATA:", JSON.stringify(profileData, null, 2));
+        console.log("PROFILE PIC URL TYPE:", typeof profileData.profile_pic);
+        console.log("PROFILE PIC URL VALUE:", profileData.profile_pic);
+        
+        // Ensure the URL is properly formatted
+        const formattedPicUrl = profileData.profile_pic && profileData.profile_pic.trim();
+        console.log("FORMATTED URL:", formattedPicUrl);
+        
+        // Get profile_pic from the "account" table instead
+        let { data: accountData, error: accountError } = await supabase
+          .from('account')
+          .select('*')
+          .eq('id', user.id)  // Try the id column first
+          .single();
+          
+        // If that doesn't work, try this alternative approach:
+        if (!accountData || accountError) {
+          const { data: altAccountData, error: altAccountError } = await supabase
+            .from('account')
+            .select('*')
+            .eq('user_id', user.id)  // Try the user_id column
+            .single();
+            
+          if (altAccountData) {
+            console.log("Found account data via user_id:", altAccountData);
+            // Use this data instead
+            accountData = altAccountData;
+            accountError = null;
+          }
+        }
+        
+        let profilePicUrl = defaultData.profile_pic;
+        
+        // Use account table's profile_pic if available
+        if (accountData && accountData.profile_pic) {
+          profilePicUrl = accountData.profile_pic;
+          console.log("Using account table profile pic:", profilePicUrl);
+        }
+        
+        setAccountData({
+          ...defaultData,
+          full_name: accountData?.full_name || profileData.full_name || defaultData.full_name,
+          profile_pic: profilePicUrl,
+          role: accountData?.role || userRole || 'user',
+          nickname: accountData?.nickname || defaultData.nickname
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching account data:', error);
+      // Error handling is already done with default data
+    }
+  };
+
+  // Fetch account data on component mount
+  useEffect(() => {
+    if (user) {
+      fetchAccountData();
+    }
+  }, [user]);
+
+  // Handle clicks outside account dropdown to close it
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) {
+        setShowAccountDropdown(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const getPublicImageUrl = (url: string) => {
+    if (!url) return '';
+    
+    console.log('Original profile_pic URL:', url); // Add this for debugging
+    
+    // Simplify the approach - direct return for testing
+    return url;
+  };
+
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
-      {/* Only show greeting on desktop (lg screens and up) */}
-      <div className="group hidden lg:block">
-        <a href="https://i.pinimg.com/736x/f4/7d/1a/f47d1a20470813af55020d51c4f5159a.jpg" target="_blank" rel="noopener noreferrer"> 
-          <div className="text-xl text-gray-600 group-hover:animate-bounce cursor-pointer">
-            Hello, {fullName}. Have a great day!
-          </div>
-        </a>
-      </div>
-
       {/* Mobile/Tablet Hamburger Menu (hidden on desktop) */}
       <div className="block lg:hidden w-full flex justify-end">
         <label className="event-wrapper">
@@ -322,6 +437,14 @@ function Navbar() {
             <span className="bottom bar-list"></span>
           </div>
           <section className="menu-container">
+            {/* My Account Menu Item */}
+            <div className="menu-list" onClick={() => setShowAccountDropdown(!showAccountDropdown)}>
+              <div className="flex items-center">
+                <User className="w-4 h-4 mr-2 text-indigo-600" />
+                <span>My Account</span>
+              </div>
+            </div>
+            
             {/* Audit Rating Menu Item */}
             <div className="menu-list" onClick={() => setShowAuditRating(true)}>
               <div className="flex items-center">
@@ -347,7 +470,7 @@ function Navbar() {
             {/* PIC List Menu Item */}
             <div className="menu-list" onClick={handleShowPICList}>
               <div className="flex items-center">
-                <Users className="w-2 h-2 mr-2 text-indigo-600" />
+                <Users className="w-4 h-4 mr-2 text-indigo-600" />
                 <span>PIC List</span>
               </div>
             </div>
@@ -358,7 +481,7 @@ function Navbar() {
               onClick={() => {
                 // Close the hamburger menu
                 const checkbox = document.querySelector('.event-wrapper-inp') as HTMLInputElement;
-                if (checkbox) checkbox.checked = true;
+                if (checkbox) checkbox.checked = false;
                 
                 // Show notifications panel
                 setShowNotifications(true);
@@ -381,11 +504,7 @@ function Navbar() {
             {/* Logout Menu Item */}
             <div className="menu-list" onClick={signOut}>
               <div className="flex items-center">
-                <svg className="w-4 h-4 mr-2 text-indigo-600" viewBox="0 0 512 512" fill="currentColor">
-                  <path 
-                    d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
-                  />
-                </svg>
+                <LogOut className="w-4 h-4 mr-2 text-indigo-600" />
                 <span>Logout</span>
               </div>
             </div>
@@ -482,7 +601,7 @@ function Navbar() {
       )}
 
       {/* Desktop Buttons (hidden on mobile/tablet) */}
-      <div className="hidden lg:flex items-center space-x-6">
+      <div className="hidden lg:flex items-center space-x-6 ml-auto">
         {/* Audit Rating */}
         <button
           onClick={() => setShowAuditRating(true)}
@@ -566,6 +685,7 @@ function Navbar() {
             )}
           </button>
 
+          {/* Notifications Dropdown - keep existing code */}
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg z-50">
               <div className="p-4 border-b flex justify-between items-center">
@@ -650,26 +770,94 @@ function Navbar() {
           )}
         </div>
 
-        {/* Logout */}
-        <button
-          onClick={signOut}
-          className="group flex items-center justify-start w-8 h-8 bg-indigo-500 rounded-full cursor-pointer relative overflow-hidden transition-all duration-200 shadow-lg hover:w-24 hover:rounded-lg active:translate-x-1 active:translate-y-1"
-        >
-          <div
-            className="flex items-center justify-center w-full transition-all duration-300 group-hover:justify-start group-hover:px-2"
+        {/* Profile Button - New Component replacing Logout */}
+        <div className="relative" ref={accountDropdownRef}>
+          <button
+            onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+            className="flex items-center space-x-2 focus:outline-none"
           >
-            <svg className="w-3 h-3" viewBox="0 0 512 512" fill="white">
-              <path
-                d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
-              ></path>
-            </svg>
-          </div>
-          <div
-            className="absolute right-3 transform translate-x-full opacity-0 text-white text-sm font-semibold transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
-          >
-            Logout
-          </div>
-        </button>
+            {/* Profile Picture */}
+            <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-indigo-500 flex items-center justify-center bg-indigo-100">
+              <img 
+                src={accountData?.profile_pic}
+                alt={accountData?.full_name || 'Profile'} 
+                className="w-full h-full object-cover"
+                onLoad={() => console.log('Profile image loaded successfully:', accountData?.profile_pic)}
+                onError={(e) => {
+                  console.error('Profile image failed to load:', e.currentTarget.src);
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
+                }}
+              />
+            </div>
+            
+            {/* Tetap tampilkan nickname di navbar */}
+            <span className="text-sm font-medium text-gray-700 hidden md:block">
+              {accountData?.nickname || 'Account'}
+            </span>
+          </button>
+          
+          {/* Account Dropdown */}
+          {showAccountDropdown && (
+            <div className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-100">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center">
+                  {/* Profile Picture */}
+                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3 ring-2 ring-indigo-100 flex items-center justify-center bg-indigo-50">
+                    <img 
+                      src={accountData?.profile_pic || 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif'}
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                      onLoad={() => console.log('Dropdown profile image loaded successfully')}
+                      onError={(e) => {
+                        console.log('Dropdown profile image failed, using fallback');
+                        e.currentTarget.onerror = null; 
+                        e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
+                      }}
+                    />
+                  </div>
+                  
+                  {/* User Info */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {accountData?.full_name || fullName || 'User'}
+                    </p>
+                    <p className="text-xs font-medium text-indigo-600 capitalize">
+                      {accountData?.role || userRole || 'User'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Account Options */}
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setShowAccountDropdown(false);
+                    setShowAccountSettings(true);
+                  }}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                >
+                  <Settings className="w-4 h-4 mr-2 text-gray-500" />
+                  Account Settings
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowAccountDropdown(false);
+                    signOut();
+                  }}
+                  className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left flex items-center"
+                >
+                  <LogOut className="w-4 h-4 mr-2 text-red-500" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Remove the existing logout button */}
       </div>
 
       {showFullMessage && selectedNotification && (
@@ -703,143 +891,166 @@ function Navbar() {
 
       {showRCMSearch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 relative mx-4">
-            <Button
-              onClick={() => setShowRCMSearch(false)}
-              variant="ghost"
-              size="sm"
-              className="absolute top-2 right-2 p-1"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <h4 className="font-semibold text-lg mb-4">Search Matriks</h4>
-            
-            {/* Updated search form with new style */}
-            <form 
-              onSubmit={handleRCMSearch} 
-              className={`relative flex items-center w-full max-w-lg mx-auto h-[40px] px-3 bg-gray-50 rounded-[120px] transition-all duration-500 focus-within:rounded-[1px] group mb-4 ${rcmQuery ? 'has-text' : ''}`}
-            >
-              {/* Search Button */}
-              <button 
-                type="submit" 
-                className="text-[#8b8ba7] hover:text-indigo-600 transition-colors duration-200"
-                disabled={rcmLoading}
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <h4 className="font-semibold text-lg">Search Matriks</h4>
+              <Button
+                onClick={() => setShowRCMSearch(false)}
+                variant="ghost"
+                size="sm"
+                className="p-1"
               >
-                {rcmLoading ? (
-                  <div className="animate-spin w-[17px] h-[17px]">
-                    <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="32" strokeDashoffset="32">
-                        <animate attributeName="stroke-dasharray" dur="2s" values="0 64;32 32;0 64" repeatCount="indefinite"/>
-                        <animate attributeName="stroke-dashoffset" dur="2s" values="0;-32;-64" repeatCount="indefinite"/>
-                      </circle>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Search Form */}
+            <div className="px-6 py-4 border-b">
+              <form 
+                onSubmit={handleRCMSearch} 
+                className={`relative flex items-center w-full max-w-lg mx-auto h-[40px] px-3 bg-gray-50 rounded-[120px] transition-all duration-500 focus-within:rounded-[1px] group ${rcmQuery ? 'has-text' : ''}`}
+              >
+                {/* Search Button */}
+                <button 
+                  type="submit" 
+                  className="text-[#8b8ba7] hover:text-indigo-600 transition-colors duration-200"
+                  disabled={rcmLoading}
+                >
+                  {rcmLoading ? (
+                    <div className="animate-spin w-[17px] h-[17px]">
+                      <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="32" strokeDashoffset="32">
+                          <animate attributeName="stroke-dasharray" dur="2s" values="0 64;32 32;0 64" repeatCount="indefinite"/>
+                          <animate attributeName="stroke-dashoffset" dur="2s" values="0;-32;-64" repeatCount="indefinite"/>
+                        </circle>
+                      </svg>
+                    </div>
+                  ) : (
+                    <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="search">
+                      <path d="M7.667 12.667A5.333 5.333 0 107.667 2a5.333 5.333 0 000 10.667zM14.334 14l-2.9-2.9" stroke="currentColor" strokeWidth="1.333" strokeLinecap="round" strokeLinejoin="round"></path>
                     </svg>
+                  )}
+                </button>
+
+                {/* Input */}
+                <input
+                  ref={rcmInputRef}
+                  type="text"
+                  value={rcmQuery}
+                  onChange={e => setRcmQuery(e.target.value)}
+                  required
+                  placeholder="Search matriks data..."
+                  className="flex-1 h-full px-2 py-[0.7em] text-sm bg-transparent border-none placeholder-gray-400 focus:outline-none"
+                  disabled={rcmLoading}
+                />
+
+                {/* Reset Button */}
+                <button 
+                  type="button"
+                  onClick={() => setRcmQuery('')}
+                  className={`opacity-0 invisible transition-opacity duration-200 ${rcmQuery ? 'opacity-100 visible' : ''}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-[17px] h-[17px] mt-[3px] text-gray-400 hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+
+                {/* Animated Border */}
+                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-indigo-500 scale-x-0 origin-center transition-transform duration-300 group-focus-within:scale-x-100 rounded-sm"></span>
+              </form>
+            </div>
+
+            {/* Results Container */}
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-y-auto px-6 py-4">
+                {rcmLoading ? (
+                  <div className="flex justify-center items-center py-10">
+                    <div id="wifi-loader">
+                      <svg className="circle-outer" viewBox="0 0 86 86">
+                        <circle className="back" cx="43" cy="43" r="40"></circle>
+                        <circle className="front" cx="43" cy="43" r="40"></circle>
+                        <circle className="new" cx="43" cy="43" r="40"></circle>
+                      </svg>
+                      <svg className="circle-middle" viewBox="0 0 60 60">
+                        <circle className="back" cx="30" cy="30" r="27"></circle>
+                        <circle className="front" cx="30" cy="30" r="27"></circle>
+                      </svg>
+                      <svg className="circle-inner" viewBox="0 0 34 34">
+                        <circle className="back" cx="17" cy="17" r="14"></circle>
+                        <circle className="front" cx="17" cy="17" r="14"></circle>
+                      </svg>
+                      <div className="text" data-text="Searching"></div>
+                    </div>
+                  </div>
+                ) : rcmResults.length === 0 ? (
+                  <div className="text-gray-500 text-center py-8">
+                    {rcmQuery ? 'Tidak ada hasil ditemukan' : 'Masukkan kata kunci untuk mencari data matriks'}
                   </div>
                 ) : (
-                  <svg width="17" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="search">
-                    <path d="M7.667 12.667A5.333 5.333 0 107.667 2a5.333 5.333 0 000 10.667zM14.334 14l-2.9-2.9" stroke="currentColor" strokeWidth="1.333" strokeLinecap="round" strokeLinejoin="round"></path>
-                  </svg>
+                  <div className="space-y-4">
+                    {rcmResults.map((row, idx) => (
+                      <div key={row.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                        <div className="font-semibold text-gray-900 mb-2">{row.judul_temuan}</div>
+                        <div className="flex items-center gap-2 text-xs mb-2">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{row.kc_kr_kp}</span>
+                          <span
+                            className={`px-2 py-1 rounded font-medium ${
+                              row.kategori?.toLowerCase() === "major"
+                                ? "bg-red-100 text-red-700"
+                                : row.kategori?.toLowerCase() === "moderate"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : row.kategori?.toLowerCase() === "minor"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {row.kategori}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-2">
+                          <span className="font-medium">Kode:</span> {row.kode_risk_issue}
+                        </div>
+                        <div className="text-sm text-gray-800 mb-2">{row.judul_risk_issue}</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">Penyebab:</span>
+                            <p className="text-gray-600 mt-1">{row.penyebab}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Dampak:</span>
+                            <p className="text-gray-600 mt-1">{row.dampak}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Kelemahan:</span>
+                            <p className="text-gray-600 mt-1">{row.kelemahan}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Rekomendasi:</span>
+                            <p className="text-gray-600 mt-1">{row.rekomendasi}</p>
+                          </div>
+                        </div>
+                        {(row.poin || row.jatuh_tempo) && (
+                          <div className="flex gap-4 mt-3 pt-3 border-t border-gray-200">
+                            {row.poin && (
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-700">Poin:</span>
+                                <span className="text-gray-600 ml-1">{row.poin}</span>
+                              </div>
+                            )}
+                            {row.jatuh_tempo && (
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-700">Jatuh Tempo:</span>
+                                <span className="text-gray-600 ml-1">{row.jatuh_tempo}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </button>
-
-              {/* Input */}
-              <input
-                ref={rcmInputRef}
-                type="text"
-                value={rcmQuery}
-                onChange={e => setRcmQuery(e.target.value)}
-                required
-                placeholder="Search matriks data..."
-                className="flex-1 h-full px-2 py-[0.7em] text-sm bg-transparent border-none placeholder-gray-400 focus:outline-none"
-                disabled={rcmLoading}
-              />
-
-              {/* Reset Button */}
-              <button 
-                type="button"
-                onClick={() => setRcmQuery('')}
-                className={`opacity-0 invisible transition-opacity duration-200 ${rcmQuery ? 'opacity-100 visible' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-[17px] h-[17px] mt-[3px] text-gray-400 hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-
-              {/* Animated Border */}
-              <span className="absolute bottom-0 left-0 w-full h-[2px] bg-indigo-500 scale-x-0 origin-center transition-transform duration-300 group-focus-within:scale-x-100 rounded-sm"></span>
-            </form>
-
-            <div className="max-h-96 overflow-y-auto">
-              {rcmLoading ? (
-                <div className="flex justify-center items-center py-10">
-                  <div id="wifi-loader">
-                    <svg className="circle-outer" viewBox="0 0 86 86">
-                      <circle className="back" cx="43" cy="43" r="40"></circle>
-                      <circle className="front" cx="43" cy="43" r="40"></circle>
-                      <circle className="new" cx="43" cy="43" r="40"></circle>
-                    </svg>
-                    <svg className="circle-middle" viewBox="0 0 60 60">
-                      <circle className="back" cx="30" cy="30" r="27"></circle>
-                      <circle className="front" cx="30" cy="30" r="27"></circle>
-                    </svg>
-                    <svg className="circle-inner" viewBox="0 0 34 34">
-                      <circle className="back" cx="17" cy="17" r="14"></circle>
-                      <circle className="front" cx="17" cy="17" r="14"></circle>
-                    </svg>
-                    <div className="text" data-text="Searching"></div>
-                  </div>
-                </div>
-              ) : rcmResults.length === 0 ? (
-                <div className="text-gray-500 text-center">Tidak ada hasil</div>
-              ) : (
-                rcmResults.map((row, idx) => (
-                  <div key={row.id} className="border-b py-2 px-1">
-                    <div className="font-semibold">{row.judul_temuan}</div>
-                    <div className="text-xs mb-1">
-                      <span className="text-blue-500">{row.kc_kr_kp}</span>
-                      {" | "}
-                      <span
-                        className={
-                          row.kategori?.toLowerCase() === "major"
-                            ? "text-red-500"
-                            : row.kategori?.toLowerCase() === "moderate"
-                            ? "text-yellow-500"
-                            : row.kategori?.toLowerCase() === "minor"
-                            ? "text-green-500"
-                            : ""
-                        }
-                      >
-                        {row.kategori}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-600 mb-1">
-                      <span className="font-semibold">Kode:</span> {row.kode_risk_issue}
-                    </div>
-                    <div className="text-sm text-gray-700 mb-1">{row.judul_risk_issue}</div>
-                    <div className="text-xs text-gray-600 mb-1">
-                      <span className="font-semibold">Penyebab:</span> {row.penyebab}
-                    </div>
-                    <div className="text-xs text-gray-600 mb-1">
-                      <span className="font-semibold">Dampak:</span> {row.dampak}
-                    </div>
-                    <div className="text-xs text-gray-600 mb-1">
-                      <span className="font-semibold">Kelemahan:</span> {row.kelemahan}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      <span className="font-semibold">Rekomendasi:</span> {row.rekomendasi}
-                    </div>
-                    {row.poin && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        <span className="font-semibold">Poin:</span> {row.poin}
-                      </div>
-                    )}
-                    {row.jatuh_tempo && (
-                      <div className="text-xs text-gray-600">
-                        <span className="font-semibold">Jatuh Tempo:</span> {row.jatuh_tempo}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -847,12 +1058,16 @@ function Navbar() {
 
       {showAuditRating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 relative">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative overflow-hidden">
+            {/* Background accents - posisi yang lebih baik */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full opacity-60 transform translate-x-1/4 -translate-y-1/4"></div>
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-50 rounded-full opacity-60 transform -translate-x-1/4 translate-y-1/4"></div>
+            
             <Button
               onClick={() => setShowAuditRating(false)}
               variant="ghost"
               size="sm"
-              className="absolute top-2 right-2 p-1"
+              className="absolute top-2 right-2 p-1 z-10"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -940,6 +1155,12 @@ function Navbar() {
           </div>
         </div>
       )}
+
+      <AccountSettings 
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        onAccountUpdate={fetchAccountData} // This will refresh navbar data when account is updated
+      />
     </div>
   );
 }
