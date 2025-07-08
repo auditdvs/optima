@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Building2, ClipboardCheck, Users } from 'lucide-react';
+import { AlertTriangle, Building2, Users } from 'lucide-react';
 
 interface DashboardStatsProps {
   stats: {
@@ -89,8 +89,8 @@ const DashboardStats = ({
             <div className="flex-1">
               <p className="text-xm text-gray-600">Total fraud cases (staff)</p>
               <div className="flex flex-col leading-tight">
-                <span className="text-xl font-semibold">{stats.totalFraudulentBranches}</span>
-                <span className="text-[10px] text-gray-500">branches involved</span>
+                <span className="text-xl font-semibold">{stats.totalFraudCases}</span>
+                <span className="text-[10px] text-gray-500">{stats.totalFraudulentBranches} branches involved</span>
               </div>
             </div>
           </div>

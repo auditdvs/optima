@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 interface WorkPaper {
   id?: string;
   branch_name: string;
+  region?: string; // Add region field
   audit_start_date: string;
   audit_end_date: string;
   audit_type: 'regular' | 'fraud';
@@ -80,6 +81,7 @@ const QASection: React.FC = () => {
   const [inputterSummary, setInputterSummary] = useState<InputterSummary[]>([]);
   const [newWorkPaper, setNewWorkPaper] = useState<WorkPaper>({
     branch_name: '',
+    region: '', // Add region to initial state
     audit_start_date: '',
     audit_end_date: '',
     audit_type: 'regular',
@@ -106,6 +108,11 @@ const QASection: React.FC = () => {
   // Add these state variables near your other state declarations
   const [showAuditorDetails, setShowAuditorDetails] = useState(false);
   const [selectedAuditorDetails, setSelectedAuditorDetails] = useState<{ auditor_name: string }[]>([]);
+
+  // Add month filter state
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedRegion, setSelectedRegion] = useState<string>(''); // Add region filter state
 
   const auditorOptions: CheckboxOption[] = [
     { label: 'Andre Perkasa Ginting', value: 'andre' },
@@ -262,28 +269,64 @@ const QASection: React.FC = () => {
     
     try {
       setLoading(true);
-      // First, delete related auditor records
-      const { error: auditorsError } = await supabase
+      
+      // First, get all work_paper_auditor IDs for this work paper
+      const { data: existingAuditors, error: fetchError } = await supabase
+        .from('work_paper_auditors')
+        .select('id')
+        .eq('work_paper_id', workPaperToDelete);
+      
+      if (fetchError) {
+        console.error('Error fetching existing auditors:', fetchError);
+        throw fetchError;
+      }
+      
+      // Delete related audit_counts records first (if any exist)
+      if (existingAuditors && existingAuditors.length > 0) {
+        const auditorIds = existingAuditors.map(a => a.id);
+        
+        console.log('Deleting audit_counts for auditor IDs:', auditorIds);
+        
+        const { error: auditCountsDeleteError } = await supabase
+          .from('audit_counts')
+          .delete()
+          .in('work_paper_auditor_id', auditorIds);
+        
+        if (auditCountsDeleteError) {
+          console.error('Error deleting audit counts:', auditCountsDeleteError);
+          throw auditCountsDeleteError;
+        }
+      }
+      
+      // Now delete the work_paper_auditors
+      const { error: deleteError } = await supabase
         .from('work_paper_auditors')
         .delete()
         .eq('work_paper_id', workPaperToDelete);
-
-      if (auditorsError) throw auditorsError;
-
-      // Then delete the work paper
+        
+      if (deleteError) {
+        console.error('Error deleting work paper auditors:', deleteError);
+        throw deleteError;
+      }
+      
+      // Finally delete the work paper
       const { error: workPaperError } = await supabase
         .from('work_papers')
         .delete()
         .eq('id', workPaperToDelete);
 
-      if (workPaperError) throw workPaperError;
+      if (workPaperError) {
+        console.error('Error deleting work paper:', workPaperError);
+        throw workPaperError;
+      }
 
-      // Update state and show toast ONLY ONCE
+      // Update state and show toast
       setWorkPapers(workPapers.filter(wp => wp.id !== workPaperToDelete));
       toast.success('Work paper deleted successfully');
     } catch (error) {
       console.error('Error deleting work paper:', error);
-      toast.error('Failed to delete work paper');
+      debugError(error, 'confirmDelete');
+      toast.error('Failed to delete work paper. Check console for details.');
     } finally {
       setShowDeleteConfirmation(false);
       setWorkPaperToDelete(null);
@@ -320,7 +363,6 @@ const QASection: React.FC = () => {
       return;
     }
 
-
     try {
       setLoading(true);
       // Insert work paper
@@ -328,6 +370,7 @@ const QASection: React.FC = () => {
         .from('work_papers')
         .insert({
           branch_name: newWorkPaper.branch_name,
+          region: newWorkPaper.region, // Add region to insert
           audit_start_date: newWorkPaper.audit_start_date,
           audit_end_date: newWorkPaper.audit_end_date,
           audit_type: newWorkPaper.audit_type,
@@ -362,6 +405,7 @@ const QASection: React.FC = () => {
       await fetchWorkPapers();
       setNewWorkPaper({
         branch_name: '',
+        region: '', // Reset region
         audit_start_date: '',
         audit_end_date: '',
         audit_type: 'regular',
@@ -386,16 +430,72 @@ const QASection: React.FC = () => {
     }
   };
 
-  // Filter workPapers based on search term
+  // Filter workPapers based on search term, month/year, and region
   const filteredWorkPapers = workPapers.filter(wp => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       wp.branch_name.toLowerCase().includes(searchLower) ||
       wp.inputted_by.toLowerCase().includes(searchLower) ||
       wp.audit_type.toLowerCase().includes(searchLower) ||
-      (wp.fraud_staff && wp.fraud_staff.toLowerCase().includes(searchLower))
+      (wp.fraud_staff && wp.fraud_staff.toLowerCase().includes(searchLower)) ||
+      (wp.region && wp.region.toLowerCase().includes(searchLower)) // Add region to search
     );
+
+    // Month/Year filter
+    let matchesDate = true;
+    if (selectedMonth || selectedYear) {
+      const startDate = new Date(wp.audit_start_date);
+      const endDate = new Date(wp.audit_end_date);
+      
+      if (selectedYear) {
+        const year = parseInt(selectedYear);
+        const startYear = startDate.getFullYear();
+        const endYear = endDate.getFullYear();
+        matchesDate = matchesDate && (startYear === year || endYear === year);
+      }
+      
+      if (selectedMonth) {
+        const month = parseInt(selectedMonth);
+        const startMonth = startDate.getMonth() + 1; // getMonth() returns 0-11
+        const endMonth = endDate.getMonth() + 1;
+        matchesDate = matchesDate && (startMonth === month || endMonth === month);
+      }
+    }
+
+    // Region filter
+    const matchesRegion = !selectedRegion || wp.region === selectedRegion;
+
+    return matchesSearch && matchesDate && matchesRegion;
   });
+
+  // Get available years from work papers
+  const availableYears = Array.from(new Set(
+    workPapers.flatMap(wp => [
+      new Date(wp.audit_start_date).getFullYear(),
+      new Date(wp.audit_end_date).getFullYear()
+    ])
+  )).sort((a, b) => b - a);
+
+  // Get available regions from work papers
+  const availableRegions = Array.from(new Set(
+    workPapers.map(wp => wp.region).filter(region => region && region.trim() !== '')
+  )).sort();
+
+  const months = [
+    { value: '', label: 'All Months' },
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ];
 
   const handleEditWorkPaper = (id: string) => {
     // Find the work paper to edit
@@ -416,6 +516,17 @@ const QASection: React.FC = () => {
     }
   };
   
+  // Tambahkan fungsi debug
+  const debugError = (error: any, context: string) => {
+    console.group(`Error in ${context}:`);
+    console.log('Error object:', error);
+    console.log('Error message:', error?.message);
+    console.log('Error code:', error?.code);
+    console.log('Error details:', error?.details);
+    console.log('Error hint:', error?.hint);
+    console.groupEnd();
+  };
+
   const handleUpdateWorkPaper = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -444,51 +555,124 @@ const QASection: React.FC = () => {
     try {
       setLoading(true);
       
-      // Update the work paper - now including start and end dates
+      // Log current session for debugging
+      const { data: session } = await supabase.auth.getSession();
+      console.log('Current session:', session?.session?.user?.id);
+      
+      // Update the work paper only (tidak update auditors di sini)
+      const updateData: any = {
+        audit_start_date: workPaperToEdit.audit_start_date,
+        audit_end_date: workPaperToEdit.audit_end_date,
+        rating: workPaperToEdit.rating,
+        inputted_by: workPaperToEdit.inputted_by
+      };
+
+      // Only add region if it's not empty
+      if (workPaperToEdit.region && workPaperToEdit.region.trim() !== '') {
+        updateData.region = workPaperToEdit.region;
+      }
+
+      // Only add fraud fields if it's a fraud type
+      if (workPaperToEdit.audit_type === 'fraud') {
+        if (workPaperToEdit.fraud_amount) {
+          updateData.fraud_amount = workPaperToEdit.fraud_amount;
+        }
+        if (workPaperToEdit.fraud_staff) {
+          updateData.fraud_staff = workPaperToEdit.fraud_staff;
+        }
+      }
+
       const { error: workPaperError } = await supabase
         .from('work_papers')
-        .update({
-          audit_start_date: workPaperToEdit.audit_start_date,
-          audit_end_date: workPaperToEdit.audit_end_date,
-          fraud_amount: workPaperToEdit.fraud_amount,
-          fraud_staff: workPaperToEdit.fraud_staff,
-          rating: workPaperToEdit.rating,
-          inputted_by: workPaperToEdit.inputted_by
-        })
+        .update(updateData)
         .eq('id', workPaperToEdit.id);
         
-      if (workPaperError) throw workPaperError;
-      
-      // Handle auditors - unchanged code
-      const { error: deleteError } = await supabase
-        .from('work_paper_auditors')
-        .delete()
-        .eq('work_paper_id', workPaperToEdit.id);
-        
-      if (deleteError) throw deleteError;
-      
-      // Then insert new ones - unchanged code
-      if (workPaperToEdit.auditors.length > 0) {
-        const auditorInserts = workPaperToEdit.auditors.map(auditor => ({
-          work_paper_id: workPaperToEdit.id!,
-          auditor_name: auditor
-        }));
-        
-        const { error: auditorsError } = await supabase
-          .from('work_paper_auditors')
-          .insert(auditorInserts);
-          
-        if (auditorsError) throw auditorsError;
+      if (workPaperError) {
+        console.error('Work paper update error:', workPaperError);
+        throw workPaperError;
       }
       
-      // Rest of the function remains unchanged
+      // Handle auditors - HANYA jika ada perubahan auditor
+      const currentAuditors = workPapers.find(wp => wp.id === workPaperToEdit.id)?.work_paper_auditors?.map(a => a.auditor_name) || [];
+      const newAuditors = workPaperToEdit.auditors || [];
+      
+      // Check if auditors have changed
+      const auditorsChanged = JSON.stringify(currentAuditors.sort()) !== JSON.stringify(newAuditors.sort());
+      
+      if (auditorsChanged) {
+        // First, get existing work_paper_auditor IDs
+        const { data: existingAuditors, error: fetchError } = await supabase
+          .from('work_paper_auditors')
+          .select('id')
+          .eq('work_paper_id', workPaperToEdit.id);
+        
+        if (fetchError) {
+          console.error('Error fetching existing auditors:', fetchError);
+          throw fetchError;
+        }
+        
+        // Delete related audit_counts records first (if any exist)
+        if (existingAuditors && existingAuditors.length > 0) {
+          const auditorIds = existingAuditors.map(a => a.id);
+          
+          console.log('Deleting audit_counts for auditor IDs:', auditorIds);
+          
+          const { error: auditCountsDeleteError } = await supabase
+            .from('audit_counts')
+            .delete()
+            .in('work_paper_auditor_id', auditorIds);
+          
+          if (auditCountsDeleteError) {
+            console.error('Error deleting audit counts:', auditCountsDeleteError);
+            throw auditCountsDeleteError;
+          }
+        }
+        
+        // Now delete the work_paper_auditors
+        const { error: deleteError } = await supabase
+          .from('work_paper_auditors')
+          .delete()
+          .eq('work_paper_id', workPaperToEdit.id);
+          
+        if (deleteError) {
+          console.error('Error deleting work paper auditors:', deleteError);
+          throw deleteError;
+        }
+        
+        // Insert new auditors if any
+        if (newAuditors.length > 0) {
+          const auditorInserts = newAuditors.map(auditor => ({
+            work_paper_id: workPaperToEdit.id!,
+            auditor_name: auditor
+          }));
+          
+          const { error: auditorsError } = await supabase
+            .from('work_paper_auditors')
+            .insert(auditorInserts);
+            
+          if (auditorsError) {
+            console.error('Auditor insert error:', auditorsError);
+            throw auditorsError;
+          }
+        }
+      }
+      
+      // Refresh data and close modal
       await fetchWorkPapers();
       setIsEditModalOpen(false);
       setWorkPaperToEdit(null);
       toast.success('Work paper updated successfully!');
     } catch (error) {
-      console.error('Error updating work paper:', error);
-      toast.error('Failed to update work paper');
+      debugError(error, 'handleUpdateWorkPaper');
+      
+      // More detailed error message
+      if (error && typeof error === 'object' && 'message' in error) {
+        toast.error(`Failed to update work paper: ${error.message}`);
+      } else if (error && typeof error === 'object' && 'code' in error) {
+        toast.error(`Database error (${error.code}): Please check console for details.`);
+      } else {
+        toast.error('Failed to update work paper. Please check console for details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -510,6 +694,15 @@ const QASection: React.FC = () => {
   const handleShowAuditors = (auditors: { auditor_name: string }[]) => {
     setSelectedAuditorDetails(auditors);
     setShowAuditorDetails(true);
+  };
+
+  // Add function to format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
+    return `${day}/${month}/${year}`;
   };
 
   if (!branches || branches.length < 1) {
@@ -554,10 +747,58 @@ const QASection: React.FC = () => {
 
       {/* Search bar and table container with shadcn styling */}
       <div className="rounded-md border shadow-sm">
-        {/* Table header with search and add button */}
+        {/* Table header with search, filters and add button */}
         <div className="bg-white p-4 border-b flex justify-between items-center">
           <h3 className="text-lg font-medium">Work Papers</h3>
           <div className="flex items-center space-x-4">
+            {/* Region Filter */}
+            <div className="w-32">
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="">All Regions</option>
+                {availableRegions.map(region => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Month Filter */}
+            <div className="w-32">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                {months.map(month => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Year Filter */}
+            <div className="w-24">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="">All Years</option>
+                {availableYears.map(year => (
+                  <option key={year} value={year.toString()}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search Input */}
             <div className="relative w-64">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -576,6 +817,8 @@ const QASection: React.FC = () => {
                 </button>
               )}
             </div>
+
+            {/* Add Button */}
             <button 
               onClick={() => setIsAddModalOpen(true)}
               className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
@@ -591,6 +834,7 @@ const QASection: React.FC = () => {
             <thead>
               <tr className="bg-gray-50 text-left border-b">
                 <th className="p-3 font-medium text-gray-600">Branch</th>
+                <th className="p-3 font-medium text-gray-600">Region</th>
                 <th className="p-3 font-medium text-gray-600">Start Date</th>
                 <th className="p-3 font-medium text-gray-600">End Date</th>
                 <th className="p-3 font-medium text-gray-600">Type</th>
@@ -607,8 +851,9 @@ const QASection: React.FC = () => {
                 filteredWorkPapers.map((wp) => (
                   <tr key={wp.id} className="hover:bg-gray-50 bg-white">
                     <td className="p-3 text-gray-700">{wp.branch_name}</td>
-                    <td className="p-3 text-gray-700">{wp.audit_start_date}</td>
-                    <td className="p-3 text-gray-700">{wp.audit_end_date}</td>
+                    <td className="p-3 text-gray-700">{wp.region || '-'}</td>
+                    <td className="p-3 text-gray-700">{formatDate(wp.audit_start_date)}</td>
+                    <td className="p-3 text-gray-700">{formatDate(wp.audit_end_date)}</td>
                     <td className="p-3 text-gray-700">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         wp.audit_type === 'fraud' 
@@ -668,8 +913,8 @@ const QASection: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={10} className="p-4 text-center text-gray-500">
-                    {searchTerm ? 'No results found for your search' : 'No work papers available'}
+                  <td colSpan={11} className="p-4 text-center text-gray-500">
+                    {searchTerm || selectedMonth || selectedYear || selectedRegion ? 'No results found for your filters' : 'No work papers available'}
                   </td>
                 </tr>
               )}
@@ -705,8 +950,25 @@ const QASection: React.FC = () => {
                   className="border p-2 rounded w-full bg-gray-100"
                 />
               </div>
+
+              {/* Region - Editable */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Region
+                </label>
+                <input 
+                  type="text" 
+                  value={workPaperToEdit.region || ''} 
+                  onChange={(e) => setWorkPaperToEdit({
+                    ...workPaperToEdit,
+                    region: e.target.value
+                  })}
+                  placeholder="Enter region"
+                  className="border p-2 rounded w-full"
+                />
+              </div>
               
-              {/* Dates - Editable now */}
+              {/* Dates - Editable */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -964,6 +1226,17 @@ const QASection: React.FC = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+                <input
+                  type="text"
+                  placeholder="Enter region"
+                  value={newWorkPaper.region || ''}
+                  onChange={(e) => setNewWorkPaper({...newWorkPaper, region: e.target.value})}
+                  className="border p-2 rounded w-full"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

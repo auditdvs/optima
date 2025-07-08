@@ -11,9 +11,11 @@ import {
   Mail,
   MapPinPlus,
   Megaphone,
+  Settings,
   Table2,
   UserCog,
   Users,
+  ScanFace,
   Wrench
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -37,6 +39,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
     { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
     { path: '/update-location', icon: MapPinPlus, label: 'Branch Location' },
     { path: '/email-address', icon: Mail, label: 'Email Address Branch' },
+    { path: '/account-settings', icon: ScanFace, label: 'Profiles' },
   ];
   
   // super admin, qa, manager dan dvs

@@ -1,6 +1,7 @@
 import { AlignStartVertical, ChartNoAxesColumn, LogOut, Settings, User, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 import dvs1Icon from '../assets/dvs-1.png';
 import dvs2Icon from '../assets/dvs-2.png';
 import managerIcon from '../assets/manager.png';
@@ -29,6 +30,8 @@ interface Notification {
 
 function Navbar() {
   const { signOut, user, userRole } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -423,6 +426,14 @@ function Navbar() {
     
     // Simplify the approach - direct return for testing
     return url;
+  };
+
+  const handleAccountSettingsClick = () => {
+    // Close the dropdown
+    setShowAccountDropdown(false);
+    
+    // Navigate to the account settings page instead of showing modal
+    navigate('/account-settings');
   };
 
   return (
@@ -832,13 +843,10 @@ function Navbar() {
               {/* Account Options */}
               <div className="py-1">
                 <button
-                  onClick={() => {
-                    setShowAccountDropdown(false);
-                    setShowAccountSettings(true);
-                  }}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                  onClick={handleAccountSettingsClick}
+                  className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <Settings className="w-4 h-4 mr-2 text-gray-500" />
+                  <Settings className="mr-2 h-4 w-4" />
                   Account Settings
                 </button>
                 

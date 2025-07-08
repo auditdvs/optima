@@ -5,11 +5,13 @@ import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-d
 import { ToastContainer } from 'react-toastify';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
+import GrammarCorrectionPage from './pages/GrammarCorrectionPage';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
 import NotificationHistory from './pages/NotificationHistory';
@@ -21,7 +23,6 @@ import RiskDashboard from './pages/RiskDashboard';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UpdateLocation from './pages/UpdateLocation';
-import GrammarCorrectionPage from './pages/GrammarCorrectionPage';
 
 const queryClient = new QueryClient();
 
@@ -119,6 +120,14 @@ function App() {
                   <GrammarCorrectionPage />
                 </PrivateRoute>
               } />
+              <Route 
+                path="account-settings" // Remove the leading slash to match other routes
+                element={
+                  <PrivateRoute>
+                    <AccountSettingsPage />
+                  </PrivateRoute>
+                } 
+              />
             </Route>
           </Routes>
           <ToastContainer position="top-right" autoClose={5000} />

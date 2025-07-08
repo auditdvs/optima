@@ -417,7 +417,7 @@ const Dashboard = () => {
         // Cari id dan nama standar auditor
         const auditorId = auditorIdMap[auditorName];
         const standardName = auditorNameMap[auditorName];
-        
+
         if (!auditorId || !standardName) return;
         
         // Buat kunci unik audit
@@ -537,18 +537,27 @@ const Dashboard = () => {
     workPapers.filter(wp => wp.audit_type === 'regular').map(wp => wp.branch_name)
   );
 
+  // Update this section to use workPapers instead of fraudAuditCount
+  const uniqueFraudAudits = new Set<string>();
+  workPapers.forEach(wp => {
+    if (wp.audit_type === 'fraud') {
+      const uniqueKey = `${wp.branch_name}|${wp.audit_start_date}|${wp.audit_end_date}`;
+      uniqueFraudAudits.add(uniqueKey);
+    }
+  });
+
   const stats = {
     totalBranches: branches.length,
     auditedBranches: regularAuditedBranches.size,
     unauditedBranches: branches.length - regularAuditedBranches.size,
-    fraudAudits: fraudAuditCount,
+    fraudAudits: uniqueFraudAudits.size,
     annualAudits: workPapers.filter(wp => wp.audit_type === 'regular').length,
     totalAudits: workPapers.length,
     totalFraud: workPapers.reduce((sum, wp) => sum + (wp.fraud_amount || 0), 0),
     totalFraudCases: new Set(
       workPapers
         .filter(wp => wp.audit_type === 'fraud' && wp.fraud_staff)
-        .map(wp => wp.fraud_staff)
+        .map(wp => wp.fraud_staff)  // ← Ini menghitung unique staff names
     ).size,
     totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size
   };
@@ -735,6 +744,10 @@ const Dashboard = () => {
       regionMap[branch.region] = { regular: 0, fraud: 0 };
     });
 
+    // Create sets to track unique audits
+    const uniqueRegularAudits = new Set<string>();
+    const uniqueFraudAudits = new Set<string>();
+
     // Count audits by region
     workPapers.forEach(wp => {
       // Find the branch to get its region
@@ -746,10 +759,21 @@ const Dashboard = () => {
         regionMap[region] = { regular: 0, fraud: 0 };
       }
 
+      // Create unique key using branch_name, audit_start_date, and audit_end_date
+      const uniqueKey = `${wp.branch_name}|${wp.audit_start_date}|${wp.audit_end_date}`;
+
       if (wp.audit_type === 'regular') {
-        regionMap[region].regular += 1;
+        const regionalUniqueKey = `${region}|${uniqueKey}`;
+        if (!uniqueRegularAudits.has(regionalUniqueKey)) {
+          uniqueRegularAudits.add(regionalUniqueKey);
+          regionMap[region].regular += 1;
+        }
       } else if (wp.audit_type === 'fraud') {
-        regionMap[region].fraud += 1;
+        const regionalUniqueKey = `${region}|${uniqueKey}`;
+        if (!uniqueFraudAudits.has(regionalUniqueKey)) {
+          uniqueFraudAudits.add(regionalUniqueKey);
+          regionMap[region].fraud += 1;
+        }
       }
     });
 
@@ -1354,17 +1378,6 @@ const Dashboard = () => {
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-900">
                               {failedChecks}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-xs">
-                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
-                                audit.review === 'Completed' 
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {audit.review || 'Not Reviewed'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-xs">
                               <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
