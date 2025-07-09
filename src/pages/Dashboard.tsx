@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CartesianGrid, Label, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
+import CountUp from '../components/CountUp';
 import { BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
 import { FraudRow } from "../components/dashboard/TopFraudTable";
@@ -697,6 +698,7 @@ const Dashboard = () => {
   // State to manage selected month for the pie chart
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [chartInView, setChartInView] = useState(false);
 
   // Add this function to filter data by selected month
   const getFilteredPieData = () => {
@@ -951,74 +953,68 @@ const Dashboard = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-1 items-center pb-0 pt-0">
-                    <ChartContainer
-                      config={chartConfig}
-                      className="mx-auto my-auto aspect-square w-full max-w-[250px]"
-                    >
-                      <RadialBarChart
-                        data={getFilteredRadialData()}
-                        endAngle={180}
-                        innerRadius={80}
-                        outerRadius={130}
+                    <div className="relative mx-auto my-auto aspect-square w-full max-w-[250px]">
+                      <ChartContainer
+                        config={chartConfig}
+                        className="mx-auto my-auto aspect-square w-full max-w-[250px]"
                       >
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent hideLabel />}
-                        />
-                        <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                          <Label
-                            content={({ viewBox }) => {
-                              if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                                const data = getFilteredRadialData()[0];
-                                const totalAudits = data.annualAudits + data.fraudAudits;
-                                return (
-                                  <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                                    <tspan
-                                      x={viewBox.cx}
-                                      y={(viewBox.cy || 0) - 16}
-                                      className="fill-foreground text-2xl font-bold"
-                                    >
-                                      {totalAudits.toLocaleString()}
-                                    </tspan>
-                                    <tspan
-                                      x={viewBox.cx}
-                                      y={(viewBox.cy || 0) + 4}
-                                      className="fill-muted-foreground"
-                                    >
-                                      Total Audits
-                                    </tspan>
-                                  </text>
-                                );
-                              }
-                            }}
+                        <RadialBarChart
+                          data={getFilteredRadialData()}
+                          endAngle={180}
+                          innerRadius={80}
+                          outerRadius={130}
+                        >
+                          <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent hideLabel />}
                           />
-                        </PolarRadiusAxis>
-                        <RadialBar
-                          dataKey="annualAudits"
-                          stackId="a"
-                          cornerRadius={5}
-                          fill="var(--color-annualAudits)"
-                          className="stroke-transparent stroke-2"
-                        />
-                        <RadialBar
-                          dataKey="fraudAudits"
-                          fill="var(--color-fraudAudits)"
-                          stackId="a"
-                          cornerRadius={5}
-                          className="stroke-transparent stroke-2"
-                        />
-                      </RadialBarChart>
-                    </ChartContainer>
+                          <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+                            {/* Remove the SVG label since we're using React overlay */}
+                          </PolarRadiusAxis>
+                          <RadialBar
+                            dataKey="annualAudits"
+                            stackId="a"
+                            cornerRadius={5}
+                            fill="var(--color-annualAudits)"
+                            className="stroke-transparent stroke-2"
+                          />
+                          <RadialBar
+                            dataKey="fraudAudits"
+                            fill="var(--color-fraudAudits)"
+                            stackId="a"
+                            cornerRadius={5}
+                            className="stroke-transparent stroke-2"
+                          />
+                        </RadialBarChart>
+                      </ChartContainer>
+                      
+                      {/* CountUp overlay positioned over the chart */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="text-center" style={{ marginTop: '-20px' }}>
+                          <CountUp 
+                            to={getFilteredRadialData()[0]?.annualAudits + getFilteredRadialData()[0]?.fraudAudits || 0}
+                            className="text-2xl font-bold"
+                            duration={2}
+                            separator=","
+                          />
+                          <div className="text-xs text-gray-500 mt-1">Total Audits</div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                   <CardFooter className="flex-col gap-2 text-sm">
                     <div className="flex items-center justify-center gap-4 text-xs">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-[#50C878]"></div>
-                        <span>Annual: {getFilteredRadialData()[0]?.annualAudits || 0}</span>
+                        <span className="flex items-center gap-1">
+                          Annual: <CountUp to={getFilteredRadialData()[0]?.annualAudits || 0} duration={1.5} delay={0.5} />
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-[#e74c3c]"></div>
-                        <span>Special: {getFilteredRadialData()[0]?.fraudAudits || 0}</span>
+                        <span className="flex items-center gap-1">
+                          Special: <CountUp to={getFilteredRadialData()[0]?.fraudAudits || 0} duration={1.5} delay={0.7} />
+                        </span>
                       </div>
                     </div>
                   </CardFooter>
@@ -1102,9 +1098,15 @@ const Dashboard = () => {
                               <TableRow key={`auditor-${auditor.auditor_id || idx}`}>
                                 <TableCell>{idx + 1}</TableCell>
                                 <TableCell>{auditor.auditor_name}</TableCell>
-                                <TableCell className="text-right">{auditor.regular}</TableCell>
-                                <TableCell className="text-right">{auditor.fraud}</TableCell>
-                                <TableCell className="text-right">{auditor.total}</TableCell>
+                                <TableCell className="text-right">
+                                  <CountUp to={auditor.regular} duration={1.5} delay={idx * 0.1} />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <CountUp to={auditor.fraud} duration={1.5} delay={idx * 0.1 + 0.2} />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <CountUp to={auditor.total} duration={1.5} delay={idx * 0.1 + 0.4} />
+                                </TableCell>
                               </TableRow>
                             ))}
                         </TableBody>
@@ -1133,10 +1135,14 @@ const Dashboard = () => {
                             <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
                               <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
                               <TableCell className="text-right py-1 px-2">
-                                <span className="text-green-600">{item.regular}</span>
+                                <span className="text-green-600">
+                                  <CountUp to={item.regular} duration={1.5} delay={index * 0.1} />
+                                </span>
                               </TableCell>
                               <TableCell className="text-right py-1 px-2">
-                                <span className="text-red-600">{item.fraud}</span>
+                                <span className="text-red-600">
+                                  <CountUp to={item.fraud} duration={1.5} delay={index * 0.1 + 0.2} />
+                                </span>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1160,10 +1166,14 @@ const Dashboard = () => {
                           <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
                             <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
                             <TableCell className="text-right py-1 px-2">
-                              <span className="text-green-600">{item.regular}</span>
+                              <span className="text-green-600">
+                                <CountUp to={item.regular} duration={1.5} delay={index * 0.1} />
+                              </span>
                             </TableCell>
                             <TableCell className="text-right py-1 px-2">
-                              <span className="text-red-600">{item.fraud}</span>
+                              <span className="text-red-600">
+                                <CountUp to={item.fraud} duration={1.5} delay={index * 0.1 + 0.2} />
+                              </span>
                             </TableCell>
                           </TableRow>
                         ))}

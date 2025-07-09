@@ -741,7 +741,7 @@ const PullRequest = () => {
                   value={formData.message}
                   onChange={(e) => setFormData({...formData, message: e.target.value})}
                   className="w-full p-2 border rounded min-h-[100px]"
-                  placeholder="e.g. reason why you can't get data from mdis or you can request a tools for supporting your data"
+                  placeholder=".... + reason why you can't get data from mdis or you can request a tools for supporting your data"
                   required
                 ></textarea>
               </div>

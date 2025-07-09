@@ -29,11 +29,28 @@ const AccountSettings = ({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
     if ((isOpen || isStandalone) && user) fetchAccountData();
+    // Fetch user role
+    if (user) fetchUserRole();
     // eslint-disable-next-line
   }, [isOpen, isStandalone, user]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setUserRole(data?.role || '');
+    } catch {
+      setUserRole('');
+    }
+  };
 
   const fetchAccountData = async () => {
     if (!user) return;
@@ -182,8 +199,8 @@ const AccountSettings = ({
   if (!isOpen && !isStandalone) return null;
 
   return (
-    <div className="h-full flex items-center w-full">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-8 py-12 w-full max-w-[600px] min-h-[600px] flex flex-col items-center">
+    <div className="h-full flex items-stretch w-full">
+  <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-8 py-12 w-full max-w-[600px] h-full flex flex-col items-center">
         <h1 className="text-2xl font-bold mb-3 mt-0 w-full text-center">Profile Settings</h1>
         <div className="flex flex-col items-center w-full max-w-md mx-auto">
           {/* Foto profil */}
@@ -217,18 +234,29 @@ const AccountSettings = ({
               className="hidden"
             />
           </div>
-          <span className="text-xl text-gray-500 mb-4">Choose default profile</span>
-          <div className="flex justify-center space-x-3 mb-6 w-full">
-            {defaultProfilePics.map((url, idx) => (
-              <img
-              key={idx}
-              src={url}
-              alt={`Default ${idx + 1}`}
-              className={`w-24 h-24 rounded-full ring-2 cursor-pointer transition-all duration-150 ${accountData?.profile_pic === url ? 'ring-indigo-500' : 'ring-gray-200'} hover:ring-indigo-400`}
-              onClick={() => handleChooseDefaultPic(url)}
-              />
-            ))}
-            </div>
+          {/* Profile picture selection section */}
+          <div className="mt-4">
+  <p className="text-sm text-stone-600 mb-3 text-center">Choose default profile</p>
+  
+  {/* Update grid ini dengan responsive classes */}
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-full">
+    {defaultProfilePics.map((profile, index) => (
+      <div 
+        key={index}
+        className="relative aspect-square w-full max-w-[80px] mx-auto"
+        onClick={() => handleChooseDefaultPic(profile)}
+      >
+        <img
+          src={profile}
+          alt={`Profile option ${index + 1}`}
+          className={`rounded-full w-full h-full object-cover border-2 cursor-pointer transition-all ${
+            accountData?.profile_pic === profile ? 'border-blue-500 shadow-lg scale-105' : 'border-gray-200'
+          }`}
+        />
+      </div>
+    ))}
+  </div>
+</div>
           {/* Form container */}
           <div className="w-full max-w-md mx-auto flex flex-col items-center">
             {/* Nickname */}
@@ -332,6 +360,13 @@ const AccountSettings = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+        {/* Tambahkan teks kecil di bawah, hanya jika userRole bukan 'risk' */}
+        {userRole !== 'risk' && (
+          <div className="text-[8px] text-black text-center mt-4 mb-0">
+            fraud amount : optima<br />
+            administration : auditkomida
           </div>
         )}
       </div>

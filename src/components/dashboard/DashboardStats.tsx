@@ -1,5 +1,6 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Building2, Users } from 'lucide-react';
+import CountUp from '../CountUp';
+import { Card, CardContent } from '../ui/card';
 
 interface DashboardStatsProps {
   stats: {
@@ -38,10 +39,29 @@ const DashboardStats = ({
             <div className="flex-1">
               <p className="text-xm text-gray-600 mt-2 mb-0.5">Total Branches</p>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-semibold">{stats.totalBranches}</span>
+                <CountUp 
+                  to={stats.totalBranches} 
+                  className="text-2xl font-semibold"
+                  duration={1.5}
+                  separator=","
+                />
                 <div className="flex flex-col leading-tight">
-                  <span className="text-[11px] text-sky-600">{stats.auditedBranches} audited</span>
-                  <span className="text-[11px] text-rose-600">{stats.unauditedBranches} unaudited</span>
+                  <span className="text-[11px] text-sky-600 flex items-center gap-1">
+                    <CountUp 
+                      to={stats.auditedBranches} 
+                      duration={1.5}
+                      delay={0.3}
+                    />
+                    <span>audited</span>
+                  </span>
+                  <span className="text-[11px] text-rose-600 flex items-center gap-1">
+                    <CountUp 
+                      to={stats.unauditedBranches} 
+                      duration={1.5}
+                      delay={0.6}
+                    />
+                    <span>unaudited</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -89,8 +109,20 @@ const DashboardStats = ({
             <div className="flex-1">
               <p className="text-xm text-gray-600">Total fraud cases (staff)</p>
               <div className="flex flex-col leading-tight">
-                <span className="text-xl font-semibold">{stats.totalFraudCases}</span>
-                <span className="text-[10px] text-gray-500">{stats.totalFraudulentBranches} branches involved</span>
+                <CountUp 
+                  to={stats.totalFraudCases} 
+                  className="text-xl font-semibold"
+                  duration={1.5}
+                  delay={0.5}
+                />
+                <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <CountUp 
+                    to={stats.totalFraudulentBranches} 
+                    duration={1.5}
+                    delay={0.8}
+                  />
+                  <span>branches involved</span>
+                </span>
               </div>
             </div>
           </div>

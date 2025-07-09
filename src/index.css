@@ -6,6 +6,16 @@ html, body, #root {
   font-family: 'Poppins', system-ui, -apple-system, sans-serif !important;
 }
 
+/* Marquee animation */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 /* Rest of your existing CSS */
 @tailwind base;
 @tailwind components;
@@ -183,18 +193,21 @@ td[data-column-id="review"] {
 .marquee {
   overflow: hidden;
   width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 5%,
+    black 95%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to right,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 5%,
+    black 95%,
     transparent 100%
   );
 }
@@ -215,26 +228,26 @@ td[data-column-id="review"] {
 
 .marquee__group {
   display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
 }
 
 .marquee__group span {
-  margin: 0 1.5rem;
+  margin: 0 2rem;
   white-space: nowrap;
-  background: linear-gradient(to right, #1e40af, #7c3aed);
-  color: white;
-  padding: 6px 16px 6px 12px;
-  border-radius: 6px;
-  font-size: 1rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1d4ed8;
+  flex-shrink: 0;
 }
 
 @keyframes marquee {
   0% {
-    transform: translateX(0);
+    transform: translateX(0%);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translateX(-100%);
   }
 }
 

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { DateRange } from "react-day-picker";
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
+import CountUp from '../components/CountUp';
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Card, CardContent } from '../components/ui/card';
@@ -340,6 +341,7 @@ const ManagerDashboard = () => {
           audit_end_date,
           audit_type,
           fraud_amount,
+          fraud_staff,
           fraud_payments_audits (
             hkp_amount
           )
@@ -348,8 +350,15 @@ const ManagerDashboard = () => {
       // Count regular audits
       const regularAudits = workPapersData?.filter(wp => wp.audit_type === 'regular').length || 0;
 
-      // Count fraud cases from work_papers
-      const fraudCases = workPapersData?.filter(wp => wp.audit_type === 'fraud').length || 0;
+      // Count unique fraud staff (removing duplicates)
+      const uniqueFraudStaffSet = new Set();
+      workPapersData?.forEach(wp => {
+        if (wp.fraud_staff && wp.fraud_staff.trim() !== '') {
+          uniqueFraudStaffSet.add(wp.fraud_staff.trim().toLowerCase());
+        }
+      });
+      
+      const fraudCases = uniqueFraudStaffSet.size;
 
       // Fetch special audits from audit_fraud table where pic is not empty
       const { data: specialAuditsData } = await supabase
@@ -384,9 +393,9 @@ const ManagerDashboard = () => {
         totalBranches: branchesData?.length || 0,
         regularAudits,
         specialAudits,
-        fraudAudits: fraudCases,
+        fraudAudits: fraudCases, // This is the count of unique fraud staff
         totalAuditors: auditorsData?.length || 0,
-        totalFraud,
+        totalFraud, // This is the fraud amount in currency
         fraudRecovery,
         outstandingFraud
       });
@@ -1387,7 +1396,7 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Total Branch</p>
-                  <p className="text-base font-bold">{stats.totalBranches}</p>
+                  <p className="text-base font-bold"><CountUp to={stats.totalBranches} duration={1.5} /></p>
                 </div>
               </CardContent>
             </Card>
@@ -1400,9 +1409,15 @@ const ManagerDashboard = () => {
                 <div>
                   <p className="text-xs text-gray-600">Total Audit</p>
                   <div className="flex flex-col">
-                    <p className="text-xs text-green-600">{stats.regularAudits} Regular</p>
-                    <p className="text-xs text-blue-600">{stats.specialAudits} Special Audit</p>
-                    <p className="text-xs text-red-600">{stats.fraudAudits} Fraud Cases</p>
+                    <span className="text-xs text-green-500 font-semibold">
+                      <CountUp to={stats.regularAudits} duration={1.5} /> Regular
+                    </span>
+                    <span className="text-xs text-red-500 font-semibold">
+                      <CountUp to={stats.specialAudits} duration={1.5} /> Special Audit
+                    </span>
+                    <span className="text-xs text-yellow-500 font-semibold">
+                      <CountUp to={stats.fraudAudits || 0} duration={1.5} /> Fraud Cases
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -1421,7 +1436,7 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Total Auditors</p>
-                  <p className="text-base font-bold">{stats.totalAuditors}</p>
+                  <p className="text-base font-bold"><CountUp to={stats.totalAuditors} duration={1.5} /></p>
                 </div>
               </CardContent>
             </Card>
@@ -1433,7 +1448,7 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Total Fraud</p>
-                  <p className="text-base font-bold text-red-600">{formatCurrency(stats.totalFraud)}</p>
+                  <p className="text-base font-bold text-red-600"><CountUp to={stats.totalFraud} duration={1.5} prefix="Rp " separator="," /></p>
                 </div>
               </CardContent>
             </Card>
@@ -1445,7 +1460,7 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Fraud Recovery</p>
-                  <p className="text-base font-bold text-emerald-600">{formatCurrency(stats.fraudRecovery)}</p>
+                  <p className="text-base font-bold text-emerald-600"><CountUp to={stats.fraudRecovery} duration={1.5} prefix="Rp " separator="," /></p>
                 </div>
               </CardContent>
             </Card>
@@ -1457,7 +1472,7 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Outstanding Fraud</p>
-                  <p className="text-base font-bold text-yellow-600">{formatCurrency(stats.outstandingFraud)}</p>
+                  <p className="text-base font-bold text-yellow-600"><CountUp to={stats.outstandingFraud} duration={1.5} prefix="Rp " separator="," /></p>
                 </div>
               </CardContent>
             </Card>
@@ -1819,7 +1834,7 @@ const ManagerDashboard = () => {
                             }`}>
                               {audit.monitoring}
                             </span>
-                          </td>
+                            </td>
                           <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
                             {getFailedChecksWithAliases(audit, true)}
                           </td>
@@ -1857,8 +1872,7 @@ const ManagerDashboard = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Fraud Data</h2>
               <div className="relative">
-                <
-Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
                   value={fraudSearchTerm}
