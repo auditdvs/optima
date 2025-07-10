@@ -1,5 +1,6 @@
-/* Import Poppins font */
+/* Import Poppins and Roboto Flex fonts */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght,opsz,wdth@100..900,8..144,25..151&display=swap');
 
 /* Apply Poppins globally */
 html, body, #root {

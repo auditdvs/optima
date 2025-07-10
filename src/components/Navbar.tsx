@@ -487,28 +487,26 @@ function Navbar() {
             </div>
             
             {/* Notifications Menu Item */}
-            <div 
-              className="menu-list" 
-              onClick={() => {
-                // Close the hamburger menu
-                const checkbox = document.querySelector('.event-wrapper-inp') as HTMLInputElement;
-                if (checkbox) checkbox.checked = false;
-                
-                // Show notifications panel
-                setShowNotifications(true);
-                setHasNewNotification(false);
-              }}
-            >
+            <div className="menu-list" onClick={() => {
+              // Close the hamburger menu
+              const checkbox = document.querySelector('.event-wrapper-inp') as HTMLInputElement;
+              if (checkbox) checkbox.checked = false;
+              
+              // Show notifications panel
+              setShowNotifications(true);
+              setHasNewNotification(false);
+            }}>
               <div className="flex items-center">
-                <div className="bell-container mr-2">
-                  <div className="bell !border-indigo-600 !before:bg-indigo-600 !after:bg-indigo-600"></div>
-                </div>
-                <span>Notifications</span>
-                {unreadCount > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
+              {/* Ubah ukuran bell di sini: tambahkan w-5 h-5 (atau ukuran lain) */}
+              <div className="bell-container mr-4 w-8 h-8">
+                <div className="bell !border-indigo-600 !before:bg-indigo-600 !after:bg-indigo-600 w-5 h-5"></div>
+              </div>
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+                {unreadCount}
+                </span>
+              )}
               </div>
             </div>
             
@@ -612,29 +610,18 @@ function Navbar() {
       )}
 
       {/* Desktop Buttons (hidden on mobile/tablet) */}
-      <div className="hidden lg:flex items-center space-x-6 ml-auto">
+      <div className="hidden lg:flex items-center space-x-8 ml-auto">
         {/* Audit Rating */}
         <button
           onClick={() => setShowAuditRating(true)}
-          className="group overflow-hidden relative w-8 h-8 bg-indigo-500 rounded-full cursor-pointer z-10 flex items-center justify-center text-white shadow-lg hover:w-28 hover:rounded-lg transition-all duration-200 active:translate-x-1 active:translate-y-1"
+          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          title="Audit Rating"
         >
-          <AlignStartVertical className="w-4 h-4 group-hover:opacity-0 transition-opacity absolute" />
-          
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-white rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left"
-          ></span>
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-400 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left"
-          ></span>
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-600 rotate-12 transform scale-x-0 group-hover:scale-x-50 transition-transform group-hover:duration-1000 duration-500 origin-left"
-          ></span>
-          
-          <span
-            className="group-hover:opacity-100 opacity-0 text-sm font-medium transition-opacity group-hover:duration-1000 duration-100 z-10"
-          >
-            Audit Rating
-          </span>
+          {/* Chart Bar Icon (Heroicons) */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M8 17V9m4 8V5m4 12v-3" />
+          </svg>
+          <span className="text-sm font-medium">Audit Rating</span>
         </button>
 
         {/* RCM */}
@@ -643,38 +630,27 @@ function Navbar() {
             setShowRCMSearch(true);
             setTimeout(() => rcmInputRef.current?.focus(), 100);
           }}
-          className="group relative cursor-pointer outline-none border-none rounded-full flex flex-row items-center justify-center h-8 w-8 hover:!w-[75px] transition-all duration-[0.75s] before:content-[''] before:absolute before:w-full before:h-full before:inset-0 before:bg-[linear-gradient(130deg,#4f46e5,#6366f1_33%,#818cf8)] before:ring-2 before:ring-offset-2 before:ring-indigo-500 before:rounded-full before:transition before:duration-300 before:ring-offset-[#fff] hover:before:scale-105 active:before:scale-95 text-white"
+          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          title="RCM"
         >
-          <ChartNoAxesColumn className="absolute left-2 group-hover:left-1.5 group-active:left-[7px] duration-300 transition-[left] z-10 w-4 h-4 text-white" />
-          <span
-            className="absolute right-1.5 text-[13px] font-semibold [--w:calc(100%-32px)] w-[--w] max-w-[--w] overflow-hidden flex items-center justify-end -z-[1] group-hover:z-[9] pointer-events-none select-none opacity-0 group-hover:opacity-100 text-transparent group-hover:text-inherit group-active:right-2 transition-all duration-[2s] group-hover:duration-300 group-active:scale-[0.85]"
-          >
-            RCM
-          </span>
+          {/* Document Icon (Heroicons) */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z" />
+          </svg>
+          <span className="text-sm font-medium">RCM</span>
         </button>
 
         {/* PIC List */}
         <button
           onClick={handleShowPICList}
-          className="group overflow-hidden relative w-8 h-8 bg-indigo-500 rounded-full cursor-pointer z-10 flex items-center justify-center text-white shadow-lg hover:w-28 hover:rounded-lg transition-all duration-200 active:translate-x-1 active:translate-y-1"
+          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          title="PIC List"
         >
-          <Users className="w-4 h-4 group-hover:opacity-0 transition-opacity absolute" />
-          
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-white rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left"
-          ></span>
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-400 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left"
-          ></span>
-          <span
-            className="absolute w-36 h-32 -top-8 -left-2 bg-indigo-600 rotate-12 transform scale-x-0 group-hover:scale-x-50 transition-transform group-hover:duration-1000 duration-500 origin-left"
-          ></span>
-          
-          <span
-            className="group-hover:opacity-100 opacity-0 text-sm font-medium transition-opacity group-hover:duration-1000 duration-100 z-10"
-          >
-            PIC List
-          </span>
+          {/* Users Icon (Heroicons) */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0zm6 13v-2a4 4 0 00-3-3.87M6 7a4 4 0 100 8 4 4 0 000-8z" />
+          </svg>
+          <span className="text-sm font-medium">PIC List</span>
         </button>
 
         {/* Notifications */}
@@ -684,190 +660,271 @@ function Navbar() {
               setShowNotifications(!showNotifications);
               setHasNewNotification(false);
             }}
-            className="notification text-gray-600 hover:text-gray-900 relative"
+            className="relative flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+            title="Notifications"
           >
-            <div className="bell-container">
-              <div className="bell"></div>
-            </div>
+            {/* Bell Icon (Heroicons) */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-3.5 w-3.5 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
                 {unreadCount}
               </span>
             )}
           </button>
-
-          {/* Notifications Dropdown - keep existing code */}
+          {/* Desktop Notification Dropdown */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg z-50">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="font-semibold">Notifications</h3>
-                <div className="flex items-center gap-4">
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllAsRead}
-                      className="text-sm text-indigo-600 hover:text-indigo-800"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-                  <Button
-                    onClick={() => setShowNotifications(false)}
-                    variant="ghost"
-                    size="sm"
-                    className="p-1"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+            <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg z-50 border border-gray-100 max-h-[70vh] overflow-y-auto">
+              <div className="flex justify-between items-center px-4 py-3 border-b">
+                <span className="font-semibold">Notifications</span>
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-gray-400 hover:text-gray-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <div className="max-h-96 overflow-y-auto">
-                {notifications.filter(n => !n.read_by.includes(user?.id || '')).length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    No notifications
-                  </div>
+              <div>
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">No notifications</div>
                 ) : (
-                  notifications
-                    .filter(n => !n.read_by.includes(user?.id || ''))
-                    .map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="p-4 border-b hover:bg-gray-50 bg-blue-50"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-medium">{notification.title}</h4>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {notification.message.length > 80
-                                ? `${notification.message.slice(0, 80)}...`
-                                : notification.message}
-                            </p>
-                            {notification.message.length > 80 && (
-                              <button
-                                onClick={() => handleShowFullMessage(notification)}
-                                className="text-xs text-indigo-600 hover:underline mt-1"
-                              >
-                                See full message
-                              </button>
-                            )}
-                            {notification.attachment_url && (
-                              <a
-                                href={notification.attachment_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
-                              >
-
-                              </a>
-                            )}
-                            <p className="text-xs text-gray-400 mt-2">
-                              {new Date(notification.created_at).toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              Sent by: {notification.sender_name}
-                            </p>
-                          </div>
+                  notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-4 border-b hover:bg-gray-50 ${!notification.read_by.includes(user?.id) ? 'bg-blue-50' : ''}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{notification.title}</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {notification.message.length > 80
+                              ? `${notification.message.slice(0, 80)}...`
+                              : notification.message}
+                          </p>
+                          {notification.message.length > 80 && (
+                            <button
+                              onClick={() => handleShowFullMessage(notification)}
+                              className="text-xs text-indigo-600 hover:underline mt-1"
+                            >
+                              See full message
+                            </button>
+                          )}
+                          {notification.attachment_url && (
+                            <a
+                              href={notification.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+                            >
+                              {notification.attachment_name || 'View attachment'}
+                            </a>
+                          )}
+                          <p className="text-xs text-gray-400 mt-2">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Sent by: {notification.sender_name}
+                          </p>
+                        </div>
+                        {!notification.read_by.includes(user?.id) && (
                           <button
                             onClick={() => markNotificationAsRead(notification.id)}
                             className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 ml-4"
                           >
                             Mark as read
                           </button>
-                        </div>
+                        )}
                       </div>
-                    ))
+                    </div>
+                  ))
                 )}
               </div>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  className="w-full py-2 text-indigo-600 hover:text-indigo-800 text-sm border-t"
+                >
+                  Mark all as read
+                </button>
+              )}
             </div>
           )}
         </div>
-
-        {/* Profile Button - New Component replacing Logout */}
-        <div className="relative" ref={accountDropdownRef}>
-          <button
-            onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-            className="flex items-center space-x-2 focus:outline-none"
-          >
-            {/* Profile Picture */}
-            <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-indigo-500 flex items-center justify-center bg-indigo-100">
-              <img 
-                src={accountData?.profile_pic}
-                alt={accountData?.full_name || 'Profile'} 
-                className="w-full h-full object-cover"
-                onLoad={() => console.log('Profile image loaded successfully:', accountData?.profile_pic)}
-                onError={(e) => {
-                  console.error('Profile image failed to load:', e.currentTarget.src);
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
-                }}
-              />
-            </div>
-            
-            {/* Tetap tampilkan nickname di navbar */}
-            <span className="text-sm font-medium text-gray-700 hidden md:block">
-              {accountData?.nickname || 'Account'}
-            </span>
-          </button>
-          
-          {/* Account Dropdown */}
-          {showAccountDropdown && (
-            <div className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-100">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center">
-                  {/* Profile Picture */}
-                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3 ring-2 ring-indigo-100 flex items-center justify-center bg-indigo-50">
-                    <img 
-                      src={accountData?.profile_pic || 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif'}
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                      onLoad={() => console.log('Dropdown profile image loaded successfully')}
-                      onError={(e) => {
-                        console.log('Dropdown profile image failed, using fallback');
-                        e.currentTarget.onerror = null; 
-                        e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
-                      }}
-                    />
-                  </div>
-                  
-                  {/* User Info */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {accountData?.full_name || fullName || 'User'}
-                    </p>
-                    <p className="text-xs font-medium text-indigo-600 capitalize">
-                      {accountData?.role || userRole || 'User'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Account Options */}
-              <div className="py-1">
-                <button
-                  onClick={handleAccountSettingsClick}
-                  className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Account Settings
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setShowAccountDropdown(false);
-                    signOut();
-                  }}
-                  className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left flex items-center"
-                >
-                  <LogOut className="w-4 h-4 mr-2 text-red-500" />
-                  Logout
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Remove the existing logout button */}
       </div>
 
+      {/* Mobile/Tablet Notification Panel - keep existing code */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="bg-black bg-opacity-40 absolute inset-0" onClick={() => setShowNotifications(false)}></div>
+          <div className="absolute top-16 right-0 w-full sm:w-96 max-h-[80vh] bg-white rounded-b-lg shadow-lg overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="font-semibold">Notifications</h3>
+              <div className="flex items-center gap-4">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-sm text-indigo-600 hover:text-indigo-800"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+                <Button
+                  onClick={() => setShowNotifications(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="p-1"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="max-h-[calc(80vh-4rem)] overflow-y-auto">
+              {notifications.filter(n => !n.read_by.includes(user?.id || '')).length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  No notifications
+                </div>
+              ) : (
+                notifications
+                  .filter(n => !n.read_by.includes(user?.id || ''))
+                  .map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="p-4 border-b hover:bg-gray-50 bg-blue-50"
+                    >
+                      {/* Same notification content as in the desktop view */}
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{notification.title}</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {notification.message.length > 80
+                              ? `${notification.message.slice(0, 80)}...`
+                              : notification.message}
+                          </p>
+                          {notification.message.length > 80 && (
+                            <button
+                              onClick={() => handleShowFullMessage(notification)}
+                              className="text-xs text-indigo-600 hover:underline mt-1"
+                            >
+                              See full message
+                            </button>
+                          )}
+                          {notification.attachment_url && (
+                            <a
+                              href={notification.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+                            >
+
+                            </a>
+                          )}
+                          <p className="text-xs text-gray-400 mt-2">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Sent by: {notification.sender_name}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => markNotificationAsRead(notification.id)}
+                          className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 ml-4"
+                        >
+                          Mark as read
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Button - New Component replacing Logout */}
+      <div className="relative" ref={accountDropdownRef}>
+        <button
+          onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+          className="flex items-center space-x-2 focus:outline-none"
+        >
+          {/* Profile Picture */}
+          <div className="ml-2 w-8 h-8 rounded-full overflow-hidden ring-2 ring-indigo-500 flex items-center justify-center bg-indigo-100">
+            <img 
+              src={accountData?.profile_pic}
+              alt={accountData?.full_name || 'Profile'} 
+              className="w-full h-full object-cover"
+              onLoad={() => console.log('Profile image loaded successfully:', accountData?.profile_pic)}
+              onError={(e) => {
+                console.error('Profile image failed to load:', e.currentTarget.src);
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
+              }}
+            />
+          </div>
+          
+          {/* Tetap tampilkan nickname di navbar */}
+          <span className="text-sm font-medium text-gray-700 hidden md:block">
+            {accountData?.nickname || 'Account'}
+          </span>
+        </button>
+        
+        {/* Account Dropdown */}
+        {showAccountDropdown && (
+          <div className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-100">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center">
+                {/* Profile Picture */}
+                <div className="w-10 h-10 rounded-full overflow-hidden mr-3 ring-2 ring-indigo-100 flex items-center justify-center bg-indigo-50">
+                  <img 
+                    src={accountData?.profile_pic || 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif'}
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                    onLoad={() => console.log('Dropdown profile image loaded successfully')}
+                    onError={(e) => {
+                      console.log('Dropdown profile image failed, using fallback');
+                      e.currentTarget.onerror = null; 
+                      e.currentTarget.src = 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif';
+                    }}
+                  />
+                </div>
+                
+                {/* User Info */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {accountData?.full_name || fullName || 'User'}
+                  </p>
+                  <p className="text-xs font-medium text-indigo-600 capitalize">
+                    {accountData?.role || userRole || 'User'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Account Options */}
+            <div className="py-1">
+              <button
+                onClick={handleAccountSettingsClick}
+                className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Account Settings
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowAccountDropdown(false);
+                  signOut();
+                }}
+                className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left flex items-center"
+              >
+                <LogOut className="w-4 h-4 mr-2 text-red-500" />
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      
       {showFullMessage && selectedNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
@@ -1087,79 +1144,69 @@ function Navbar() {
       {/* PIC List Modal */}
       {showPICList && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="pic-list-container rounded-lg shadow-lg max-w-6xl w-full p-6 relative">
-            {/* Background waves */}
-            <div className="background-wave"></div>
-            <div className="background-wave"></div>
-            <div className="background-wave"></div>
-            
-            {/* Modal content */}
-            <div className="pic-content">
-              {/* Replace the current close button in the PIC List modal */}
-              <Button
-                onClick={() => setShowPICList(false)}
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2 p-1"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <h4 className="font-semibold text-lg mb-4 text-indigo-900">PIC List</h4>
-              
-              {picLoading ? (
-                <div className="flex justify-center items-center py-10">
-                  <div id="wifi-loader">
-                    {/* Loader content */}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8 p-4">
-                  {picList.length === 0 ? (
-                    <div className="col-span-full text-center text-gray-500">No PIC data available</div>
-                  ) : (
-                    picList.map((pic) => (
-                      <div key={pic.id} className="flex justify-center">
-                        <div className="e-card playing">
-                          <div className="wave"></div>
-                          <div className="wave"></div>
-                          <div className="wave"></div>
-                          
-                          <div className="infotop">
-                            {/* Conditional rendering based on name/position */}
-                            {(() => {
-                              // Determine which image to use
-                              let iconSrc;
-                              if (pic.nama === "Ganjar Raharja") {
-                                iconSrc = dvs1Icon;
-                              } else if (pic.nama === "Dede Yudha N") {
-                                iconSrc = dvs2Icon;
-                              } else if (pic.posisi === "QA" || pic.posisi.includes("QA")) {
-                                iconSrc = qaIcon;
-                              } else if (pic.nama === "M Afan") {
-                                iconSrc = managerIcon;
-                              } else {
-                                iconSrc = pic.posisi === "Manager" ? managerIcon : qaIcon;
-                              }
-                              
-                              return (
-                                <div className="icon-container">
-                                  <img src={iconSrc} alt={pic.posisi} className="icon" />
-                                </div>
-                              );
-                            })()}
-                            <br />
-                            <div className="font-semibold text-white mb-4">
-                              {pic.nama || 'Name'} - {pic.posisi || 'Position'}
-                            </div>
-                            <div className="pic-area">{pic.pic_area || 'Area'}</div>
-                          </div>
-                        </div>
+          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full p-8 relative">
+            <Button
+              onClick={() => setShowPICList(false)}
+              variant="ghost"
+              size="sm"
+              className="absolute top-4 right-4 p-1"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <h4 className="font-semibold text-2xl mb-6 text-indigo-900 text-center">PIC List</h4>
+            {picLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <div id="wifi-loader">{/* Loader content */}</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {picList.length === 0 ? (
+                  <div className="col-span-full text-center text-gray-500">No PIC data available</div>
+                ) : (
+                  picList.map((pic) => {
+                    let iconSrc;
+                    if (pic.nama === "Ganjar Raharja") {
+                      iconSrc = dvs1Icon;
+                    } else if (pic.nama === "Dede Yudha N") {
+                      iconSrc = dvs2Icon;
+                    } else if (pic.posisi === "QA" || pic.posisi?.includes("QA")) {
+                      iconSrc = qaIcon;
+                    } else if (pic.nama === "M Afan") {
+                      iconSrc = managerIcon;
+                    } else {
+                      iconSrc = pic.posisi === "Manager" ? managerIcon : qaIcon;
+                    }
+
+                    // Status badge color
+                    let statusColor = "bg-gray-300 text-gray-700";
+                    if (pic.status?.toLowerCase() === "aktif" || pic.status?.toLowerCase() === "active") {
+                      statusColor = "bg-green-100 text-green-700";
+                    } else if (pic.status?.toLowerCase() === "nonaktif" || pic.status?.toLowerCase() === "inactive") {
+                      statusColor = "bg-red-100 text-red-700";
+                    }
+
+                    return (
+                      <div key={pic.id} className="bg-white border rounded-lg p-5 flex flex-col items-center shadow-sm">
+                        <img
+                          src={iconSrc}
+                          alt={pic.posisi}
+                          className="w-16 h-16 object-contain mb-3 rounded-full border border-indigo-100 bg-white"
+                        />
+                        <div className="font-semibold text-gray-900 text-center">{pic.nama || '-'}</div>
+                        {/* Status badge */}
+                        {pic.status && (
+                          <span className={`mt-1 mb-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                            {pic.status}
+                          </span>
+                        )}
+                        <div className="text-sm text-indigo-600 mb-1 text-center">{pic.posisi || '-'}</div>
+                        <div className="text-xs text-gray-500 text-center">{pic.pic_area || '-'}</div>
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

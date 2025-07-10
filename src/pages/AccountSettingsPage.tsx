@@ -515,18 +515,6 @@ const AccountSettingsPage = () => {
     <div className="px-1 py-1 w-full">
       <h1 className="text-2xl font-semibold text-gray-900 mb-4">Profile and Total Recap Data Audits</h1>
       
-      {/* Total Statistics dengan 4 kolom */}
-      {showAuditSections && (
-        <TotalStatsContainer
-          totalRegular={totalRegular}
-          totalFraud={totalFraud}
-          totalAudits={totalAudits}
-          sisaTarget={sisaTarget}
-          targetColor={targetColor}
-          loading={loadingStats}
-        />
-      )}
-      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
         {/* Kiri: Profile */}
         <div className="col-span-1 flex">
@@ -544,6 +532,20 @@ const AccountSettingsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Moved Total Statistics */}
+      {showAuditSections && (
+        <div className="mt-6 mb-6">
+          <TotalStatsContainer
+            totalRegular={totalRegular}
+            totalFraud={totalFraud}
+            totalAudits={totalAudits}
+            sisaTarget={sisaTarget}
+            targetColor={targetColor}
+            loading={loadingStats}
+          />
+        </div>
+      )}
 
       {/* NEW: Administration Issues Table */}
       {showAuditSections && (
