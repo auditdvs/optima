@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -210,9 +210,9 @@ const AuditStats = () => {
           const target = 2; // Default target per month, bisa disesuaikan
           
           // Tentukan warna berdasarkan realization vs target
-          let realizationColor = '#dc2626'; // merah default
+          let realizationColor = '#dc2626'; // merah default (red for below target)
           if (realization >= target) {
-            realizationColor = realization > target ? '#2563eb' : '#16a34a'; // biru jika melebihi, hijau jika sama
+            realizationColor = realization > target ? '#2563eb' : '#16a34a'; // biru jika melebihi (blue for above target), hijau jika sama (green for exactly meeting target)
           }
           
           targetRealizationArr.push({
@@ -260,7 +260,6 @@ const AuditStats = () => {
               <XAxis dataKey="label" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Legend />
               <Bar dataKey="regular" fill="#16a34a" name="Regular" radius={4} />
               <Bar dataKey="fraud" fill="#dc2626" name="Fraud" radius={4} />
             </BarChart>
@@ -285,25 +284,41 @@ const AuditStats = () => {
                   name === 'Target' ? 'Target' : 'Realization'
                 ]}
               />
-              <Legend />
               <Bar dataKey="target" fill="#6b7280" name="Target" radius={4} />
-              <Bar dataKey="realization" fill="#16a34a" name="Realization" radius={4} />
+              <Bar 
+                dataKey="realization" 
+                name="Realization" 
+                radius={4}
+                fill="#16a34a" // This default won't be used due to the fill function below
+                fillOpacity={1}
+              >
+                {targetRealizationData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.realizationColor} 
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           
-          {/* Color Legend */}
-          <div className="mt-4 flex justify-center gap-6 text-sm">
-            <div className="flex items-center gap-2">
+          {/* Custom Legend */}
+          <div className="mt-2 flex justify-center gap-4">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-gray-500 rounded"></div>
+              <span className="text-xs text-gray-600">Target</span>
+            </div>
+            <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-red-600 rounded"></div>
-              <span className="text-gray-600">Below Target</span>
+              <span className="text-xs text-gray-600">Below Target</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-green-600 rounded"></div>
-              <span className="text-gray-600">Target Met</span>
+              <span className="text-xs text-gray-600">Target Met</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-blue-600 rounded"></div>
-              <span className="text-gray-600">Above Target</span>
+              <span className="text-xs text-gray-600">Above Target</span>
             </div>
           </div>
         </CardContent>

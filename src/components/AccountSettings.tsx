@@ -29,28 +29,11 @@ const AccountSettings = ({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
     if ((isOpen || isStandalone) && user) fetchAccountData();
-    // Fetch user role
-    if (user) fetchUserRole();
     // eslint-disable-next-line
   }, [isOpen, isStandalone, user]);
-
-  const fetchUserRole = async () => {
-    if (!user) return;
-    try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      setUserRole(data?.role || '');
-    } catch {
-      setUserRole('');
-    }
-  };
 
   const fetchAccountData = async () => {
     if (!user) return;
@@ -136,7 +119,7 @@ const AccountSettings = ({
     }
   };
 
-  const onCropComplete = (croppedArea: any, croppedAreaPixels: any) => {
+  const onCropComplete = (_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
   };
 
@@ -360,13 +343,6 @@ const AccountSettings = ({
                 </button>
               </div>
             </div>
-          </div>
-        )}
-        {/* Tambahkan teks kecil di bawah, hanya jika userRole bukan 'risk' */}
-        {userRole !== 'risk' && (
-          <div className="text-[8px] text-black text-center mt-4 mb-0">
-            fraud amount : optima<br />
-            administration : auditkomida
           </div>
         )}
       </div>
