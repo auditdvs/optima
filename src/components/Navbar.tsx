@@ -1,11 +1,14 @@
-import { AlignStartVertical, ChartNoAxesColumn, LogOut, Settings, User, Users, X } from 'lucide-react';
+import { LogOut, Settings, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import dvs1Icon from '../assets/dvs-1.png';
 import dvs2Icon from '../assets/dvs-2.png';
+import magnifyingIcon from '../assets/magnifying-glass.svg';
 import managerIcon from '../assets/manager.png';
 import qaIcon from '../assets/qa.png';
+import strategyIcon from '../assets/strategy.svg';
+import userListIcon from '../assets/user-list.svg';
 import { Button } from "../components/ui/button";
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -459,7 +462,7 @@ function Navbar() {
             {/* Audit Rating Menu Item */}
             <div className="menu-list" onClick={() => setShowAuditRating(true)}>
               <div className="flex items-center">
-                <AlignStartVertical className="w-4 h-4 mr-2 text-indigo-600" />
+                <img src={strategyIcon} alt="Audit Rating" className="w-5 h-5 mr-2" />
                 <span>Audit Rating</span>
               </div>
             </div>
@@ -473,7 +476,7 @@ function Navbar() {
               }}
             >
               <div className="flex items-center">
-                <ChartNoAxesColumn className="w-4 h-4 mr-2 text-indigo-600" />
+                <img src={magnifyingIcon} alt="RCM" className="w-5 h-5 mr-2" />
                 <span>RCM</span>
               </div>
             </div>
@@ -481,7 +484,7 @@ function Navbar() {
             {/* PIC List Menu Item */}
             <div className="menu-list" onClick={handleShowPICList}>
               <div className="flex items-center">
-                <Users className="w-4 h-4 mr-2 text-indigo-600" />
+                <img src={userListIcon} alt="PIC List" className="w-5 h-5 mr-2" />
                 <span>PIC List</span>
               </div>
             </div>
@@ -614,14 +617,12 @@ function Navbar() {
         {/* Audit Rating */}
         <button
           onClick={() => setShowAuditRating(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 transition-all duration-200 relative group"
           title="Audit Rating"
         >
-          {/* Chart Bar Icon (Heroicons) */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M8 17V9m4 8V5m4 12v-3" />
-          </svg>
-          <span className="text-sm font-medium">Audit Rating</span>
+          <span className="absolute inset-0 rounded-lg border border-indigo-200 opacity-0 group-hover:opacity-100 group-hover:shadow-md transition-all duration-200 pointer-events-none"></span>
+          <img src={strategyIcon} alt="Audit Rating" className="h-5 w-5 mr-2 z-10" />
+          <span className="text-sm font-medium z-10">Audit Rating</span>
         </button>
 
         {/* RCM */}
@@ -630,27 +631,23 @@ function Navbar() {
             setShowRCMSearch(true);
             setTimeout(() => rcmInputRef.current?.focus(), 100);
           }}
-          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 transition-all duration-200 relative group"
           title="RCM"
         >
-          {/* Document Icon (Heroicons) */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z" />
-          </svg>
-          <span className="text-sm font-medium">RCM</span>
+          <span className="absolute inset-0 rounded-lg border border-indigo-200 opacity-0 group-hover:opacity-100 group-hover:shadow-md transition-all duration-200 pointer-events-none"></span>
+          <img src={magnifyingIcon} alt="RCM" className="h-5 w-5 mr-2 z-10" />
+          <span className="text-sm font-medium z-10">RCM</span>
         </button>
 
         {/* PIC List */}
         <button
           onClick={handleShowPICList}
-          className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-700 transition-all duration-200 relative group"
           title="PIC List"
         >
-          {/* Users Icon (Heroicons) */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0zm6 13v-2a4 4 0 00-3-3.87M6 7a4 4 0 100 8 4 4 0 000-8z" />
-          </svg>
-          <span className="text-sm font-medium">PIC List</span>
+          <span className="absolute inset-0 rounded-lg border border-indigo-200 opacity-0 group-hover:opacity-100 group-hover:shadow-md transition-all duration-200 pointer-events-none"></span>
+          <img src={userListIcon} alt="PIC List" className="h-5 w-5 mr-2 z-10" />
+          <span className="text-sm font-medium z-10">PIC List</span>
         </button>
 
         {/* Notifications */}
@@ -660,15 +657,15 @@ function Navbar() {
               setShowNotifications(!showNotifications);
               setHasNewNotification(false);
             }}
-            className="relative flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
+            className="relative flex items-center gap-2 px-1 py-1.5 rounded hover:bg-gray-100 text-gray-700 hover:text-indigo-700 transition"
             title="Notifications"
           >
             {/* Bell Icon (Heroicons) */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full h-3 w-3 flex items-center justify-center">
                 {unreadCount}
               </span>
             )}
@@ -842,7 +839,7 @@ function Navbar() {
       )}
 
       {/* Profile Button - New Component replacing Logout */}
-      <div className="relative" ref={accountDropdownRef}>
+      <div className="relative ml-4" ref={accountDropdownRef}>
         <button
           onClick={() => setShowAccountDropdown(!showAccountDropdown)}
           className="flex items-center space-x-2 focus:outline-none"
