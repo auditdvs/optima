@@ -1024,8 +1024,8 @@ function Navbar() {
             </div>
 
             {/* Results Container */}
-            <div className="flex-1 overflow-hidden">
-              <div className="h-full overflow-y-auto px-6 py-4">
+              <div className="flex-1">
+                <div className="overflow-y-auto px-6 py-4 max-h-[60vh]">
                 {rcmLoading ? (
                   <div className="flex justify-center items-center py-10">
                     <div id="wifi-loader">
