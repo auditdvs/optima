@@ -4,12 +4,12 @@ import html2canvas from 'html2canvas';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, CalendarIcon, Clock, Pencil, Search, TrendingUp, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { DateRange } from "react-day-picker";
-import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis, PieChart, Pie } from 'recharts';
 import * as XLSX from 'xlsx';
 import CountUp from '../components/CountUp';
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -238,6 +238,75 @@ const ManagerDashboard = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+
+  // State Audit Rating Count
+  const [auditRatingSummary, setAuditRatingSummary] = useState<{ high: number; medium: number; low: number }>({ high: 0, medium: 0, low: 0 });
+  const [auditRatingByRegion, setAuditRatingByRegion] = useState<{ region: string; high: number; medium: number; low: number }[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
+  const [regionOptions, setRegionOptions] = useState<string[]>([]);
+
+      // Data chart audit rating
+  const getBarChartData = () => {
+  if (selectedRegion === 'ALL') {
+    return auditRatingByRegion.map(r => ({
+      region: r.region,
+      high: r.high,
+      medium: r.medium,
+      low: r.low,
+    }));
+  }
+  const regionData = auditRatingByRegion.find(r => r.region === selectedRegion);
+  return regionData ? [regionData] : [];
+};
+
+  // Pengambilan data audit rating
+  const fetchAuditRatingSummary = async () => {
+  try {
+    const { data: workPapers } = await supabase
+      .from('work_papers')
+      .select('region, rating')
+      .eq('audit_type', 'regular');
+
+    // Rekap total
+    const total = { high: 0, medium: 0, low: 0 };
+    const regionMap: Record<string, { high: number; medium: number; low: number }> = {};
+
+    workPapers?.forEach(wp => {
+      const rating = wp.rating?.toLowerCase();
+      if (rating === 'high' || rating === 'medium' || rating === 'low') {
+      total[rating as 'high' | 'medium' | 'low']++;
+      const region = wp.region || 'Unknown';
+      if (!regionMap[region]) regionMap[region] = { high: 0, medium: 0, low: 0 };
+      regionMap[region][rating as 'high' | 'medium' | 'low']++;
+      }
+      });
+
+    // Sort region alphabetically
+    const sortedRegions = Object.keys(regionMap).sort((a, b) => a.localeCompare(b));
+    setRegionOptions(['ALL', ...sortedRegions]);
+    setAuditRatingByRegion(
+    sortedRegions.map(region => ({ region, ...regionMap[region] }))
+      );
+    setAuditRatingSummary(total);
+     } catch (error) {
+    console.error('Error fetching audit rating summary:', error);
+     }
+   };
+
+    useEffect(() => {
+    fetchAuditRatingSummary();
+    }, []);
+
+const getFilteredRatingSummary = () => {
+  if (selectedRegion === 'ALL') {
+    return auditRatingSummary;
+  }
+  const regionData = auditRatingByRegion.find(r => r.region === selectedRegion);
+  return regionData
+    ? { high: regionData.high, medium: regionData.medium, low: regionData.low }
+    : { high: 0, medium: 0, low: 0 };
+};
+
   useEffect(() => {
     const initializeDashboard = async () => {
       const hasAccess = await checkUserAccess(supabase);
@@ -284,6 +353,8 @@ const ManagerDashboard = () => {
     'Ayusri Erian Agustin': 'Ayu',
   };
   const AUDITORS = ['Ganjar', 'Dede', 'Lise', 'Ayu'];
+
+
 
   // 1. Ambil data input audit dari work_papers.inputted_by
   const { data: workPapers } = await supabase
@@ -1698,143 +1769,294 @@ const ManagerDashboard = () => {
 
       {/* Audit Summary Section */}
       {activeSection === 'auditSummary' && (
-        <Card>
-          <CardContent className="p-6">
-            {/* All the existing audit summary content */}
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-semibold">Audit Summary: Incomplete Documentation</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search..."
-                  className="pl-7 pr-2 py-1 border rounded-md w-44 text-xs"
-                />
+        <>
+          <Card className="mb-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xl">Audit Rating - Recap</CardTitle>
+              <div>
+                <select
+                  value={selectedRegion}
+                  onChange={e => setSelectedRegion(e.target.value)}
+                  className="border rounded px-3 py-2 text-sm bg-muted"
+                  style={{ minWidth: 160 }}
+                >
+                  {regionOptions.map(region => (
+                    <option key={region} value={region}>{region === 'ALL' ? 'All Region' : region}</option>
+                  ))}
+                </select>
               </div>
-            </div>
+            </CardHeader>
+            <CardContent>
+              {/** Gunakan summary yang sudah difilter */}
+              {(() => {
+                const filteredSummary = getFilteredRatingSummary();
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <Card className="bg-red-100">
+                        <CardContent className="flex flex-col items-center py-6">
+                          <span className="text-3xl font-bold text-rose-600">{filteredSummary.high}</span>
+                          <span className="text-lg font-semibold text-rose-500 mt-2">Total High</span>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-yellow-100">
+                        <CardContent className="flex flex-col items-center py-6">
+                          <span className="text-3xl font-bold text-amber-600">{filteredSummary.medium}</span>
+                          <span className="text-lg font-semibold text-amber-500 mt-2">Total Medium</span>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-green-100">
+                        <CardContent className="flex flex-col items-center py-6">
+                          <span className="text-3xl font-bold text-emerald-600">{filteredSummary.low}</span>
+                          <span className="text-lg font-semibold text-emerald-500 mt-2">Total Low</span>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Bar Chart Style shadcn */}
+                      <Card>
+                        <CardHeader>
+                        </CardHeader>
+                        <CardContent>
+                          <ChartContainer
+                            config={{
+                              high: { label: "High", color: "#fb7185" },      // rose-400
+                              medium: { label: "Medium", color: "#fde68a" },   // amber-300
+                              low: { label: "Low", color: "#34d399" },         // emerald-400
+                            }}
+                          >
+                            <BarChart data={getBarChartData()} accessibilityLayer>
+                              <CartesianGrid vertical={false} />
+                              <XAxis
+                                dataKey="region"
+                                tickLine={false}
+                                tickMargin={10}
+                                axisLine={false}
+                              />
+                              <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent indicator="dashed" />}
+                              />
+                              <Bar dataKey="high" fill="#fb7185" radius={4} />      {/* rose-400 */}
+                              <Bar dataKey="medium" fill="#fde68a" radius={4} />    {/* amber-300 */}
+                              <Bar dataKey="low" fill="#34d399" radius={4} />       {/* emerald-400 */}
+                            </BarChart>
+                          </ChartContainer>
+                        </CardContent>
+                        <CardFooter className="flex-col gap-2 text-sm text-center">
+                          <div className="flex gap-2 leading-none font-medium">
+                            Audit rating recap by region
+                          </div>
+                        </CardFooter>
+                      </Card>
+                      {/* Pie Chart Style shadcn */}
+                      <Card className="flex flex-col">
+                        <CardHeader className="items-center pb-0">
+                        </CardHeader>
+                        <CardContent className="flex-1 pb-0">
+                          <ChartContainer
+                            config={{
+                              high: { label: "High", color: "#fb7185" },      // rose-400
+                              medium: { label: "Medium", color: "#fde68a" },   // amber-300
+                              low: { label: "Low", color: "#34d399" },         // emerald-400
+                            }}
+                            className="mx-auto aspect-square max-h-[450px]"
+                          >
+                            <PieChart>
+                              <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent hideLabel />}
+                              />
+                              <Pie
+                                data={[
+                                  { name: "High", value: filteredSummary.high, fill: "#fb7185" },    // rose-400
+                                  { name: "Medium", value: filteredSummary.medium, fill: "#fde68a" }, // amber-300
+                                  { name: "Low", value: filteredSummary.low, fill: "#34d399" },       // emerald-400
+                                ]}
+                                dataKey="value"
+                                nameKey="name"
+                                stroke="0"
+                              />
+                            </PieChart>
+                          </ChartContainer>
+                        </CardContent>
+                        <CardFooter className="flex-col gap-2 text-sm">
+                          <div className="flex items-center gap-2 leading-none font-medium">
+                            Audit rating recap total
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    </div>
 
-            <div className="flex space-x-4 mb-4">
-              <button
-                onClick={() => setActiveTab('regular')}
-                className={`px-4 py-2 rounded-md ${
-                  activeTab === 'regular'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                Regular Audits
-              </button>
-              <button
-                onClick={() => setActiveTab('fraud')}
-                className={`px-4 py-2 rounded-md ${
-                  activeTab === 'fraud'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                Special Audits
-              </button>
-            </div>
+                    {/* Tambahkan Tabel Recap Rating Per Region */}
+                    <div className="mt-8">
+                      <h4 className="text-md font-semibold mb-2">Audit Rating Recap Per Region</h4>
+                      <div className="overflow-x-auto rounded-md border">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
+                              <th className="px-3 py-2 text-center text-xs font-medium text-rose-500 uppercase tracking-wider">High</th>
+                              <th className="px-3 py-2 text-center text-xs font-medium text-amber-500 uppercase tracking-wider">Medium</th>
+                              <th className="px-3 py-2 text-center text-xs font-medium text-emerald-500 uppercase tracking-wider">Low</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {auditRatingByRegion.map(region => (
+                              <tr key={region.region}>
+                                <td className="px-3 py-2 text-xs text-gray-900">{region.region}</td>
+                                <td className="px-3 py-2 text-center text-xs font-bold text-rose-600">{region.high}</td>
+                                <td className="px-3 py-2 text-center text-xs font-bold text-amber-600">{region.medium}</td>
+                                <td className="px-3 py-2 text-center text-xs font-bold text-emerald-600">{region.low}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th 
-                      className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => requestSort('branch_name')}
-                    >
-                      <div className="flex items-center">
-                        Branch Name
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => requestSort('region')}
-                    >
-                      <div className="flex items-center">
-                        Region
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </th>
-                    {activeTab === 'regular' ? (
-                      <>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                          onClick={() => requestSort('monitoring')}
-                        >
-                          <div className="flex items-center">
-                            Monitoring
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          </div>
-                        </th>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          <div className="flex items-center">
-                            Failed Checks
-                          </div>
-                        </th>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          <div className="flex items-center">
-                            PIC
-                          </div>
-                        </th>
-                      </>
-                    ) : (
-                      <>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          <div className="flex items-center">
-                            Failed Checks
-                          </div>
-                        </th>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-normal break-words max-w-[300px]"
-                          onClick={() => requestSort('review')}
-                        >
-                          <div className="flex items-center">
-                            Review
-                            <ArrowUpDown className="ml-1 h-4 w-4" />
-                          </div>
-                        </th>
-                        <th 
-                          className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          <div className="flex items-center">
-                            PIC
-                          </div>
-                        </th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedAudits.map((audit, index) => (
-                    <tr key={index}>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {audit.branch_name}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                        {audit.region}
-                      </td>
+          <Card>
+            <CardContent className="p-6">
+              {/* All the existing audit summary content */}
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="text-lg font-semibold">Incomplete Documentation</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search..."
+                    className="pl-7 pr-2 py-1 border rounded-md w-44 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-4 mb-4">
+                <button
+                  onClick={() => setActiveTab('regular')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeTab === 'regular'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Regular Audits
+                </button>
+                <button
+                  onClick={() => setActiveTab('fraud')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeTab === 'fraud'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Special Audits
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th 
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => requestSort('branch_name')}
+                      >
+                        <div className="flex items-center">
+                          Branch Name
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => requestSort('region')}
+                      >
+                        <div className="flex items-center">
+                          Region
+                          <ArrowUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </th>
                       {activeTab === 'regular' ? (
                         <>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
-                              audit.monitoring === 'Adequate' 
-                                ? 'bg-lime-100 text-lime-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}>
-                              {audit.monitoring}
-                            </span>
-                            </td>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                            onClick={() => requestSort('monitoring')}
+                          >
+                            <div className="flex items-center">
+                              Monitoring
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </th>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            <div className="flex items-center">
+                              Failed Checks
+                            </div>
+                          </th>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            <div className="flex items-center">
+                              PIC
+                            </div>
+                          </th>
+                        </>
+                      ) : (
+                        <>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            <div className="flex items-center">
+                              Failed Checks
+                            </div>
+                          </th>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-normal break-words max-w-[300px]"
+                            onClick={() => requestSort('review')}
+                          >
+                            <div className="flex items-center">
+                              Review
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </th>
+                          <th 
+                            className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            <div className="flex items-center">
+                              PIC
+                            </div>
+                          </th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {sortedAudits.map((audit, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {audit.branch_name}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                          {audit.region}
+                        </td>
+                        {activeTab === 'regular' ? (
+                          <>
+                            <td className="px-3 py-2 whitespace-nowrap text-xs">
+                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
+                                audit.monitoring === 'Adequate' 
+                                  ? 'bg-lime-100 text-lime-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {audit.monitoring}
+                              </span>
+                              </td>
                           <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
                             {getFailedChecksWithAliases(audit, true)}
                           </td>
@@ -1862,6 +2084,7 @@ const ManagerDashboard = () => {
             </div>
           </CardContent>
         </Card>
+      </>
       )}
 
       {/* Fraud Data Section */}

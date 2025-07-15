@@ -1,3 +1,4 @@
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
@@ -16,6 +17,31 @@ import {
 import { supabase } from '../lib/supabase';
 import { supabaseService } from '../lib/supabaseService';
 
+// Add the convertJsonToCsv utility function
+const convertJsonToCsv = (data: any[]): string => {
+  if (!data || data.length === 0) return '';
+  
+  const headers = Object.keys(data[0]);
+  const csvHeaders = headers.join(',');
+  
+  const csvRows = data.map(row => {
+    return headers.map(header => {
+      const value = row[header];
+      // Handle null/undefined values
+      if (value === null || value === undefined) return '';
+      // Handle objects and arrays
+      if (typeof value === 'object') return JSON.stringify(value).replace(/"/g, '""');
+      // Handle strings with commas or quotes
+      const stringValue = String(value);
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    }).join(',');
+  });
+  
+  return [csvHeaders, ...csvRows].join('\n');
+};
 
 const toastInfo = (message: string) => {
   toast(message, {
@@ -733,6 +759,7 @@ function UserControlPanel() {
   const handleBackupData = async () => {
     try {
       setLoading(true);
+
       
       const zip = new JSZip();
       

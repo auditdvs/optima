@@ -32,7 +32,6 @@ const AccountSettings = ({
 
   useEffect(() => {
     if ((isOpen || isStandalone) && user) fetchAccountData();
-    // eslint-disable-next-line
   }, [isOpen, isStandalone, user]);
 
   const fetchAccountData = async () => {
