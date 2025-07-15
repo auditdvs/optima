@@ -904,7 +904,7 @@ const PullRequest = () => {
                   onChange={(e) => setAdminResponse(e.target.value)}
                   className="w-full p-2 border rounded min-h-[100px]"
                   placeholder="Provide feedback about this request"
-                  required
+                  required={selectedRequest.status !== 'Waiting List'}
                 ></textarea>
               </div>
               

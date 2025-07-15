@@ -4,12 +4,12 @@ import html2canvas from 'html2canvas';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, CalendarIcon, Clock, Pencil, Search, TrendingUp, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { DateRange } from "react-day-picker";
-import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis, PieChart, Pie } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import CountUp from '../components/CountUp';
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -214,6 +214,9 @@ const ManagerDashboard = () => {
   const [paymentHistory, setPaymentHistory] = useState<FraudPayment[]>([]);
   const [hkpAmountInput, setHkpAmountInput] = useState<number>(0);
   const [fromSalaryChecked, setFromSalaryChecked] = useState<boolean>(false);
+
+  const [selectedRegionReport, setSelectedRegionReport] = useState<string>('ALL');
+  const [reportUndoneOnly, setReportUndoneOnly] = useState(false);
 
   // Add this state
   const [auditorAuditCounts, setAuditorAuditCounts] = useState<AuditorAuditCount[]>([]);
@@ -481,57 +484,29 @@ const getFilteredRatingSummary = () => {
     }
   };
 
-  const fetchAuditRecapData = async () => {
-    try {
-      // Fetch regular audits
-      const { data: regularData, error: regularError } = await supabase
-        .from('audit_regular')
-        .select('*, pic'); // Include the 'pic' field
+const fetchAuditRecapData = async () => {
+  try {
+    // Fetch regular audits
+    const { data: regularData, error: regularError } = await supabase
+      .from('audit_regular')
+      .select('*, pic'); // Include the 'pic' field
 
-      if (regularError) throw regularError;
+    if (regularError) throw regularError;
 
-      // Fetch fraud audits
-      const { data: fraudData, error: fraudError } = await supabase
-        .from('audit_fraud')
-        .select('*, pic'); // Include the 'pic' field
+    // Fetch fraud audits
+    const { data: fraudData, error: fraudError } = await supabase
+      .from('audit_fraud')
+      .select('*, pic'); // Include the 'pic' field
 
-      if (fraudError) throw fraudError;
+    if (fraudError) throw fraudError;
 
-      // Process and set data as before
-      const filteredRegularAudits = regularData?.filter(audit => {
-        const falseCount = [
-          audit.dapa,
-          audit.revised_dapa,
-          audit.dapa_supporting_data,
-          audit.assignment_letter,
-          audit.entrance_agenda,
-          audit.entrance_attendance,
-          audit.audit_working_papers,
-          audit.exit_meeting_minutes,
-          audit.exit_attendance_list,
-          audit.audit_result_letter,
-          audit.rta
-        ].filter(value => value === false).length;
-        return falseCount >= 2;
-      });
-
-      const filteredFraudAudits = fraudData?.filter(audit => {
-        const hasFalseValue = [
-          audit.data_preparation,
-          audit.assignment_letter,
-          audit.audit_working_papers,
-          audit.audit_report,
-          audit.detailed_findings
-        ].some(value => value === false);
-        return hasFalseValue;
-      });
-
-      setRegularAudits(filteredRegularAudits || []);
-      setFraudAudits(filteredFraudAudits || []);
-    } catch (error) {
-      console.error('Error fetching audit recap data:', error);
-    }
-  };
+    // Tampilkan semua regular audit di Report
+    setRegularAudits(regularData || []);
+    setFraudAudits(fraudData || []);
+  } catch (error) {
+    console.error('Error fetching audit recap data:', error);
+  }
+};
 
   const fetchAuditors = async () => {
     try {
@@ -759,7 +734,6 @@ const getFilteredRatingSummary = () => {
 
   const handleDownload = () => {
     try {
-      // Prepare data for export with aliases
       let dataToExport;
       
       if (activeTab === 'regular') {
@@ -1365,6 +1339,21 @@ const getFilteredRatingSummary = () => {
   };
   const SUPPORT_AUDITORS = ['Ganjar', 'Dede', 'Lise', 'Ayu'];
 
+  // Tambahkan state untuk workPapersRegular
+const [workPapersRegular, setWorkPapersRegular] = useState<any[]>([]);
+
+// Tambahkan useEffect untuk mengambil data work_papers regular
+useEffect(() => {
+  const fetchWorkPapersRegular = async () => {
+    const { data, error } = await supabase
+      .from('work_papers')
+      .select('branch_name')
+      .eq('audit_type', 'regular');
+    if (!error) setWorkPapersRegular(data || []);
+  };
+  fetchWorkPapersRegular();
+}, []);
+
   // Modify the Audit Trends Chart section to include the download image button
   return (
     <div className="p-0 space-y-3">
@@ -1549,7 +1538,7 @@ const getFilteredRatingSummary = () => {
             </Card>
           </div>
 
-          {/* Audit Trends Chart */}
+         {/* Audit Trends Chart */}
           <Card>
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1590,6 +1579,7 @@ const getFilteredRatingSummary = () => {
           </Card>
         </>
       )}
+
 
       {/* Audit Counts Per Auditor Section */}
       {activeSection === 'auditorCounts' && (
@@ -2038,53 +2028,156 @@ const getFilteredRatingSummary = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {sortedAudits.map((audit, index) => (
-                      <tr key={index}>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {audit.branch_name}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                          {audit.region}
-                        </td>
-                        {activeTab === 'regular' ? (
-                          <>
-                            <td className="px-3 py-2 whitespace-nowrap text-xs">
-                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
-                                audit.monitoring === 'Adequate' 
-                                  ? 'bg-lime-100 text-lime-800'
-                                  : 'bg-rose-100 text-rose-800'
-                              }`}>
-                                {audit.monitoring}
-                              </span>
-                              </td>
-                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
-                            {getFailedChecksWithAliases(audit, true)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
-                            {audit.pic || 'N/A'}
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
-                            {getFailedChecksWithAliases(audit, false)}
+                    {sortedAudits
+                      .filter(audit => {
+                        if (activeTab !== 'regular') return true;
+                        // Cari semua field boolean yang false dan ada di aliases
+                        const failedKeys = Object.entries(audit)
+                          .filter(([key, value]) =>
+                            typeof value === 'boolean' &&
+                            !value &&
+                            regularAuditAliases[key]
+                          )
+                          .map(([key]) => key);
+
+                        // Jika hanya "revised_dapa" yang false, baris dihilangkan
+                        if (failedKeys.length === 1 && failedKeys[0] === 'revised_dapa') {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map((audit, index) => (
+                        <tr key={index}>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                            {audit.branch_name}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                            {(audit as FraudAudit).review}
+                            {audit.region}
                           </td>
-                          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
-                            {audit.pic || 'N/A'}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </>
+                          {/* ...existing columns... */}
+                          {activeTab === 'regular' ? (
+                            <>
+                              <td className="px-3 py-2 whitespace-nowrap text-xs">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
+                                  audit.monitoring === 'Adequate' 
+                                    ? 'bg-lime-100 text-lime-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {audit.monitoring}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
+                                {getFailedChecksWithAliases(audit, true)}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
+                                {audit.pic || 'N/A'}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {/* ...fraud columns... */}
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+         {/* Container Baru: Report */}
+    <Card className="mt-8">
+  <CardHeader>
+  <CardTitle className="text-lg">Report</CardTitle>
+  <div className="mt-2 flex gap-2 items-center flex-wrap">
+    {/* Region Filter as Label + Button */}
+    <button
+      className={`px-3 py-1 rounded-md text-xs font-medium border ${selectedRegionReport === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+      onClick={() => setSelectedRegionReport('ALL')}
+      type="button"
+    >
+      All Region
+    </button>
+    {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
+      <button
+        key={region}
+        className={`px-3 py-1 rounded-md text-xs font-medium border ${selectedRegionReport === region ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+        onClick={() => setSelectedRegionReport(region)}
+        type="button"
+      >
+        Regional {region}
+      </button>
+    ))}
+    <label className="flex items-center text-xs font-medium ml-2">
+      <input
+      type="checkbox"
+      checked={reportUndoneOnly}
+      onChange={e => setReportUndoneOnly(e.target.checked)}
+      className="mr-2 h-4 w-4" // Tambahkan h-5 w-5 untuk memperbesar checkbox
+      />
+      Show only Undone
+    </label>
+  </div>
+</CardHeader>
+  <CardContent>
+    <div className="overflow-x-auto rounded-md border">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch Name</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RTA</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {regularAudits
+            .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
+            .filter(audit => {
+              const branchName = audit.branch_name;
+              const rtaStatus = audit.rta ? 'Done' : 'Undone';
+              const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
+              const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+              if (!reportUndoneOnly) return true;
+              return rtaStatus === 'Undone' || reportStatus === 'Undone';
+            })
+            .map((audit, idx) => {
+              const branchName = audit.branch_name;
+              const rtaStatus = audit.rta ? 'Done' : 'Undone';
+              const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
+              const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+              return (
+                <tr key={branchName + idx}>
+                  <td className="px-3 py-2 text-xs text-gray-900">{idx + 1}</td>
+                  <td className="px-3 py-2 text-xs text-gray-900">{branchName}</td>
+                  <td className={`px-3 py-2 text-xs font-semibold ${audit.rta ? 'text-green-600' : 'text-red-600'}`}>{rtaStatus}</td>
+                  <td className={`px-3 py-2 text-xs font-semibold ${reportStatus === 'Done' ? 'text-green-600' : 'text-red-600'}`}>{reportStatus}</td>
+                </tr>
+              );
+            })}
+          {regularAudits
+            .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
+            .filter(audit => {
+              const branchName = audit.branch_name;
+              const rtaStatus = audit.rta ? 'Done' : 'Undone';
+              const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
+              const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+              if (!reportUndoneOnly) return true;
+              return rtaStatus === 'Undone' || reportStatus === 'Undone';
+            }).length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-3 py-4 text-center text-sm text-gray-500">
+                No data available.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </CardContent>
+</Card>
+        </>
       )}
 
       {/* Fraud Data Section */}
@@ -2477,7 +2570,6 @@ const getFilteredRatingSummary = () => {
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 };
