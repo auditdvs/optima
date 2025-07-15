@@ -2029,57 +2029,74 @@ useEffect(() => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {sortedAudits
-                      .filter(audit => {
-                        if (activeTab !== 'regular') return true;
-                        // Cari semua field boolean yang false dan ada di aliases
-                        const failedKeys = Object.entries(audit)
-                          .filter(([key, value]) =>
-                            typeof value === 'boolean' &&
-                            !value &&
-                            regularAuditAliases[key]
-                          )
-                          .map(([key]) => key);
+  .filter(audit => {
+    if (activeTab === 'regular') {
+      const failedKeys = Object.entries(audit)
+        .filter(([key, value]) =>
+          typeof value === 'boolean' &&
+          !value &&
+          regularAuditAliases[key]
+        )
+        .map(([key]) => key);
 
-                        // Jika hanya "revised_dapa" yang false, baris dihilangkan
-                        if (failedKeys.length === 1 && failedKeys[0] === 'revised_dapa') {
-                          return false;
-                        }
-                        return true;
-                      })
-                      .map((audit, index) => (
-                        <tr key={index}>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                            {audit.branch_name}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                            {audit.region}
-                          </td>
-                          {/* ...existing columns... */}
-                          {activeTab === 'regular' ? (
-                            <>
-                              <td className="px-3 py-2 whitespace-nowrap text-xs">
-                                <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
-                                  audit.monitoring === 'Adequate' 
-                                    ? 'bg-lime-100 text-lime-800'
-                                    : 'bg-rose-100 text-rose-800'
-                                }`}>
-                                  {audit.monitoring}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
-                                {getFailedChecksWithAliases(audit, true)}
-                              </td>
-                              <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
-                                {audit.pic || 'N/A'}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              {/* ...fraud columns... */}
-                            </>
-                          )}
-                        </tr>
-                      ))}
+      if (failedKeys.length === 0) return false;
+      if (failedKeys.length === 1 && failedKeys[0] === 'revised_dapa') return false;
+      return true;
+    }
+    if (activeTab === 'fraud') {
+      const failedKeys = Object.entries(audit)
+        .filter(([key, value]) =>
+          typeof value === 'boolean' &&
+          !value &&
+          fraudAuditAliases[key]
+        )
+        .map(([key]) => key);
+
+      return failedKeys.length > 0;
+    }
+    return true;
+  })
+  .map((audit, index) => (
+    <tr key={index}>
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+        {audit.branch_name}
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+        {audit.region}
+      </td>
+      {activeTab === 'regular' ? (
+        <>
+          <td className="px-3 py-2 whitespace-nowrap text-xs">
+            <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
+              audit.monitoring === 'Adequate' 
+                ? 'bg-lime-100 text-lime-800'
+                : 'bg-rose-100 text-rose-800'
+            }`}>
+              {audit.monitoring}
+            </span>
+          </td>
+          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
+            {getFailedChecksWithAliases(audit, true)}
+          </td>
+          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
+            {audit.pic || 'N/A'}
+          </td>
+        </>
+      ) : (
+        <>
+          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
+            {getFailedChecksWithAliases(audit, false)}
+          </td>
+          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
+            {audit.review}
+          </td>
+          <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[200px]">
+            {audit.pic || 'N/A'}
+          </td>
+        </>
+      )}
+    </tr>
+  ))}
                   </tbody>
                 </table>
               </div>
