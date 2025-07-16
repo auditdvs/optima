@@ -134,14 +134,14 @@ const RiskDashboard = () => {
       const processedFraudAudits = fraudData?.map(audit => {
         const payments = paymentsData?.filter(payment => payment.work_paper_id === audit.id) || [];
         const caseDetails = fraudCaseData?.find(caseDetail => caseDetail.work_paper_id === audit.id);
-        
+
         const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-        
+
         let collectionFee = 'NO';
         if (caseDetails?.due_date) {
           const dueDate = new Date(caseDetails.due_date);
           const sixMonthsAfterDueDate = addMonths(dueDate, 6);
-          
+
           if (payments.length === 0 && isAfter(new Date(), sixMonthsAfterDueDate)) {
             collectionFee = 'YES';
           } else if (payments.length > 0) {
@@ -151,11 +151,16 @@ const RiskDashboard = () => {
             }
           }
         }
-        
-        // VLOOKUP region dari branches
+
+        // VLOOKUP region dari branches (lebih toleran)
+        const auditBranch = (audit.branch_name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
         const branchInfo = branches.find(
-          b => b.name.trim().toLowerCase() === audit.branch_name.trim().toLowerCase()
+          b => (b.name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === auditBranch
         );
+        if (!branchInfo) {
+          // Debug: tampilkan branch yang tidak ketemu region-nya
+          console.warn('Branch not found in branches table:', audit.branch_name);
+        }
         return {
           ...audit,
           payments,
