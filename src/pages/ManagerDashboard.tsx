@@ -4,12 +4,12 @@ import html2canvas from 'html2canvas';
 import { AlertTriangle, ArrowDown, ArrowUpDown, Building2, CalendarIcon, Clock, Pencil, Search, TrendingUp, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { DateRange } from "react-day-picker";
-import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Dot, Legend, Line, LineChart, Pie, PieChart, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import CountUp from '../components/CountUp';
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -196,6 +196,36 @@ const ManagerDashboard = () => {
     outstandingFraud: 0,
     specialAudits: 0
   });
+
+  const [fraudTrendData, setFraudTrendData] = useState<{ month: string; total: number }[]>([]);
+
+const fetchFraudTrendData = async () => {
+  // Ambil data work_papers fraud
+  const { data, error } = await supabase
+    .from('work_papers')
+    .select('audit_end_date, fraud_amount')
+    .eq('audit_type', 'fraud');
+  if (error) return;
+
+  // Inisialisasi bulan Jan-Des
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fraudByMonth: Record<string, number> = {};
+  months.forEach(m => (fraudByMonth[m] = 0));
+
+  data?.forEach(row => {
+    if (row.audit_end_date) {
+      const d = new Date(row.audit_end_date);
+      const m = months[d.getMonth()];
+      fraudByMonth[m] += row.fraud_amount || 0;
+    }
+  });
+
+  setFraudTrendData(months.map(m => ({ month: m, total: fraudByMonth[m] })));
+};
+
+useEffect(() => {
+  fetchFraudTrendData();
+}, []);
 
   const [auditTrends, setAuditTrends] = useState<AuditTrend[]>([]);
   const [regularAudits, setRegularAudits] = useState<RegularAudit[]>([]);
@@ -2199,190 +2229,253 @@ useEffect(() => {
 
       {/* Fraud Data Section */}
       {activeSection === 'fraudData' && (
-        <Card>
-          <CardContent className="p-6">
-            {/* All the existing fraud data content */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Fraud Data</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  type="text"
-                  value={fraudSearchTerm}
-                  onChange={(e) => setFraudSearchTerm(e.target.value)}
-                  placeholder="Search branch or staff..."
-                  className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        <>
+          {/* Fraud Trend Line Chart */}
+            <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Fraud Trend per Month</CardTitle>
+            <CardDescription>January - December</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+            config={{
+              total: { label: "Total Fraud", color: "#e74c3c" },
+              className: "w-full"
+            }}
+            className="w-full h-[300px]" // Set explicit height here
+            >
+            <LineChart
+              data={fraudTrendData}
+              margin={{ top: 24, left: 24, right: 24, bottom: 32 }}
+              height={250} // Set chart height here (try 250 or 300)
+              width={undefined}
+            >
+              <CartesianGrid vertical={false} />
+              <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                indicator="line"
+                nameKey="total"
+                hideLabel
                 />
-              </div>
+              }
+              />
+              <Line
+              dataKey="total"
+              type="natural"
+              stroke="#6366F1"
+              strokeWidth={2}
+              dot={({ payload, ...props }) => (
+                <Dot
+                key={payload.month}
+                r={5}
+                cx={props.cx}
+                cy={props.cy}
+                fill="#6366F1"
+                stroke="#6366F1"
+                />
+              )}
+              />
+            </LineChart>
+            {/* Bulan label di bawah chart */}
+            <div className="flex justify-between mt-2 px-2">
+          {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
+            <span key={m} className="text-xs text-gray-500" style={{ minWidth: 18, textAlign: 'center' }}>{m}</span>
+          ))}
             </div>
-            
-            <div className="flex space-x-4 mb-4">
-              <button
-                onClick={() => setActiveFraudTab('data')}
-                className={`px-4 py-2 rounded-md ${
-                  activeFraudTab === 'data'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                Fraud Data
-              </button>
-              <button
-                onClick={() => setActiveFraudTab('region')}
-                className={`px-4 py-2 rounded-md ${
-                  activeFraudTab === 'region'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                Fraud by Region
-              </button>
-            </div>
-
-            {activeFraudTab === 'data' ? (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">No.</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => requestFraudSort('region')}
-                      >
-                        <div className="flex items-center">
-                          Region
-
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => requestFraudSort('branch_name')}
-                      >
-                        <div className="flex items-center">
-                          Branch Name
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => requestFraudSort('fraud_staff')}
-                      >
-                        <div className="flex items-center">
-                          Fraud Staff
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => requestFraudSort('fraud_amount')}
-                      >
-                        <div className="flex items-center">
-                          Fraud Amount
-                          <ArrowUpDown className="ml-1 h-4 w-4" />
-                        </div>
-                      </TableHead>
-                      <TableHead>HKP Amount</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedFraudCases.map((fraud, index) => (
-                      <TableRow
-                        key={fraud.id}
-                        className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
-                      >
-                        <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
-                        <TableCell className="text-xs">{fraud.region}</TableCell>
-                        <TableCell className="text-xs">{fraud.branch_name}</TableCell>
-                        <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
-                        <TableCell className="text-xs">
-                          {formatCurrency(fraud.fraud_amount)}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {fraud.fraud_payments_audits?.[0]?.hkp_amount 
-                            ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
-                            : 'No HKP'}
-                          {fraud.fraud_payments_audits?.[0]?.from_salary && (
-                            <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
-                          {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
-                          fraud.fraud_payments_audits?.[0]?.notes !== null
-                            ? fraud.fraud_payments_audits[0].notes
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-3">
-                            <button
-                              onClick={() => {
-                                setSelectedFraud(fraud);
-                                setIsPaymentDialogOpen(true);
-                              }}
-                              className="text-blue-600 hover:text-blue-800"
-                              aria-label="Edit Payment"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => fetchPaymentHistory(fraud.id)}
-                              className="text-gray-600 hover:text-gray-800"
-                              aria-label="View Payment History"
-                            >
-                              <Clock className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              </ChartContainer>
+            </CardContent>
+            <CardFooter className="flex-col items-start gap-2 text-sm">
+              <div className="text-muted-foreground leading-none mt-5">
+                Showing total fraud amount per month (Jan–Dec)
               </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">No.</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Total Fraud Amount</TableHead>
-                      <TableHead>Fraud Recovery</TableHead>
-                      <TableHead>Total Regular Audit</TableHead>
-                      <TableHead>Total Special Audit</TableHead>
-                      <TableHead>Total Fraud Staff</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fraudDetailsByRegion.map((detail, index) => (
-                      <TableRow key={detail.region}>
-                        <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
-                        <TableCell className="text-xs">{detail.region}</TableCell>
-                        <TableCell className="text-xs font-medium text-red-600">
-                          {formatCurrency(detail.totalFraudAmount)}
-                        </TableCell>
-                        <TableCell className="text-xs font-medium text-emerald-600">
-                          {formatCurrency(detail.totalRecoveryAmount)}
-                        </TableCell>
-                        <TableCell className="text-xs">{detail.totalRegularAudit}</TableCell>
-                        <TableCell className="text-xs">{detail.totalSpecialAudit}</TableCell>
-                        <TableCell className="text-xs">{detail.totalFraudStaff}</TableCell>
-                      </TableRow>
-                    ))}
-                    {fraudDetailsByRegion.length === 0 && (
+            </CardFooter>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              {/* All the existing fraud data content */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Fraud Data</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    value={fraudSearchTerm}
+                    onChange={(e) => setFraudSearchTerm(e.target.value)}
+                    placeholder="Search branch or staff..."
+                    className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-4 mb-4">
+                <button
+                  onClick={() => setActiveFraudTab('data')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeFraudTab === 'data'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Fraud Data
+                </button>
+                <button
+                  onClick={() => setActiveFraudTab('region')}
+                  className={`px-4 py-2 rounded-md ${
+                    activeFraudTab === 'region'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Fraud by Region
+                </button>
+              </div>
+
+              {activeFraudTab === 'data' ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
-                          No fraud details found
-                        </TableCell>
+                        <TableHead className="w-12">No.</TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => requestFraudSort('region')}
+                        >
+                          <div className="flex items-center">
+                            Region
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => requestFraudSort('branch_name')}
+                        >
+                          <div className="flex items-center">
+                            Branch Name
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => requestFraudSort('fraud_staff')}
+                        >
+                          <div className="flex items-center">
+                            Fraud Staff
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => requestFraudSort('fraud_amount')}
+                        >
+                          <div className="flex items-center">
+                            Fraud Amount
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead>HKP Amount</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedFraudCases.map((fraud, index) => (
+                        <TableRow
+                          key={fraud.id}
+                          className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
+                        >
+                          <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
+                          <TableCell className="text-xs">{fraud.region}</TableCell>
+                          <TableCell className="text-xs">{fraud.branch_name}</TableCell>
+                          <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
+                          <TableCell className="text-xs">
+                            {formatCurrency(fraud.fraud_amount)}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {fraud.fraud_payments_audits?.[0]?.hkp_amount 
+                              ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
+                              : 'No HKP'}
+                            {fraud.fraud_payments_audits?.[0]?.from_salary && (
+                              <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
+                            {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
+                            fraud.fraud_payments_audits?.[0]?.notes !== null
+                              ? fraud.fraud_payments_audits[0].notes
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-3">
+                              <button
+                                onClick={() => {
+                                  setSelectedFraud(fraud);
+                                  setIsPaymentDialogOpen(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-800"
+                                aria-label="Edit Payment"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => fetchPaymentHistory(fraud.id)}
+                                className="text-gray-600 hover:text-gray-800"
+                                aria-label="View Payment History"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">No.</TableHead>
+                        <TableHead>Region</TableHead>
+                        <TableHead>Total Fraud Amount</TableHead>
+                        <TableHead>Fraud Recovery</TableHead>
+                        <TableHead>Total Regular Audit</TableHead>
+                        <TableHead>Total Special Audit</TableHead>
+                        <TableHead>Total Fraud Staff</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fraudDetailsByRegion.map((detail, index) => (
+                        <TableRow key={detail.region}>
+                          <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
+                          <TableCell className="text-xs">{detail.region}</TableCell>
+                          <TableCell className="text-xs font-medium text-red-600">
+                            {formatCurrency(detail.totalFraudAmount)}
+                          </TableCell>
+                          <TableCell className="text-xs font-medium text-emerald-600">
+                            {formatCurrency(detail.totalRecoveryAmount)}
+                          </TableCell>
+                          <TableCell className="text-xs">{detail.totalRegularAudit}</TableCell>
+                          <TableCell className="text-xs">{detail.totalSpecialAudit}</TableCell>
+                          <TableCell className="text-xs">{detail.totalFraudStaff}</TableCell>
+                        </TableRow>
+                      ))}
+                      {fraudDetailsByRegion.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
+                            No fraud details found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Payment Dialog */}

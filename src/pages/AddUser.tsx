@@ -765,6 +765,7 @@ function UserControlPanel() {
       
       // Backup all tables
       const tables = [
+        'accounts',
         'audit_counts',
         'audit_fraud',
         'audit_regular',
@@ -778,12 +779,14 @@ function UserControlPanel() {
         'fraud_cases',
         'fraud_payments',
         'fraud_payments_audits',
+        'grammar_requests',
         'matriks',
         'notification_reads',
         'notifications',
         'pic',
         'profiles',
         'pull_requests',
+        'recap',
         'rpm_letters',
         'user_roles',
         'user_status',
