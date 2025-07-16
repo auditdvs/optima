@@ -152,15 +152,6 @@ const RiskDashboard = () => {
           }
         }
 
-        // VLOOKUP region dari branches (lebih toleran)
-        const auditBranch = (audit.branch_name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        const branchInfo = branches.find(
-          b => (b.name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === auditBranch
-        );
-        if (!branchInfo) {
-          // Debug: tampilkan branch yang tidak ketemu region-nya
-          console.warn('Branch not found in branches table:', audit.branch_name);
-        }
         return {
           ...audit,
           payments,
@@ -168,7 +159,7 @@ const RiskDashboard = () => {
           due_date: caseDetails?.due_date || null,
           fraud_collection_fee: collectionFee,
           pic: caseDetails?.pic || '',
-          region: branchInfo?.region || '-' // tambahkan region
+          region: audit.region || '-' // langsung ambil dari work_papers
         };
       });
 
