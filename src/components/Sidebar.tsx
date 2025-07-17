@@ -113,8 +113,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
       items: [
         { path: '/companyregulations', icon: Library, label: 'Company Regulations' },
         { path: '/tutorials', icon: FileVideo, label: 'Tutorials' },
-        { path: '/update-location', icon: MapPinPlus, label: 'Branch Location' },
-        { path: '/email-address', icon: Mail, label: 'Email Address Branch' },
+        { path: '/branch-directory', icon: Table2, label: 'Branch Directory' },
       ]
     }
   ];

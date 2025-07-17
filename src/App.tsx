@@ -23,6 +23,7 @@ import RiskDashboard from './pages/RiskDashboard';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UpdateLocation from './pages/UpdateLocation';
+import BranchDirectory from './pages/BranchDirectory';
 
 const queryClient = new QueryClient();
 
@@ -126,8 +127,12 @@ function App() {
                   <PrivateRoute>
                     <AccountSettingsPage />
                   </PrivateRoute>
-                } 
-              />
+                } />
+                <Route path="branch-directory" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <BranchDirectory />
+                </PrivateRoute>
+                } />
             </Route>
           </Routes>
           <ToastContainer position="top-right" autoClose={5000} />

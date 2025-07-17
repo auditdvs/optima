@@ -68,7 +68,14 @@ interface PIC {
   nama: string;
   posisi: string;
   pic_area: string;
-  status: 'Active' | 'Sick' | 'On leave' | 'On Branch';
+  status: 
+    | 'Active'
+    | 'Sick'
+    | 'On leave'
+    | 'On Branch'
+    | 'Business Trip'
+    | 'Meeting'
+    | 'Occupied';
 }
 
 interface AddUserModalProps {
@@ -261,7 +268,15 @@ const EditPICModal: React.FC<EditPICModalProps> = ({ isOpen, onClose, pic, onSub
   const [nama, setNama] = useState(pic?.nama || '');
   const [posisi, setPosisi] = useState(pic?.posisi || '');
   const [picArea, setPicArea] = useState(pic?.pic_area || '');
-  const [status, setStatus] = useState<'Active' | 'Sick' | 'On leave' | 'On Branch'>(pic?.status || 'Active');
+  const [status, setStatus] = useState<
+    | 'Active'
+    | 'Sick'
+    | 'On leave'
+    | 'On Branch'
+    | 'Business Trip'
+    | 'Meeting'
+    | 'Occupied'
+  >(pic?.status || 'Active');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -332,13 +347,16 @@ const EditPICModal: React.FC<EditPICModalProps> = ({ isOpen, onClose, pic, onSub
             <label className="block text-sm font-medium text-gray-700">Status</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as 'Active' | 'Sick' | 'On leave' | 'On Branch')}
+              onChange={(e) => setStatus(e.target.value as PIC['status'])}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
               <option value="Active">Active</option>
               <option value="Sick">Sick</option>
               <option value="On leave">On Leave</option>
               <option value="On Branch">On Branch</option>
+              <option value="Business Trip">Business Trip</option>
+              <option value="Meeting">Meeting</option>
+              <option value="Occupied">Occupied</option>
             </select>
           </div>
           <button
@@ -1118,10 +1136,13 @@ function UserControlPanel() {
                       <TableCell className="text-sm text-gray-500">{pic.pic_area}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          pic.status === 'Active' ? 'bg-green-100 text-green-800' :
-                          pic.status === 'Sick' ? 'bg-red-100 text-red-800' :
-                          pic.status === 'On leave' ? 'bg-yellow-100 text-yellow-800' :
-                          pic.status === 'On Branch' ? 'bg-blue-100 text-blue-800' :
+                          pic.status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
+                          pic.status === 'Sick' ? 'bg-rose-100 text-rose-800' :
+                          pic.status === 'On leave' ? 'bg-amber-100 text-amber-800' :
+                          pic.status === 'On Branch' ? 'bg-cyan-100 text-cyan-800' :
+                          pic.status === 'Business Trip' ? 'bg-sky-100 text-sky-800' :
+                          pic.status === 'Meeting' ? 'bg-fuchsia-100 text-fuchsia-800' :
+                          pic.status === 'Occupied' ? 'bg-zinc-300 text-zinc-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {pic.status}
@@ -1195,22 +1216,30 @@ function UserControlPanel() {
           </div>
           
           <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
-            <div className="overflow-y-auto max-h-[500px]">
+            <div className="overflow-y-auto h-full">
               <Table>
                 <TableHeader className="bg-gray-50 sticky top-0">
-                  <TableRow>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Role</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers?.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="text-sm text-gray-900">{user.email}</TableCell>
-                      <TableCell className="text-sm text-gray-900">{user.full_name}</TableCell>
+  <TableRow>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider w-10">No.</TableHead>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</TableHead>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</TableHead>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Role</TableHead>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
+    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
+  </TableRow>
+</TableHeader>
+<TableBody>
+  {filteredUsers
+    ?.slice() // copy array agar tidak mutasi
+    .sort((a, b) => {
+      const roleOrder = ['superadmin', 'manager', 'dvs', 'qa', 'risk', 'user'];
+      return roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
+    })
+    .map((user, index) => (
+    <TableRow key={user.id}>
+      <TableCell className="text-sm text-gray-900">{index + 1}</TableCell>
+      <TableCell className="text-sm text-gray-900">{user.email}</TableCell>
+      <TableCell className="text-sm text-gray-900">{user.full_name}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           user.role === 'dvs' ? 'bg-cyan-100 text-cyan-800' :
