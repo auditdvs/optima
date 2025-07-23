@@ -550,7 +550,10 @@ const AccountSettingsPage = () => {
       {/* NEW: Administration Issues Table */}
       {showAuditSections && (
         <div className="mt-10">
-          <h2 className="text-lg font-semibold mb-2">Administration Issues</h2>
+          <h2 className="text-xl font-semibold mb-2">Administration Issues</h2>
+            <h3 className="text-sm text-gray-600 mb-4">
+              For any data mismatch, contact <span className="font-bold">QA.</span>
+            </h3>
           <div className="bg-white rounded-lg shadow p-4">
             <Table>
               <TableHeader>
@@ -591,7 +594,7 @@ const AccountSettingsPage = () => {
       {/* Tabel Audited Branches - Grid Layout */}
       {showAuditSections && (
         <div className="mt-10">
-          <h2 className="text-lg font-semibold mb-2">List of Audited Branches</h2>
+          <h2 className="text-xl font-semibold mb-2">List of Audited Branches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Regular Audits - Kiri */}
             <div className="bg-white rounded-lg shadow p-4">
@@ -665,7 +668,7 @@ const AccountSettingsPage = () => {
       {/* Audit Schedule Section - New */}
       {showAuditSections && (
         <div className="mt-10">
-          <h2 className="text-lg font-semibold mb-4">Audit Schedule</h2>
+          <h2 className="text-xl font-semibold mb-4">Audit Schedule</h2>
           
           {/* Region Tabs */}
           <div className="mb-4">

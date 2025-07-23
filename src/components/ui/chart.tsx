@@ -353,23 +353,20 @@ function getPayloadConfigFromPayload(
     : config[key as keyof typeof config]
 }
 
-const auditTrendsConfig = {
-  regular: {
-    label: "Regular",
-    color: "#50C878",
-  },
-  fraud: {
-    label: "Fraud",
-    color: "#e74c3c",
-  },
+export {
+  ChartContainer, ChartLegend,
+  ChartLegendContent,
+  ChartStyle, ChartTooltip,
+  ChartTooltipContent
 }
 
-export {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-  ChartStyle,
-  auditTrendsConfig, // jika ingin import config dari luar
+export const auditTrendsConfig = {
+  annualAudits: {
+    label: "Annual Audits",
+    color: "#50C878",
+  },
+  fraudAudits: {
+    label: "Special Audits",
+    color: "#e74c3c",
+  },
 }

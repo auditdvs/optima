@@ -1,5 +1,6 @@
+import { ResponsivePie } from '@nivo/pie';
 import { useEffect, useState } from 'react';
-import { CartesianGrid, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
 import CountUp from '../components/CountUp';
 import { BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
@@ -12,6 +13,7 @@ import {
   CardHeader,
   CardTitle
 } from '../components/ui/card';
+
 import {
   ChartConfig,
   ChartContainer,
@@ -20,14 +22,6 @@ import {
 } from "../components/ui/chart";
 import PasswordModal from '../components/ui/PasswordModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '../components/ui/table';
 import { supabase } from '../lib/supabaseClient';
 
 // sesuaikan path jika berbeda
@@ -663,6 +657,118 @@ const Dashboard = () => {
       .join(', ');
   }
 
+
+  // State for selected region (shared for both Audit Barometer and Monthly Audit Trends)
+  const [selectedRegion, setSelectedRegion] = useState('All');
+  // Get unique region list
+  const regionList = ['All', ...Array.from(new Set(branches.map(b => b.region)).values())];
+
+  // Monthly Audit Trends data filtered by region
+  const getMonthlyDataByRegion = () => {
+    let filteredBranches = branches;
+    let filteredWorkPapers = workPapers;
+    if (selectedRegion !== 'All') {
+      filteredBranches = branches.filter(b => b.region === selectedRegion);
+      filteredWorkPapers = workPapers.filter(wp => {
+        const branch = branches.find(b => b.name === wp.branch_name);
+        return branch && branch.region === selectedRegion;
+      });
+    }
+    // Reuse getMonthlyAuditData but only for filteredWorkPapers
+    return getMonthlyAuditData(filteredWorkPapers);
+  };
+
+  // Calculate Audit Barometer data per region
+  const getAuditBarometerData = () => {
+    let filteredBranches = branches;
+    let filteredWorkPapers = workPapers;
+    if (selectedRegion !== 'All') {
+      filteredBranches = branches.filter(b => b.region === selectedRegion);
+      filteredWorkPapers = workPapers.filter(wp => {
+        const branch = branches.find(b => b.name === wp.branch_name);
+        return branch && branch.region === selectedRegion;
+      });
+    }
+    const totalScheduled = filteredBranches.length;
+    const specialTarget = totalScheduled / 2;
+    const regularAudited = new Set(
+      filteredWorkPapers.filter(wp => wp.audit_type === 'regular').map(wp => wp.branch_name)
+    ).size;
+    const specialAudited = new Set(
+      filteredWorkPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)
+    ).size;
+    return [
+      {
+        id: 'Regular',
+        label: 'Regular Audit %',
+        value: totalScheduled === 0 ? 0 : Math.round((regularAudited / totalScheduled) * 100),
+        color: '#50C878',
+      },
+      {
+        id: 'Special',
+        label: 'Special Audit %',
+        value: specialTarget === 0 ? 0 : Math.round((specialAudited / specialTarget) * 100),
+        color: '#e74c3c',
+      },
+    ];
+  };
+
+  // Tambahkan state untuk filter bulan BarChart region
+const [selectedRegionMonth, setSelectedRegionMonth] = useState('All');
+const regionMonths = ['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Fungsi untuk filter data region berdasarkan bulan
+const getRegionAuditDataByMonth = () => {
+  if (selectedRegionMonth === 'All') return getRegionAuditData();
+
+  const monthIndex = regionMonths.indexOf(selectedRegionMonth) - 1;
+  if (monthIndex < 0) return getRegionAuditData();
+
+  // Filter workPapers berdasarkan bulan
+  const filteredWorkPapers = workPapers.filter(wp => {
+    const startDate = new Date(wp.audit_start_date);
+    return startDate.getMonth() === monthIndex;
+  });
+
+  // Gunakan region dari branches yang ada
+  const regionMap: Record<string, { regular: number; fraud: number }> = {};
+  branches.forEach(branch => {
+    regionMap[branch.region] = { regular: 0, fraud: 0 };
+  });
+
+  const uniqueRegularAudits = new Set<string>();
+  const uniqueFraudAudits = new Set<string>();
+
+  filteredWorkPapers.forEach(wp => {
+    const branch = branches.find(b => b.name === wp.branch_name);
+    if (!branch) return;
+    const region = branch.region;
+    if (!regionMap[region]) regionMap[region] = { regular: 0, fraud: 0 };
+    const uniqueKey = `${wp.branch_name}|${wp.audit_start_date}|${wp.audit_end_date}`;
+    if (wp.audit_type === 'regular') {
+      const regionalUniqueKey = `${region}|${uniqueKey}`;
+      if (!uniqueRegularAudits.has(regionalUniqueKey)) {
+        uniqueRegularAudits.add(regionalUniqueKey);
+        regionMap[region].regular += 1;
+      }
+    } else if (wp.audit_type === 'fraud') {
+      const regionalUniqueKey = `${region}|${uniqueKey}`;
+      if (!uniqueFraudAudits.has(regionalUniqueKey)) {
+        uniqueFraudAudits.add(regionalUniqueKey);
+        regionMap[region].fraud += 1;
+      }
+    }
+  });
+
+  return Object.entries(regionMap)
+    .map(([region, counts]) => ({
+      region,
+      regular: counts.regular,
+      fraud: counts.fraud
+    }))
+    .sort((a, b) => a.region.localeCompare(b.region));
+};
+
   return (
     <div className="space-y-4 p-0">
       <div className="flex justify-between items-center mb-4">
@@ -721,18 +827,20 @@ const Dashboard = () => {
                         </SelectTrigger>
                         <SelectContent align="end" className="rounded-xl">
                           {months.map((month) => (
-                            <SelectItem key={month} value={month} className="rounded-lg">
-                              <div className="flex items-center gap-2 text-xs">
-                                <span
-                                  className="flex h-3 w-3 shrink-0 rounded-full"
-                                  style={{
-                                    backgroundColor: month === 'All' ? '#0284c7' : `var(--color-${month.toLowerCase()})`
-                                  }}
-                                />
-                                {month}
-                              </div>
-                            </SelectItem>
-                          ))}
+  <SelectItem key={month} value={month} className="rounded-lg">
+    <div className="flex items-center gap-2 text-xs">
+      {month !== 'All' && (
+        <span
+          className="flex h-3 w-3 shrink-0 rounded-full"
+          style={{
+            backgroundColor:`var(--color-${month.toLowerCase()})`
+          }}
+        />
+      )}
+      {month}
+    </div>
+  </SelectItem>
+))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -811,22 +919,37 @@ const Dashboard = () => {
                 {/* RIGHT: Monthly Audit Trends (Line Chart) */}
                 <Card className="flex flex-col bg-white shadow-sm border">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-semibold text-gray-700">Monthly Audit Trends</CardTitle>
-                    <CardDescription className="text-sm text-gray-500">Annual and Special Audits</CardDescription>
+                    <div className="flex flex-row items-center justify-between w-full">
+                      <CardTitle className="text-lg font-semibold text-gray-700">Monthly Audit Trends</CardTitle>
+                     <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+  <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region for trends">
+    <SelectValue placeholder="Select region" />
+  </SelectTrigger>
+  <SelectContent align="end" className="rounded-xl">
+    {regionList.map(region => (
+      <SelectItem key={region} value={region} className="rounded-lg">
+        <div className="flex items-center gap-2 text-xs">
+          {region}
+        </div>
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+                    </div>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
                     <ChartContainer 
                       config={barChartConfig}
-                      className="mx-auto h-[300px] w-full" // Tinggi ditambah dari 200px ke 300px
+                      className="mx-auto h-[300px] w-full"
                     >
                       <LineChart
                         accessibilityLayer
-                        data={monthlyData}
+                        data={getMonthlyDataByRegion()}
                         margin={{
                           top: 20,
-                          left: 20, // Tambahkan margin kiri
+                          left: 20,
                           right: 20,
-                          bottom: 40, // Tambahkan space di bawah untuk label
+                          bottom: 40,
                         }}
                       >
                         <CartesianGrid vertical={false} />
@@ -834,9 +957,9 @@ const Dashboard = () => {
                           dataKey="month"
                           tickLine={false}
                           axisLine={false}
-                          tickMargin={10} // Tambah margin untuk label
-                          height={40} // Tambahkan height untuk XAxis
-                          tick={{ fontSize: 12 }} // Pastikan ukuran font sesuai
+                          tickMargin={10}
+                          height={40}
+                          tick={{ fontSize: 12 }}
                         />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                         <Line
@@ -844,14 +967,14 @@ const Dashboard = () => {
                           type="monotone"
                           stroke="var(--color-annualAudits)"
                           strokeWidth={2}
-                          dot={true} // Tambahkan dot untuk melihat data points
+                          dot={true}
                         />
                         <Line
                           dataKey="fraudAudits"
                           type="monotone"
                           stroke="var(--color-fraudAudits)"
                           strokeWidth={2}
-                          dot={true} // Tambahkan dot untuk melihat data points
+                          dot={true}
                         />
                       </LineChart>
                     </ChartContainer>
@@ -861,118 +984,168 @@ const Dashboard = () => {
 
               {/* BOTTOM ROW: Both tables side by side */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                {/* LEFT: Audit Count per Auditor */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Audit Count per Auditor</h3>
-                  
-                  <div className="overflow-x-auto h-full">
-                    <div className="overflow-y-auto max-h-[300px] border rounded h-full">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-white shadow-sm">
-                          <TableRow className="border-b">
-                            <TableHead className="text-left py-1 px-2 font-medium w-12">No.</TableHead>
-                            <TableHead className="text-left py-1 px-2 font-medium">Auditor Name</TableHead>
-                            <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
-                            <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
-                            <TableHead className="text-right py-1 px-2 font-medium text-blue-600">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {auditorCounts
-                            .filter(auditor => 
-                              !['lise', 'ganjar', 'dede', 'eri'].includes(auditor.auditor_id)
-                            )
-                            .map((auditor, idx) => (
-                              <TableRow key={`auditor-${auditor.auditor_id || idx}`}>
-                                <TableCell>{idx + 1}</TableCell>
-                                <TableCell>{auditor.auditor_name}</TableCell>
-                                <TableCell className="text-right">
-                                  <CountUp to={auditor.regular} duration={1.5} delay={idx * 0.1} />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <CountUp to={auditor.fraud} duration={1.5} delay={idx * 0.1 + 0.2} />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <CountUp to={auditor.total} duration={1.5} delay={idx * 0.1 + 0.4} />
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                {/* LEFT: Audit Barometer Pie Chart */}
+                <Card className="flex flex-col bg-white shadow-sm border">
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-row items-center justify-between w-full">
+                      <CardTitle className="text-lg font-semibold">Audit Barometer</CardTitle>
+                      <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+  <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region">
+    <SelectValue placeholder="Select region" />
+  </SelectTrigger>
+  <SelectContent align="end" className="rounded-xl">
+    {regionList.map(region => (
+      <SelectItem key={region} value={region} className="rounded-lg">
+        <div className="flex items-center gap-2 text-xs">
+          {region}
+        </div>
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
                     </div>
-                  </div>
-                </div>
-
-                {/* RIGHT: Audit Summary by Region */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Audit Summary by Region</h3>
-                  
-                  {/* Desktop View: Shadcn table for region summary */}
-                  <div className="overflow-x-auto hidden lg:block h-full">
-                    <div className="overflow-y-auto max-h-[300px] border rounded h-full">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-white shadow-sm">
-                          <TableRow className="border-b">
-                            <TableHead className="text-left py-1 px-2 font-medium">Region</TableHead>
-                            <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
-                            <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {getRegionAuditData().map((item, index) => (
-                            <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                              <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
-                              <TableCell className="text-right py-1 px-2">
-                                <span className="text-green-600">
-                                  <CountUp to={item.regular} duration={1.5} delay={index * 0.1} />
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right py-1 px-2">
-                                <span className="text-red-600">
-                                  <CountUp to={item.fraud} duration={1.5} delay={index * 0.1 + 0.2} />
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                  </CardHeader>
+                  <CardContent className="flex-1 pt-0">
+                    <div className="h-[300px] w-full">
+                      <ResponsivePie
+                        data={getAuditBarometerData()}
+                        margin={{ top: 20, right: 40, bottom: 40, left: 40 }}
+                        innerRadius={0.5}
+                        padAngle={0.6}
+                        cornerRadius={2}
+                        activeOuterRadiusOffset={8}
+                        colors={({ data }) => data.color}
+                        arcLinkLabelsSkipAngle={10}
+                        arcLinkLabelsTextColor="#333"
+                        arcLinkLabelsThickness={2}
+                        arcLinkLabelsColor={{ from: 'color' }}
+                        arcLabelsSkipAngle={10}
+                        arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
+                        legends={[
+                          {
+                            anchor: 'bottom',
+                            direction: 'row',
+                            translateY: 36,
+                            itemWidth: 120,
+                            itemHeight: 18,
+                            symbolShape: 'circle',
+                          },
+                        ]}
+                        valueFormat={v => `${v}%`}
+                      />
                     </div>
-                  </div>
+                  </CardContent>
+                  <CardFooter className="flex-col gap-1 text-xs text-gray-500">
+                    <div>
+                      Regular: {getAuditBarometerData()[0].value}% dari {selectedRegion === 'All' ? branches.length : branches.filter(b => b.region === selectedRegion).length} cabang
+                    </div>
+                    <div>
+                      Special: {getAuditBarometerData()[1].value}% dari {selectedRegion === 'All' ? Math.round(branches.length / 2) : Math.round(branches.filter(b => b.region === selectedRegion).length / 2)} target
+                    </div>
+                  </CardFooter>
+                </Card>
 
-                  {/* Mobile & Tablet View */}
-                  <div className="overflow-y-auto max-h-[300px] border rounded block lg:hidden">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-white shadow-sm">
-                        <TableRow className="text-gray-500 border-b">
-                          <TableHead className="text-left py-1 px-2 font-medium">Region</TableHead>
-                          <TableHead className="text-right py-1 px-2 font-medium text-green-600">Regular</TableHead>
-                          <TableHead className="text-right py-1 px-2 font-medium text-red-600">Special</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getRegionAuditData().map((item, index) => (
-                          <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                            <TableCell className="py-1 px-2 font-medium">{item.region}</TableCell>
-                            <TableCell className="text-right py-1 px-2">
-                              <span className="text-green-600">
-                                <CountUp to={item.regular} duration={1.5} delay={index * 0.1} />
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right py-1 px-2">
-                              <span className="text-red-600">
-                                <CountUp to={item.fraud} duration={1.5} delay={index * 0.1 + 0.2} />
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+                {/* BarChart Audit Summary by Region */}
+<Card className="flex flex-col bg-white shadow-sm border">
+  <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <CardTitle className="text-lg font-semibold">Audit Summary by Region</CardTitle>
+    <Select value={selectedRegionMonth} onValueChange={setSelectedRegionMonth}>
+      <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Filter bulan region">
+        <SelectValue placeholder="Pilih Bulan" />
+      </SelectTrigger>
+      <SelectContent align="end" className="rounded-xl">
+{regionMonths.map((month) => (
+  <SelectItem key={month} value={month} className="rounded-lg">
+    <div className="flex items-center gap-2 text-xs">
+      {month !== 'All' && (
+        <span className="flex h-3 w-3 shrink-0 rounded-full"
+          style={{
+            backgroundColor: `var(--color-${month.toLowerCase()})`
+          }}
+        />
+      )}
+      {month}
+    </div>
+  </SelectItem>
+))}
+      </SelectContent>
+    </Select>
+  </CardHeader>
+  <CardContent>
+    <div className="h-[300px] w-full">
+      <ChartContainer
+        config={{
+          regular: { label: "Regular", color: "#50C878" },
+          fraud: { label: "Special", color: "#e74c3c" },
+        }}
+        className="h-full w-full"
+      >
+        <BarChart
+          data={getRegionAuditDataByMonth()}
+          margin={{ top: 20, right: 30, left: 0, bottom: 40 }}
+        >
+          <XAxis
+            dataKey="region"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+          />
+          <Bar
+            dataKey="regular"
+            stackId="a"
+            fill="#50C878"
+            radius={[0, 0, 4, 4]}
+          />
+          <Bar
+            dataKey="fraud"
+            stackId="a"
+            fill="#e74c3c"
+            radius={[4, 4, 0, 0]}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                hideLabel
+                className="w-[180px]"
+                formatter={(value, name, item, index) => (
+                  <>
+                    <div
+                      className="h-2.5 w-2.5 shrink-0 rounded-[2px] mr-2"
+                      style={{
+                        background: name === "regular" ? "#50C878" : "#e74c3c",
+                      }}
+                    />
+                    {name === "regular" ? "Regular" : "Special"}
+                    <div className="text-foreground ml-auto flex items-baseline gap-0.5 font-mono font-medium tabular-nums">
+                      {value}
+                    </div>
+                    {/* Show total after last item */}
+                    {index === 1 && (
+                      <div className="text-foreground mt-1.5 flex basis-full items-center border-t pt-1.5 text-xs font-medium">
+                        Total
+                        <div className="text-foreground ml-auto flex items-baseline gap-0.5 font-mono font-medium tabular-nums">
+                          {item.payload.regular + item.payload.fraud}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              />
+            }
+            cursor={false}
+          />
+        </BarChart>
+        <CardFooter className="flex items-center justify-center text-xs text-gray-500 text-center w-full font-semibold">
+          <div>
+            All Audit regular and special
+          </div>
+        </CardFooter>
+      </ChartContainer>
+    </div>
+  </CardContent>
+</Card>
               </div>
             </div>
-
-            
           </CardContent>
         </Card>
       )}
