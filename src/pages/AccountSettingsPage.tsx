@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabaseClient';
 interface AuditedBranch {
   branch_name: string;
   audit_type: string;
+  audit_start_date?: string | null;
+  audit_end_date?: string | null;
 }
 
 // New interface for administration issues
@@ -617,13 +619,18 @@ const AccountSettingsPage = () => {
                     </TableRow>
                   ) : (
                     auditedBranches
-                      .filter(branch => branch.audit_type === 'regular')
-                      .map((row, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{idx + 1}</TableCell>
-                          <TableCell>{row.branch_name}</TableCell>
-                        </TableRow>
-                      ))
+  .filter(branch => branch.audit_type === 'regular')
+  .sort((a, b) => {
+    const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
+    const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
+    return dateA - dateB;
+  })
+  .map((row, idx) => (
+    <TableRow key={idx}>
+      <TableCell>{idx + 1}</TableCell>
+      <TableCell>{row.branch_name}</TableCell>
+    </TableRow>
+  ))
                   )}
                 </TableBody>
               </Table>
@@ -650,13 +657,18 @@ const AccountSettingsPage = () => {
                     </TableRow>
                   ) : (
                     auditedBranches
-                      .filter(branch => branch.audit_type === 'fraud')
-                      .map((row, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{idx + 1}</TableCell>
-                          <TableCell>{row.branch_name}</TableCell>
-                        </TableRow>
-                      ))
+  .filter(branch => branch.audit_type === 'fraud')
+  .sort((a, b) => {
+    const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
+    const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
+    return dateA - dateB;
+  })
+  .map((row, idx) => (
+    <TableRow key={idx}>
+      <TableCell>{idx + 1}</TableCell>
+      <TableCell>{row.branch_name}</TableCell>
+    </TableRow>
+  ))
                   )}
                 </TableBody>
               </Table>
