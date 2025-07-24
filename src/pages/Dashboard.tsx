@@ -14,6 +14,7 @@ import {
   CardTitle
 } from '../components/ui/card';
 
+import html2canvas from 'html2canvas';
 import {
   ChartConfig,
   ChartContainer,
@@ -658,8 +659,9 @@ const Dashboard = () => {
   }
 
 
-  // State for selected region (shared for both Audit Barometer and Monthly Audit Trends)
-  const [selectedRegion, setSelectedRegion] = useState('All');
+  // State for selected region (pisahkan)
+  const [selectedBarometerRegion, setSelectedBarometerRegion] = useState('All');
+  const [selectedTrendsRegion, setSelectedTrendsRegion] = useState('All');
   // Get unique region list
   const regionList = ['All', ...Array.from(new Set(branches.map(b => b.region)).values())];
 
@@ -667,14 +669,13 @@ const Dashboard = () => {
   const getMonthlyDataByRegion = () => {
     let filteredBranches = branches;
     let filteredWorkPapers = workPapers;
-    if (selectedRegion !== 'All') {
-      filteredBranches = branches.filter(b => b.region === selectedRegion);
+    if (selectedTrendsRegion !== 'All') {
+      filteredBranches = branches.filter(b => b.region === selectedTrendsRegion);
       filteredWorkPapers = workPapers.filter(wp => {
         const branch = branches.find(b => b.name === wp.branch_name);
-        return branch && branch.region === selectedRegion;
+        return branch && branch.region === selectedTrendsRegion;
       });
     }
-    // Reuse getMonthlyAuditData but only for filteredWorkPapers
     return getMonthlyAuditData(filteredWorkPapers);
   };
 
@@ -682,11 +683,11 @@ const Dashboard = () => {
   const getAuditBarometerData = () => {
     let filteredBranches = branches;
     let filteredWorkPapers = workPapers;
-    if (selectedRegion !== 'All') {
-      filteredBranches = branches.filter(b => b.region === selectedRegion);
+    if (selectedBarometerRegion !== 'All') {
+      filteredBranches = branches.filter(b => b.region === selectedBarometerRegion);
       filteredWorkPapers = workPapers.filter(wp => {
         const branch = branches.find(b => b.name === wp.branch_name);
-        return branch && branch.region === selectedRegion;
+        return branch && branch.region === selectedBarometerRegion;
       });
     }
     const totalScheduled = filteredBranches.length;
@@ -768,6 +769,26 @@ const getRegionAuditDataByMonth = () => {
     }))
     .sort((a, b) => a.region.localeCompare(b.region));
 };
+
+  const downloadMultipleCharts = async () => {
+    const charts = [
+      { id: 'chart-audit-composition', filename: 'audit-composition.png' },
+      { id: 'chart-monthly-trends', filename: 'monthly-audit-trends.png' },
+      { id: 'chart-barometer', filename: 'audit-barometer.png' },
+      { id: 'chart-summary-region', filename: 'audit-summary-region.png' },
+    ];
+    for (const chart of charts) {
+      const el = document.getElementById(chart.id);
+      if (el) {
+        const canvas = await html2canvas(el, { backgroundColor: "#fff" });
+        const link = document.createElement('a');
+        link.download = chart.filename;
+        link.href = canvas.toDataURL();
+        link.click();
+        await new Promise(r => setTimeout(r, 500)); // beri jeda agar download tidak bentrok
+      }
+    }
+  };
 
   return (
     <div className="space-y-4 p-0">
@@ -921,20 +942,20 @@ const getRegionAuditDataByMonth = () => {
                   <CardHeader className="pb-2">
                     <div className="flex flex-row items-center justify-between w-full">
                       <CardTitle className="text-lg font-semibold text-gray-700">Monthly Audit Trends</CardTitle>
-                     <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-  <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region for trends">
-    <SelectValue placeholder="Select region" />
-  </SelectTrigger>
-  <SelectContent align="end" className="rounded-xl">
-    {regionList.map(region => (
-      <SelectItem key={region} value={region} className="rounded-lg">
-        <div className="flex items-center gap-2 text-xs">
-          {region}
-        </div>
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+                      <Select value={selectedTrendsRegion} onValueChange={setSelectedTrendsRegion}>
+        <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region for trends">
+          <SelectValue placeholder="Select region" />
+        </SelectTrigger>
+        <SelectContent align="end" className="rounded-xl">
+          {regionList.map(region => (
+            <SelectItem key={region} value={region} className="rounded-lg">
+              <div className="flex items-center gap-2 text-xs">
+                {region}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
@@ -989,20 +1010,20 @@ const getRegionAuditDataByMonth = () => {
                   <CardHeader className="pb-2">
                     <div className="flex flex-row items-center justify-between w-full">
                       <CardTitle className="text-lg font-semibold">Audit Barometer</CardTitle>
-                      <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-  <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region">
-    <SelectValue placeholder="Select region" />
-  </SelectTrigger>
-  <SelectContent align="end" className="rounded-xl">
-    {regionList.map(region => (
-      <SelectItem key={region} value={region} className="rounded-lg">
-        <div className="flex items-center gap-2 text-xs">
-          {region}
-        </div>
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+                      <Select value={selectedBarometerRegion} onValueChange={setSelectedBarometerRegion}>
+        <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Select region">
+          <SelectValue placeholder="Select region" />
+        </SelectTrigger>
+        <SelectContent align="end" className="rounded-xl">
+          {regionList.map(region => (
+            <SelectItem key={region} value={region} className="rounded-lg">
+              <div className="flex items-center gap-2 text-xs">
+                {region}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
@@ -1037,10 +1058,10 @@ const getRegionAuditDataByMonth = () => {
                   </CardContent>
                   <CardFooter className="flex-col gap-1 text-xs text-gray-500">
                     <div>
-                      Regular: {getAuditBarometerData()[0].value}% dari {selectedRegion === 'All' ? branches.length : branches.filter(b => b.region === selectedRegion).length} cabang
+                      Regular: {getAuditBarometerData()[0].value}% dari {selectedBarometerRegion === 'All' ? branches.length : branches.filter(b => b.region === selectedBarometerRegion).length} cabang
                     </div>
                     <div>
-                      Special: {getAuditBarometerData()[1].value}% dari {selectedRegion === 'All' ? Math.round(branches.length / 2) : Math.round(branches.filter(b => b.region === selectedRegion).length / 2)} target
+                      Special: {getAuditBarometerData()[1].value}% dari {selectedBarometerRegion === 'All' ? Math.round(branches.length / 2) : Math.round(branches.filter(b => b.region === selectedBarometerRegion).length / 2)} target
                     </div>
                   </CardFooter>
                 </Card>
