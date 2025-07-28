@@ -24,22 +24,24 @@ function ExternalLinkCard({ url, title, description, className = "" }) {
 }
 
 // Component untuk download card
-function DownloadCard({ url, title, description }) {
+function DownloadCard({ url, title, description, disabled = false }) {
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 h-full">
+    <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 h-full ${disabled ? "opacity-60 pointer-events-none" : ""}`}>
       <div className="p-6 flex flex-col justify-between h-full">
         <div>
           <h3 className="text-xl font-semibold mb-3 text-gray-900">{title}</h3>
           <p className="text-gray-600 mb-6">{description}</p>
         </div>
         <a
-          href={url}
+          href={disabled ? undefined : url}
           target="_blank"
           rel="noopener noreferrer"
-          className="Download-button"
+          className={`Download-button ${disabled ? "cursor-not-allowed bg-gray-300 text-gray-500" : ""}`}
+          tabIndex={disabled ? -1 : 0}
+          aria-disabled={disabled}
         >
           <Download size={16} />
-          <span>Download File</span>
+          <span>{disabled ? "Tidak Tersedia" : "Download File"}</span>
         </a>
       </div>
     </div>
@@ -366,12 +368,14 @@ function WorkPaper() {
     {
       title: "KK Pemeriksaan Audit Reguler",
       description: "Template kertas kerja untuk pemeriksaan audit reguler",
-      url: "https://drive.google.com/uc?export=download&id=1FdEazpTh4usSVS4DGZrSoP7wnyGHANw8"
+      url: "https://drive.google.com/uc?export=download&id=1FdEazpTh4usSVS4DGZrSoP7wnyGHANw8",
+      disabled: false
     },
     {
       title: "KK Pemeriksaan Audit Khusus",
       description: "Template kertas kerja untuk pemeriksaan audit khusus/fraud",
-      url: "https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents//KK%20Pemeriksaan%20Audit%20Khusus.xlsx"
+      url: "https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents//KK%20Pemeriksaan%20Audit%20Khusus.xlsx",
+      disabled: true
     }
   ];
 
@@ -403,6 +407,7 @@ function WorkPaper() {
             url={template.url}
             title={template.title}
             description={template.description}
+            disabled={template.disabled}
           />
         ))}
       </div>
