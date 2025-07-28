@@ -375,7 +375,7 @@ function WorkPaper() {
       title: "KK Pemeriksaan Audit Khusus",
       description: "Template kertas kerja untuk pemeriksaan audit khusus/fraud",
       url: "https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents//KK%20Pemeriksaan%20Audit%20Khusus.xlsx",
-      disabled: true
+      disabled: false
     }
   ];
 
