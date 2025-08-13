@@ -7,6 +7,8 @@ import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
+import AssignmentLetter from './pages/AssignmentLetter';
+import BranchDirectory from './pages/BranchDirectory';
 import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
@@ -23,7 +25,6 @@ import RiskDashboard from './pages/RiskDashboard';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UpdateLocation from './pages/UpdateLocation';
-import BranchDirectory from './pages/BranchDirectory';
 
 const queryClient = new QueryClient();
 
@@ -127,6 +128,11 @@ function App() {
                   <PrivateRoute>
                     <AccountSettingsPage />
                   </PrivateRoute>
+                } />
+                <Route path="assignment-letter" element={
+                <PrivateRoute requiredRoles={['superadmin']}>
+                  <AssignmentLetter />
+                </PrivateRoute>
                 } />
                 <Route path="branch-directory" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>

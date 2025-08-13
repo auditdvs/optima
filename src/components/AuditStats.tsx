@@ -20,49 +20,52 @@ export const AuditTotalStats = () => {
     const fetchTotalStats = async () => {
       if (!user?.id) return;
 
-      // 1. Ambil alias auditor
-      const { data: aliasData, error: aliasError } = await supabase
-        .from('auditor_aliases')
-        .select('alias')
-        .eq('profile_id', user.id)
-        .maybeSingle();
+      // Get user profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-      if (aliasError || !aliasData?.alias) {
+      if (profileError || !profileData?.full_name) {
         setLoading(false);
         return;
       }
 
-      // 2. Ambil semua work_paper_id dari work_paper_auditors
-      const { data: auditorRows, error: auditorError } = await supabase
-        .from('work_paper_auditors')
-        .select('work_paper_id')
-        .eq('auditor_name', aliasData.alias);
-
-      if (auditorError) {
-        setLoading(false);
-        return;
-      }
-
-      const workPaperIds = auditorRows?.map(row => row.work_paper_id) || [];
-      if (workPaperIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // 3. Ambil work_papers lengkap
-      const { data: papers, error: papersError } = await supabase
+      // Get work papers where user's full_name is in the auditor column (comma-delimited)
+      const { data: workPapers, error: workPapersError } = await supabase
         .from('work_papers')
-        .select('id,branch_name,audit_type,audit_start_date,audit_end_date')
-        .in('id', workPaperIds);
+        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, auditor')
+        .ilike('auditor', `%${profileData.full_name}%`);
 
-      if (papersError) {
+      if (workPapersError || !workPapers) {
         setLoading(false);
         return;
       }
 
-      // 4. Unikkan berdasarkan branch_name + audit_type + audit_start_date + audit_end_date
+      // Filter work papers to ensure user's full_name is actually in the auditor column
+      const filteredWorkPapers = workPapers.filter(wp => {
+        if (!wp.auditor) return false;
+        
+        const auditorList = wp.auditor.split(',').map((name: string) => name.trim()) || [];
+        
+        // Try exact match first
+        if (auditorList.includes(profileData.full_name)) {
+          return true;
+        }
+        
+        // Try partial matches (in case of slight name variations)
+        const userNameParts = profileData.full_name.toLowerCase().split(' ');
+        return auditorList.some((auditor: string) => {
+          const auditorLower = auditor.toLowerCase();
+          const matchingParts = userNameParts.filter((part: string) => auditorLower.includes(part));
+          return matchingParts.length >= 2;
+        });
+      });
+
+      // Unique by branch_name + audit_type + audit_start_date + audit_end_date
       const uniqueMap = new Map();
-      papers.forEach(wp => {
+      filteredWorkPapers.forEach(wp => {
         const key = `${wp.branch_name}|${wp.audit_type}|${wp.audit_start_date}|${wp.audit_end_date}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, wp);
@@ -117,49 +120,52 @@ const AuditStats = () => {
     const fetchStats = async () => {
       if (!user?.id) return;
 
-      // 1. Ambil alias auditor
-      const { data: aliasData, error: aliasError } = await supabase
-        .from('auditor_aliases')
-        .select('alias')
-        .eq('profile_id', user.id)
-        .maybeSingle();
+      // Get user profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-      if (aliasError || !aliasData?.alias) {
+      if (profileError || !profileData?.full_name) {
         setLoading(false);
         return;
       }
 
-      // 2. Ambil semua work_paper_id dari work_paper_auditors
-      const { data: auditorRows, error: auditorError } = await supabase
-        .from('work_paper_auditors')
-        .select('work_paper_id')
-        .eq('auditor_name', aliasData.alias);
-
-      if (auditorError) {
-        setLoading(false);
-        return;
-      }
-
-      const workPaperIds = auditorRows?.map(row => row.work_paper_id) || [];
-      if (workPaperIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // 3. Ambil work_papers lengkap
-      const { data: papers, error: papersError } = await supabase
+      // Get work papers where user's full_name is in the auditor column (comma-delimited)
+      const { data: workPapers, error: workPapersError } = await supabase
         .from('work_papers')
-        .select('id,branch_name,audit_type,audit_start_date,audit_end_date')
-        .in('id', workPaperIds);
+        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, auditor')
+        .ilike('auditor', `%${profileData.full_name}%`);
 
-      if (papersError) {
+      if (workPapersError || !workPapers) {
         setLoading(false);
         return;
       }
 
-      // 4. Unikkan berdasarkan branch_name + audit_type + audit_start_date + audit_end_date
+      // Filter work papers to ensure user's full_name is actually in the auditor column
+      const filteredWorkPapers = workPapers.filter(wp => {
+        if (!wp.auditor) return false;
+        
+        const auditorList = wp.auditor.split(',').map((name: string) => name.trim()) || [];
+        
+        // Try exact match first
+        if (auditorList.includes(profileData.full_name)) {
+          return true;
+        }
+        
+        // Try partial matches (in case of slight name variations)
+        const userNameParts = profileData.full_name.toLowerCase().split(' ');
+        return auditorList.some((auditor: string) => {
+          const auditorLower = auditor.toLowerCase();
+          const matchingParts = userNameParts.filter((part: string) => auditorLower.includes(part));
+          return matchingParts.length >= 2;
+        });
+      });
+
+      // Unique by branch_name + audit_type + audit_start_date + audit_end_date
       const uniqueMap = new Map();
-      papers.forEach(wp => {
+      filteredWorkPapers.forEach(wp => {
         const key = `${wp.branch_name}|${wp.audit_type}|${wp.audit_start_date}|${wp.audit_end_date}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, wp);

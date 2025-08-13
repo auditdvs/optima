@@ -1,5 +1,5 @@
-import { Edit2, RefreshCw, UserPlus } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AuditFraudTable } from '../components/AuditFraudTable';
 import AuditTable from '../components/AuditTable';
@@ -13,41 +13,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/radioButtons.css';
 
-interface Auditor {
-  id: string;
-  name: string;
-  auditor_id: string;
-  created_at: string;
-}
+// Remove auditor-related interfaces since we're removing the auditors tab
 
-interface AddAuditorForm {
-  name: string;
-  auditor_id: string;
-  regional: string;
-  semester: 'Odd' | 'Even';
-  year: number;
-}
-
-interface AddAuditorModalProps {
-  handleAddAuditor: (e: React.FormEvent, formData: AddAuditorForm) => void;
-  setShowAddModal: (show: boolean) => void;
-  loading: boolean;
-}
-
-interface Assignment {
-  id: string;
-  auditor_id: string;
-  regional: string;
-  semester: 'Odd' | 'Even';
-  year: number;
-  created_at: string;
-}
-
-interface AuditorWithAssignments extends Auditor {
-  assignments: Assignment[];
-}
-
-// Add these interfaces to help with typing
 interface Branch {
   id: string;
   name: string;
@@ -82,130 +49,16 @@ interface AuditEntry {
   comment: string;
 }
 
-const AddAuditorModal: React.FC<AddAuditorModalProps> = ({
-  handleAddAuditor,
-  setShowAddModal,
-  loading,
-}) => {
-  const [localFormData, setLocalFormData] = useState<AddAuditorForm>({
-    name: '',
-    auditor_id: '',
-    regional: '',
-    semester: 'Odd',
-    year: new Date().getFullYear(),
-  });
-
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleAddAuditor(e, localFormData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">Add New Auditor</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={localFormData.name}
-              onChange={(e) => setLocalFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Auditor ID</label>
-            <input
-              type="text"
-              value={localFormData.auditor_id}
-              onChange={(e) => setLocalFormData(prev => ({ ...prev, auditor_id: e.target.value }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Regional</label>
-            <input
-              type="text"
-              value={localFormData.regional}
-              onChange={(e) => setLocalFormData(prev => ({ ...prev, regional: e.target.value }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Semester</label>
-              <select
-                value={localFormData.semester}
-                onChange={(e) => setLocalFormData(prev => ({ ...prev, semester: e.target.value as 'Odd' | 'Even' }))}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="Odd">Odd</option>
-                <option value="Even">Even</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Year</label>
-              <input
-                type="number"
-                value={localFormData.year}
-                onChange={(e) => setLocalFormData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={() => setShowAddModal(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50"
-              disabled={loading}
-            >
-              {loading ? 'Adding...' : 'Add Auditor'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
 const QAManagement: React.FC = () => {
   const { user } = useAuth();
-  const [auditors, setAuditors] = useState<AuditorWithAssignments[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [auditSchedules, setAuditSchedules] = useState<{ branch_name: string; region: string; no: string }[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-  const [selectedAuditor, setSelectedAuditor] = useState<AuditorWithAssignments | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingRegularTable, setLoadingRegularTable] = useState(false);
   const [loadingFraudTable, setLoadingFraudTable] = useState(false);
   const [loadingRecapTable, setLoadingRecapTable] = useState(false);
   const [loadingRPMTable, setLoadingRPMTable] = useState(false);
-  const [loadingMatriksTable, setLoadingMatriksTable] = useState(false);
-  const [activeTab, setActiveTab] = useState<'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks'>('auditors');
-  const [formData, setFormData] = useState<AddAuditorForm>({
-    name: '',
-    auditor_id: '',
-    regional: '',
-    semester: 'Odd',
-    year: new Date().getFullYear(),
-  });
+  const [activeTab, setActiveTab] = useState<'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks'>('excel');
   const [auditData, setAuditData] = useState([
     {
       no: '',
@@ -237,9 +90,10 @@ const QAManagement: React.FC = () => {
   const [auditRegular, setAuditRegular] = useState<{ branch_name: string; audit_period: string }[]>([]);
   // Tambahkan state untuk refresh loading
   const [refreshing, setRefreshing] = useState(false);
+  // Add state for hide completed audits checkbox
+  const [hideCompletedAudits, setHideCompletedAudits] = useState(false);
 
   useEffect(() => {
-    fetchAuditors();
     fetchBranches();
     fetchAuditRegular();
   }, []);
@@ -251,50 +105,6 @@ const QAManagement: React.FC = () => {
     }
     // eslint-disable-next-line
   }, [auditRegular]);
-
-  const fetchAuditors = async () => {
-    try {
-      setLoading(true);
-      console.log("Fetching auditors data...");
-      
-      const { data: auditorsData, error: auditorsError } = await supabase
-        .from('auditors')
-        .select('*')
-        .order('name');
-
-      if (auditorsError) {
-        console.error("Error fetching auditors:", auditorsError);
-        throw auditorsError;
-      }
-      
-      console.log("Auditors data received:", auditorsData);
-
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('auditor_assignments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (assignmentsError) {
-        console.error("Error fetching assignments:", assignmentsError);
-        throw assignmentsError;
-      }
-      
-      console.log("Assignments data received:", assignmentsData);
-
-      const auditorsWithAssignments = auditorsData.map(auditor => ({
-        ...auditor,
-        assignments: assignmentsData.filter(assignment => assignment.auditor_id === auditor.id),
-      }));
-
-      setAuditors(auditorsWithAssignments);
-      console.log("Processed data:", auditorsWithAssignments);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to fetch auditors data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchBranches = async () => {
     try {
@@ -362,87 +172,80 @@ const QAManagement: React.FC = () => {
     }
   };
 
-  const handleAddAuditor = async (e: React.FormEvent, formData: AddAuditorForm) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (!user) throw new Error('No authenticated user');
-
-      const { data: auditor, error: auditorError } = await supabase
-        .from('auditors')
-        .insert([{ name: formData.name, auditor_id: formData.auditor_id, created_by: user.id }])
-        .select()
-        .maybeSingle();
-
-      if (auditorError) throw new Error(auditorError.message);
-
-      if (!auditor) throw new Error('Failed to create auditor');
-
-      const { error: assignmentError } = await supabase
-        .from('auditor_assignments')
-        .insert([
-          {
-            auditor_id: auditor.id,
-            regional: formData.regional,
-            semester: formData.semester,
-            year: formData.year,
-            created_by: user.id,
-          },
-        ]);
-
-      if (assignmentError) {
-        await supabase.from('auditors').delete().eq('id', auditor.id);
-        throw new Error(assignmentError.message);
-      }
-
-      toast.success('Auditor added successfully');
-      setShowAddModal(false);
-      await fetchAuditors();
-    } catch (error) {
-      console.error('Error adding auditor:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add auditor');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAuditor || !user) return;
-
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('auditor_assignments')
-        .insert([
-          {
-            auditor_id: selectedAuditor.id,
-            regional: formData.regional,
-            semester: formData.semester,
-            year: formData.year,
-            created_by: user.id,
-          },
-        ]);
-
-      if (error) throw new Error(error.message);
-
-      toast.success('Assignment updated successfully');
-      setShowAssignmentModal(false);
-      setSelectedAuditor(null);
-      await fetchAuditors();
-    } catch (error) {
-      console.error('Error updating assignment:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update assignment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRowChange = (idx: number, updatedRow: AuditEntry) => {
     const newData = [...auditData];
     newData[idx] = updatedRow;
     setAuditData(newData);
+  };
+
+  // Function to check if an audit is completed
+  // All fields should be true except revisedDapa which we ignore (can be true or false)
+  // Special rule: if monitoring is empty/null, audit is NOT completed even if other fields are true
+  const isAuditCompleted = (audit: any) => {
+    const branchName = audit.branch || audit.branchName;
+    
+    // Check if ALL required fields are explicitly true (not null, undefined, or false)
+    // Using the correct camelCase field names from the interface
+    const requiredFields = [
+      'dapa',
+      'dapaSupportingData', 
+      'assignmentLetter',
+      'entranceAgenda',
+      'entranceAttendance', 
+      'auditWorkingPapers',
+      'exitMeetingMinutes',
+      'exitAttendanceList',
+      'auditResultLetter',
+      'rta'
+    ];
+    
+    console.log(`===== CHECKING COMPLETION FOR: ${branchName} =====`);
+    console.log('Raw audit data:', audit);
+    
+    // Special check for monitoring field first
+    const monitoringValue = audit.monitoring;
+    const isMonitoringEmpty = !monitoringValue || monitoringValue === '' || monitoringValue === null || monitoringValue === undefined;
+    
+    if (isMonitoringEmpty) {
+      console.log(`monitoring: ${monitoringValue} (✗ MONITORING IS EMPTY - AUDIT NOT COMPLETED)`);
+      console.log('RESULT: MONITORING IS EMPTY -> KEEP THIS AUDIT');
+      console.log('==========================================');
+      return false;
+    }
+    
+    console.log(`monitoring: ${monitoringValue} (✓ MONITORING HAS VALUE)`);
+    
+    // Check each required field individually and log detailed info
+    let completedCount = 0;
+    let totalFields = requiredFields.length;
+    
+    for (const field of requiredFields) {
+      const value = audit[field];
+      const isFieldComplete = value === true;
+      
+      if (isFieldComplete) {
+        completedCount++;
+      }
+      
+      console.log(`${field}: ${value} (${isFieldComplete ? '✓ COMPLETED' : '✗ NOT COMPLETED'})`);
+    }
+    
+    // Ignore cash_count and audit_reporting if they're undefined (they don't exist in the table)
+    if (audit.cashCount !== undefined) {
+      console.log(`cashCount: ${audit.cashCount} (ignored - not in table)`);
+    }
+    if (audit.auditReporting !== undefined) {
+      console.log(`auditReporting: ${audit.auditReporting} (ignored - not in table)`);
+    }
+    
+    // Note: revisedDapa is completely ignored (treated as always true)
+    console.log(`revisedDapa: ${audit.revisedDapa} (✓ IGNORED - ALWAYS TREATED AS TRUE)`);
+    
+    const isCompleted = completedCount === totalFields;
+    console.log(`RESULT: ${completedCount}/${totalFields} fields completed + monitoring OK -> ${isCompleted ? '🔥 HIDE THIS AUDIT' : '👀 KEEP THIS AUDIT'}`);
+    console.log('==========================================');
+    
+    return isCompleted;
   };
 
   const findMatchingBranch = (branchName: string) => {
@@ -480,8 +283,19 @@ const QAManagement: React.FC = () => {
   };
 
   const getNumberedAuditData = () => {
+    console.log('🔍 getNumberedAuditData called, hideCompletedAudits:', hideCompletedAudits);
+    console.log('🔍 Total audit data before filtering:', auditData.length);
+    
+    // Apply filter for completed audits if enabled
+    let dataToProcess = auditData;
+    if (hideCompletedAudits) {
+      console.log('🔍 Applying completed audit filter...');
+      dataToProcess = auditData.filter(audit => !isAuditCompleted(audit));
+      console.log('🔍 Data after filtering:', dataToProcess.length, 'remaining');
+    }
+    
     // Sort auditData by region dari audit_schedule
-    const sortedData = [...auditData].sort((a, b) => {
+    const sortedData = [...dataToProcess].sort((a, b) => {
       const regionA = getRegionFromSchedule(a.branchName) || '';
       const regionB = getRegionFromSchedule(b.branchName) || '';
       
@@ -520,7 +334,7 @@ const QAManagement: React.FC = () => {
     });
   };
 
-  const switchTab = (tab: 'auditors' | 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks') => {
+  const switchTab = (tab: 'excel' | 'fraud' | 'recap' | 'rpm' | 'matriks') => {
     setActiveTab(tab);
     
     // Set appropriate loading state based on selected tab
@@ -542,74 +356,10 @@ const QAManagement: React.FC = () => {
         setTimeout(() => setLoadingRPMTable(false), 800);
         break;
       case 'matriks':
-        setLoadingMatriksTable(true);
-        setTimeout(() => setLoadingMatriksTable(false), 800);
+        // No loading state for matriks since it renders directly
         break;
     }
   };
-
-  const UpdateAssignmentModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">Update Assignment</h2>
-        <form onSubmit={handleUpdateAssignment} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Regional</label>
-            <input
-              type="text"
-              value={formData.regional}
-              onChange={(e) => setFormData(prev => ({ ...prev, regional: e.target.value }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Semester</label>
-              <select
-                value={formData.semester}
-                onChange={(e) => setFormData(prev => ({ ...prev, semester: e.target.value as 'Odd' | 'Even' }))}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="Odd">Odd</option>
-                <option value="Even">Even</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Year</label>
-              <input
-                type="number"
-                value={formData.year}
-                onChange={(e) => setFormData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={() => {
-                setShowAssignmentModal(false);
-                setSelectedAuditor(null);
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50"
-              disabled={loading}
-            >
-              {loading ? 'Updating...' : 'Update Assignment'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 
   // Dapatkan daftar region unik dari auditSchedules
   const uniqueRegions = Array.from(
@@ -632,11 +382,6 @@ const QAManagement: React.FC = () => {
     return rows;
   };
 
-  const filteredData = React.useMemo(() => {
-    if (!regionFilter) return auditData;
-    return auditData.filter(item => item.region === regionFilter);
-  }, [auditData, regionFilter]);
-
   // Fungsi untuk refresh semua data
   const refreshAllData = async () => {
     setRefreshing(true);
@@ -644,7 +389,6 @@ const QAManagement: React.FC = () => {
     
     try {
       // Refresh semua data yang diperlukan
-      await fetchAuditors();
       await fetchBranches();
       await fetchAuditRegular();
       // Schedule akan di-fetch otomatis karena ada dependency ke auditRegular
@@ -660,17 +404,17 @@ const QAManagement: React.FC = () => {
 
   // Add a function to get the selection indicator position
   const getSelectionPosition = () => {
-    const tabs = ['auditors', 'excel', 'fraud', 'recap', 'rpm', 'matriks'];
+    const tabs = ['excel', 'fraud', 'recap', 'rpm', 'matriks'];
     const index = tabs.indexOf(activeTab);
     return `${(index * 100) / tabs.length}%`;
   };
 
   const getSelectionWidth = () => {
-    const tabs = ['auditors', 'excel', 'fraud', 'recap', 'rpm', 'matriks'];
+    const tabs = ['excel', 'fraud', 'recap', 'rpm', 'matriks'];
     return `${100 / tabs.length}%`;
   };
 
-  if (loading && auditors.length === 0) {
+  if (loading && branches.length === 0) {
     return <LoadingAnimation />;
   }
 
@@ -691,19 +435,7 @@ const QAManagement: React.FC = () => {
           </div>
           
           {/* New Radio Buttons Style */}
-          <div className="relative flex w-[600px] overflow-hidden rounded-[10px] border border-[#35343439] bg-white text-black">
-            <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
-              <input 
-                type="radio" 
-                name="qaTab" 
-                value="auditors"
-                checked={activeTab === 'auditors'} 
-                onChange={() => switchTab('auditors')}
-                className="hidden peer"
-              />
-              <span className={activeTab === 'auditors' ? 'text-white' : 'text-black'}>Auditors</span>
-            </label>
-            
+          <div className="relative flex w-[500px] overflow-hidden rounded-[10px] border border-[#35343439] bg-white text-black">
             <label className="flex w-full cursor-pointer items-center justify-center p-2 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
               <input 
                 type="radio" 
@@ -775,103 +507,40 @@ const QAManagement: React.FC = () => {
         </div>
         
         {/* Description text moved below the header */}
-        <p className="text-sm text-gray-500 mt-1">Manage auditors and their regional assignments</p>
+        <p className="text-sm text-gray-500 mt-1">Manage audit schedules and quality assurance processes</p>
       </div>
 
-      {activeTab === 'auditors' ? (
-        <>
-          <div className="mb-4">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
-              disabled={loading}
-            >
-              <UserPlus className="h-5 w-5" />
-              Add Auditor
-            </button>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <div className="inline-block min-w-full align-middle">
-                  <div className="overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Auditor ID</TableHead>
-                          <TableHead>Current Regional</TableHead>
-                          <TableHead>Assignment History</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {auditors.map((auditor) => (
-                          <TableRow key={auditor.id}>
-                            <TableCell>{auditor.name}</TableCell>
-                            <TableCell>{auditor.auditor_id}</TableCell>
-                            <TableCell>{auditor.assignments[0]?.regional || '-'}</TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                {auditor.assignments.map((assignment) => (
-                                  <div key={assignment.id} className="text-sm">
-                                    <span className="font-medium">{assignment.regional}</span>
-                                    <span className="text-gray-500">
-                                      {' '}
-                                      - {assignment.semester} Semester {assignment.year}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-3">
-                                <button
-                                  onClick={() => {
-                                    setSelectedAuditor(auditor);
-                                    setFormData({
-                                      ...formData,
-                                      regional: auditor.assignments[0]?.regional || '',
-                                      semester: 'Odd',
-                                      year: new Date().getFullYear(),
-                                    });
-                                    setShowAssignmentModal(true);
-                                  }}
-                                  className="text-indigo-600 hover:text-indigo-900"
-                                  title="Update assignment"
-                                  disabled={loading}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      ) : activeTab === 'excel' ? (
+      {activeTab === 'excel' ? (
         <Card>
           <CardContent className="p-6">
-            {/* Filter region */}
-            <div className="mb-4 flex items-center gap-2">
-              <label className="font-medium">Filter by Region:</label>
-              <select
-                value={regionFilter}
-                onChange={e => setRegionFilter(e.target.value)}
-                className="border rounded px-2 py-1"
-              >
-                <option value="">All Regions</option>
-                {uniqueRegions.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
+            {/* Filter region and hide completed audits */}
+            <div className="mb-4 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="font-medium">Filter by Region:</label>
+                <select
+                  value={regionFilter}
+                  onChange={e => setRegionFilter(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">All Regions</option>
+                  {uniqueRegions.map(region => (
+                    <option key={region} value={region}>{region}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="hideCompletedAudits"
+                  checked={hideCompletedAudits}
+                  onChange={(e) => setHideCompletedAudits(e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="hideCompletedAudits" className="font-medium text-gray-700">
+                  Hide completed audits
+                </label>
+              </div>
             </div>
             {/* Audit Schedule 2 kolom */}
             <div className="mb-6">
@@ -1024,18 +693,6 @@ const QAManagement: React.FC = () => {
           </CardContent>
         </Card>
       ) : null}
-
-      {showAddModal && (
-        <AddAuditorModal
-          handleAddAuditor={handleAddAuditor}
-          setShowAddModal={setShowAddModal}
-          loading={loading}
-        />
-      )}
-
-      {showAssignmentModal && selectedAuditor && (
-        <UpdateAssignmentModal />
-      )}
     </div>
   );
 };

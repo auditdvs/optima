@@ -1,23 +1,22 @@
 import {
-  ChartPie,
-  ChevronDown,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  FilePenLine,
-  FileVideo,
-  GitPullRequest,
-  History,
-  LayoutDashboard,
-  Library,
-  Mail,
-  MapPinPlus,
-  Megaphone,
-  ScanFace,
-  Table2,
-  UserCog,
-  Users,
-  Wrench
+    ChartPie,
+    ChevronDown,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+    FilePenLine,
+    FileText,
+    FileVideo,
+    GitPullRequest,
+    History,
+    LayoutDashboard,
+    Library,
+    Megaphone,
+    ScanFace,
+    Table2,
+    UserCog,
+    Users,
+    Wrench
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -144,6 +143,11 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
     
     if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'manager') {
       auditItems.push({ path: '/qa-management', icon: Users, label: 'QA Management' });
+    }
+    
+    // Assignment Letter - visible to superadmin only
+    if (userRole === 'superadmin') {
+      auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment Letter' });
     }
     
     // Tools and Grammar Correction for all users

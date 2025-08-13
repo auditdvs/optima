@@ -65,53 +65,56 @@ const AccountSettingsPage = () => {
     const fetchData = async () => {
       if (!user?.id) return;
       
-      // 1. Get user data and auditor alias
-      const { data: userData, error: userError } = await supabase
-        .from('account')
+      // Get user profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-        
-      if (userError || !userData) {
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.error('Error fetching profile:', profileError);
         setLoadingAdminIssues(false);
         setLoadingBranches(false);
         setLoadingStats(false);
         return;
       }
       
-      setUserData(userData);
+      setUserData(profileData);
       
-      const { data: aliasData, error: aliasError } = await supabase
-        .from('auditor_aliases')
-        .select('alias')
-        .eq('profile_id', user.id)
-        .maybeSingle();
-      if (aliasError || !aliasData?.alias) {
-        // No alias found, set default values
+      if (!profileData.full_name) {
+        // No full_name found, set default values
         setTotalRegular(0);
         setTotalFraud(0);
         setTotalAudits(0);
         setSisaTarget(24); // Full annual target
         setTargetColor('#dc2626'); // Red since no progress
-        setMotivationMessage("Silakan hubungi admin untuk setup alias auditor Anda.");
+        setMotivationMessage("Silakan update nama lengkap di profile Anda.");
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
         return;
       }
-      
-      // 2. Get all work_paper_id from work_paper_auditors
-      const { data: auditorRows, error: auditorError } = await supabase
-        .from('work_paper_auditors')
-        .select('work_paper_id')
-        .eq('auditor_name', aliasData.alias);
-      if (auditorError) {
+
+      // Get work papers where user's full_name is in the auditor column (comma-delimited)
+      const { data: workPapers, error: workPapersError } = await supabase
+        .from('work_papers')
+        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, fraud_amount, rating, auditor')
+        .ilike('auditor', `%${profileData.full_name}%`); // Search for full_name in comma-delimited auditor column
+        
+      if (workPapersError) {
+        console.error('Error fetching work papers:', workPapersError);
         setLoadingBranches(false);
         setLoadingStats(false);
+        setLoadingAdminIssues(false);
         return;
       }
-      const workPaperIds = auditorRows?.map(row => row.work_paper_id) || [];
-      if (workPaperIds.length === 0) {
+
+      console.log('Profile full_name:', profileData.full_name);
+      console.log('Found work papers:', workPapers?.length || 0);
+      console.log('Sample auditor columns:', workPapers?.slice(0, 3).map(wp => wp.auditor));
+
+      if (!workPapers || workPapers.length === 0) {
         // No audit data found, set default values
         setTotalRegular(0);
         setTotalFraud(0);
@@ -121,30 +124,37 @@ const AccountSettingsPage = () => {
         setMotivationMessage("Mari semangat memulai audit pertama tahun ini!");
         setLoadingBranches(false);
         setLoadingStats(false);
+        setLoadingAdminIssues(false);
         return;
       }
       
-      // 3. Get work_papers
-      const { data: papers, error: papersError } = await supabase
-        .from('work_papers')
-        .select('id,branch_name,audit_type,audit_start_date,audit_end_date')
-        .in('id', workPaperIds);
-      if (papersError) {
-        // Error fetching papers, set default values
-        setTotalRegular(0);
-        setTotalFraud(0);
-        setTotalAudits(0);
-        setSisaTarget(24); // Full annual target
-        setTargetColor('#dc2626'); // Red since no progress
-        setMotivationMessage("Terjadi kesalahan saat mengambil data audit. Silakan refresh halaman.");
-        setLoadingBranches(false);
-        setLoadingStats(false);
-        return;
-      }
+      // Filter work papers to ensure user's full_name is actually in the auditor column
+      const filteredWorkPapers = workPapers.filter(wp => {
+        if (!wp.auditor) return false;
+        
+        const auditorList = wp.auditor.split(',').map((name: string) => name.trim()) || [];
+        
+        // Try exact match first
+        if (auditorList.includes(profileData.full_name)) {
+          return true;
+        }
+        
+        // Try partial matches (in case of slight name variations)
+        const userNameParts = profileData.full_name.toLowerCase().split(' ');
+        return auditorList.some((auditor: string) => {
+          const auditorLower = auditor.toLowerCase();
+          // Check if at least 2 name parts match (for cases like "Dede Yudha N" vs "Dede Yudha Nersanto")
+          const matchingParts = userNameParts.filter(part => auditorLower.includes(part));
+          return matchingParts.length >= 2;
+        });
+      });
+      
+      console.log('Filtered work papers:', filteredWorkPapers.length);
+      console.log('Sample filtered auditor columns:', filteredWorkPapers?.slice(0, 3).map(wp => wp.auditor));
       
       // 4. Unique by branch_name + audit_type + audit_start_date + audit_end_date
       const uniqueMap = new Map();
-      papers.forEach(wp => {
+      filteredWorkPapers.forEach(wp => {
         const key = `${wp.branch_name}|${wp.audit_type}|${wp.audit_start_date}|${wp.audit_end_date}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, wp);
@@ -196,7 +206,7 @@ const AccountSettingsPage = () => {
       setLoadingStats(false);
       
       // Fetch administration issues
-      await fetchAdminIssues(userData);
+      await fetchAdminIssues(profileData);
       
       // Fetch audit schedule data
       await fetchAuditScheduleData();
@@ -326,48 +336,27 @@ const AccountSettingsPage = () => {
       }
     };
     
-    const fetchAdminIssues = async (userData: any) => {
-      if (!userData) return;
+    const fetchAdminIssues = async (profileData: any) => {
+      if (!profileData?.full_name) return;
       
       setLoadingAdminIssues(true);
       
       try {
-        // Try multiple search patterns for regular audits
-        // 1. Search by full_name_2 (exact match)
-        const { data: regularData1 } = await supabase
+        // Search for regular audits where user is the PIC
+        const { data: regularData, error: regularError } = await supabase
           .from('audit_regular')
           .select('*')
-          .eq('pic', userData.full_name_2);
+          .ilike('pic', `%${profileData.full_name}%`);
         
-        // 2. Search by full_name_2 (case insensitive like)
-        const { data: regularData2 } = await supabase
-          .from('audit_regular')
-          .select('*')
-          .ilike('pic', userData.full_name_2);
-        
-        // 3. Search by auditor_id in pic field
-        const { data: regularData3 } = await supabase
-          .from('audit_regular')
-          .select('*')
-          .ilike('pic', `%${userData.auditor_id}%`);
-        
-        // 4. Search by first name + last name parts
-        const nameParts = userData.full_name_2?.split(' ') || [];
-        const firstName = nameParts[0];
-        let regularData4 = [];
-        if (firstName) {
-          const { data } = await supabase
-            .from('audit_regular')
-            .select('*')
-            .ilike('pic', `%${firstName}%`);
-          regularData4 = data || [];
+        if (regularError) {
+          console.error('Error fetching regular audit issues:', regularError);
         }
         
-        // Get issues for fraud audits based on auditor_id from audit_fraud table
+        // Get issues for fraud audits based on full_name from audit_fraud table
         const { data: fraudData, error: fraudError } = await supabase
           .from('audit_fraud')
           .select('*')
-          .ilike('pic', `%${userData.auditor_id}%`);
+          .ilike('pic', `%${profileData.full_name}%`);
         
         if (fraudError) {
           console.error('Error fetching fraud audit issues:', fraudError);
@@ -420,16 +409,8 @@ const AccountSettingsPage = () => {
             .join(', ');
         };
         
-        // Combine regular audit data from all queries (remove duplicates)
-        const allRegularData = [
-          ...(regularData1 || []), 
-          ...(regularData2 || []), 
-          ...(regularData3 || []), 
-          ...(regularData4 || [])
-        ];
-        const uniqueRegularData = allRegularData.filter((audit, index, self) =>
-          index === self.findIndex(a => a.id === audit.id)
-        );
+        // Combine regular audit data (no need for multiple queries now)
+        const uniqueRegularData = regularData || [];
         
         // Process regular audits - filter by false count >= 2 OR monitoring issue
         const regularIssues = uniqueRegularData
@@ -494,6 +475,13 @@ const AccountSettingsPage = () => {
         .select('role')
         .eq('user_id', user.id)
         .maybeSingle();
+      
+      console.log('=== USER ROLE DEBUG ===');
+      console.log('User ID:', user.id);
+      console.log('Role data from DB:', data);
+      console.log('Role value:', data?.role);
+      console.log('========================');
+      
       setUserRole(data?.role || '');
     };
     
@@ -510,8 +498,14 @@ const AccountSettingsPage = () => {
   }
 
   // Only show audit stats, running text, and audited branches for these roles
-  const allowedRoles = ['superadmin', 'QA', 'DVS', 'manager', 'user'];
+  const allowedRoles = ['superadmin', 'qa', 'dvs', 'manager', 'user'];
   const showAuditSections = allowedRoles.includes(userRole);
+  
+  console.log('=== AUDIT SECTIONS DEBUG ===');
+  console.log('Current userRole:', userRole);
+  console.log('Allowed roles:', allowedRoles);
+  console.log('Show audit sections:', showAuditSections);
+  console.log('=============================');
 
   return (
     <div className="px-1 py-1 w-full">

@@ -6,10 +6,15 @@ import Loader from '../components/Loader';
 import { CheckboxGroup, CheckboxOption } from '../components/ui/checkbox';
 import { supabase } from '../lib/supabaseClient';
 
+interface Auditor {
+  id: string;
+  full_name: string;
+}
+
 interface WorkPaper {
   id?: string;
   branch_name: string;
-  region?: string; // Add region field
+  region?: string; 
   audit_start_date: string;
   audit_end_date: string;
   audit_type: 'regular' | 'fraud';
@@ -17,13 +22,13 @@ interface WorkPaper {
   fraud_staff?: string;
   rating: 'high' | 'medium' | 'low';
   inputted_by: string;
-  auditors: string[];
-  work_paper_auditors?: { auditor_name: string }[];
+  auditor: string; 
 }
 
 interface Branch {
   id: string;
   name: string;
+  region: string; 
 }
 
 interface InputterSummary {
@@ -76,6 +81,7 @@ const QASection: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [workPapers, setWorkPapers] = useState<WorkPaper[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [auditors, setAuditors] = useState<Auditor[]>([]); // Add auditors state
   const [loading, setLoading] = useState(true);
   const [showAuditors, setShowAuditors] = useState(false);
   const [inputterSummary, setInputterSummary] = useState<InputterSummary[]>([]);
@@ -89,7 +95,7 @@ const QASection: React.FC = () => {
     fraud_staff: undefined,
     rating: 'low',
     inputted_by: '',
-    auditors: []
+    auditor: '' // Changed from auditors array to single auditor string
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [editingWorkPaper, setEditingWorkPaper] = useState<string | null>(null);
@@ -114,55 +120,12 @@ const QASection: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedRegion, setSelectedRegion] = useState<string>(''); // Add region filter state
 
-  const auditorOptions: CheckboxOption[] = [
-    { label: 'Andre Perkasa Ginting', value: 'andre' },
-    { label: 'Sanjung', value: 'sanjung' },
-    { label: 'Abduloh', value: 'abduloh' },
-    { label: 'Fatir Anis Sabir', value: 'fatir' },
-    { label: 'Anwar Sadat, S.E', value: 'anwar' },
-    { label: 'Antoni', value: 'antoni' },
-    { label: 'Maya Lestari, S.E', value: 'maya' },
-    { label: 'Indah Marsita', value: 'indah' },
-    { label: 'Aditya Dwi Susanto', value: 'aditya' },
-    { label: 'Achmad Miftachul Huda, S.E', value: 'miftach' },
-    { label: 'Heri Hermawan', value: 'heri' },
-    { label: 'Aris Munandar', value: 'aris' },
-    { label: 'Sandi Mulyadi', value: 'sandi' },
-    { label: 'Ahmad', value: 'ahmad' },
-    { label: 'Widya Lestari', value: 'widya' },
-    { label: 'Retno Istiyanto, A.Md', value: 'retno' },
-    { label: 'Ade Yadi Heryadi', value: 'ade' },
-    { label: 'Muhamad Yunus', value: 'yunus' },
-    { label: 'Dara Fusvita Adityacakra, S.Tr.Akun', value: 'dara' },
-    { label: 'Lukman Yasir', value: 'lukman' },
-    { label: 'Ngadiman', value: 'ngadiman' },
-    { label: 'Solikhin, A.Md', value: 'solikhin' },
-    { label: 'Amriani', value: 'amriani' },
-    { label: 'Maria Sulistya Wati', value: 'maria' },
-    { label: "Muhammad Rifa'i", value: 'rifai' },
-    { label: 'Buldani', value: 'buldani' },
-    { label: 'Imam Kristiawan', value: 'imam' },
-    { label: 'Darmayani', value: 'darmayani' },
-    { label: 'Novi Dwi Juanda', value: 'novi' },
-    { label: 'Afdal Juanda', value: 'afdal' },
-    { label: 'Kandidus Yosef Banu', value: 'kandidus' },
-    { label: 'Muhammad Alfian Sidiq', value: 'alfian' },
-    { label: 'Fadhlika Sugeng Achmadani, S.E', value: 'fadhlika' },
-    { label: 'Hendra Hermawan', value: 'hendra' },
-    { label: 'Dadang Supriatna', value: 'dadang' },
-    { label: 'Yogi Nugraha', value: 'yogi' },
-    { label: 'Iqbal Darmazi', value: 'iqbal' },
-    { label: 'Ganjar Raharja', value: 'ganjar' },
-    { label: 'Dede Yudha Nersanto', value: 'dede' },
-    { label: 'Ayu Sri Erian Agustin', value: 'eri' },
-    { label: 'Lise Roswati Rochendi MP', value: 'lise' },
-  ];
-
   const inputterOptions = ['Ayu', 'Lise', 'Ganjar', 'Dede', 'Afan'];
 
   useEffect(() => {
     setLoading(true);
     fetchBranches();
+    fetchAuditors(); // Add fetch auditors
     fetchWorkPapers();
 
     const timer = setTimeout(() => {
@@ -226,7 +189,7 @@ const QASection: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name')
+        .select('id, name, region') // Tambah kolom region
         .order('name');
       
       if (error) throw error;
@@ -237,14 +200,30 @@ const QASection: React.FC = () => {
     }
   };
 
+  const fetchAuditors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+      
+      if (error) throw error;
+      if (data) {
+        // Filter out auditors with empty full_name
+        const filteredAuditors = data.filter(auditor => auditor.full_name && auditor.full_name.trim() !== '');
+        setAuditors(filteredAuditors);
+      }
+    } catch (error) {
+      console.error('Error fetching auditors:', error);
+      toast.error('Failed to fetch auditors');
+    }
+  };
+
   const fetchWorkPapers = async () => {
     try {
       const { data, error } = await supabase
         .from('work_papers')
-        .select(`
-          *,
-          work_paper_auditors(auditor_name)
-        `);
+        .select('*');
       
       if (error) throw error;
       if (data) {
@@ -256,6 +235,39 @@ const QASection: React.FC = () => {
     }
   };
 
+
+  // Handler untuk mengubah branch dan auto-fill region
+  const handleBranchChange = (branchName: string) => {
+    const branch = branches.find(b => b.name === branchName);
+    setNewWorkPaper({
+      ...newWorkPaper,
+      branch_name: branchName,
+      region: branch?.region || ''
+    });
+  };
+
+  // Handler untuk multiple auditor selection
+  const handleAuditorChange = (selectedAuditors: string[]) => {
+    setNewWorkPaper({
+      ...newWorkPaper,
+      auditor: selectedAuditors.join(', ') // Join multiple auditors with comma
+    });
+  };
+
+  // Handler untuk edit auditor selection
+  const handleEditAuditorChange = (selectedAuditors: string[]) => {
+    if (workPaperToEdit) {
+      setWorkPaperToEdit({
+        ...workPaperToEdit,
+        auditor: selectedAuditors.join(', ') // Join multiple auditors with comma
+      });
+    }
+  };
+
+  // Helper to convert comma-separated string to array
+  const getAuditorArray = (auditorString: string): string[] => {
+    return auditorString ? auditorString.split(', ').filter(a => a.trim()) : [];
+  };
 
   const handleDeleteWorkPaper = async (id: string) => {
     // Instead of using confirm(), set the workPaperToDelete and show the confirmation modal
@@ -365,47 +377,29 @@ const QASection: React.FC = () => {
 
     try {
       setLoading(true);
-      // Insert work paper
-      const { data: workPaperData, error: workPaperError } = await supabase
+      // Insert work paper with auditor column
+      const { error: workPaperError } = await supabase
         .from('work_papers')
         .insert({
           branch_name: newWorkPaper.branch_name,
-          region: newWorkPaper.region, // Add region to insert
+          region: newWorkPaper.region,
           audit_start_date: newWorkPaper.audit_start_date,
           audit_end_date: newWorkPaper.audit_end_date,
           audit_type: newWorkPaper.audit_type,
           fraud_amount: newWorkPaper.fraud_amount,
           fraud_staff: newWorkPaper.fraud_staff,
           rating: newWorkPaper.rating,
-          inputted_by: newWorkPaper.inputted_by
-        })
-        .select('id');
+          inputted_by: newWorkPaper.inputted_by,
+          auditor: newWorkPaper.auditor // Store auditors as comma-separated string
+        });
 
       if (workPaperError) throw workPaperError;
-
-      // Handle auditors
-      if (workPaperData && workPaperData[0]?.id) {
-        const workPaperId = workPaperData[0].id;
-
-        const auditorInserts = newWorkPaper.auditors.map(auditor => ({
-          work_paper_id: workPaperId,
-          auditor_name: auditor
-        }));
-
-        if (auditorInserts.length > 0) {
-          const { error: auditorError } = await supabase
-            .from('work_paper_auditors')
-            .insert(auditorInserts);
-
-          if (auditorError) throw auditorError;
-        }
-      }
 
       // Refresh work papers and reset form
       await fetchWorkPapers();
       setNewWorkPaper({
         branch_name: '',
-        region: '', // Reset region
+        region: '',
         audit_start_date: '',
         audit_end_date: '',
         audit_type: 'regular',
@@ -413,7 +407,7 @@ const QASection: React.FC = () => {
         fraud_staff: undefined,
         rating: 'medium',
         inputted_by: '',
-        auditors: []
+        auditor: '' // Reset auditor string
       });
 
       // Close the modal
@@ -438,7 +432,8 @@ const QASection: React.FC = () => {
       wp.inputted_by.toLowerCase().includes(searchLower) ||
       wp.audit_type.toLowerCase().includes(searchLower) ||
       (wp.fraud_staff && wp.fraud_staff.toLowerCase().includes(searchLower)) ||
-      (wp.region && wp.region.toLowerCase().includes(searchLower)) // Add region to search
+      (wp.region && wp.region.toLowerCase().includes(searchLower)) ||
+      (wp.auditor && wp.auditor.toLowerCase().includes(searchLower)) // Add auditor to search
     );
 
     // Month/Year filter
@@ -481,6 +476,12 @@ const QASection: React.FC = () => {
     workPapers.map(wp => wp.region).filter(region => region && region.trim() !== '')
   )).sort();
 
+  // Create auditorOptions from database auditors
+  const auditorOptions: CheckboxOption[] = auditors.map(auditor => ({
+    label: auditor.full_name,
+    value: auditor.full_name
+  }));
+
   const months = [
     { value: '', label: 'All Months' },
     { value: '1', label: 'January' },
@@ -501,14 +502,7 @@ const QASection: React.FC = () => {
     // Find the work paper to edit
     const workPaperToEdit = workPapers.find(wp => wp.id === id);
     if (workPaperToEdit) {
-      // Set it in state with auditors prepared
-      const auditorNames = workPaperToEdit.work_paper_auditors?.map(a => a.auditor_name) || [];
-      
-      setWorkPaperToEdit({
-        ...workPaperToEdit,
-        auditors: auditorNames
-      });
-      
+      setWorkPaperToEdit(workPaperToEdit);
       // Open the modal
       setIsEditModalOpen(true);
     } else {
@@ -555,16 +549,13 @@ const QASection: React.FC = () => {
     try {
       setLoading(true);
       
-      // Log current session for debugging
-      const { data: session } = await supabase.auth.getSession();
-      console.log('Current session:', session?.session?.user?.id);
-      
-      // Update the work paper only (tidak update auditors di sini)
+      // Update the work paper including auditor column
       const updateData: any = {
         audit_start_date: workPaperToEdit.audit_start_date,
         audit_end_date: workPaperToEdit.audit_end_date,
         rating: workPaperToEdit.rating,
-        inputted_by: workPaperToEdit.inputted_by
+        inputted_by: workPaperToEdit.inputted_by,
+        auditor: workPaperToEdit.auditor // Update auditor column
       };
 
       // Only add region if it's not empty
@@ -590,71 +581,6 @@ const QASection: React.FC = () => {
       if (workPaperError) {
         console.error('Work paper update error:', workPaperError);
         throw workPaperError;
-      }
-      
-      // Handle auditors - HANYA jika ada perubahan auditor
-      const currentAuditors = workPapers.find(wp => wp.id === workPaperToEdit.id)?.work_paper_auditors?.map(a => a.auditor_name) || [];
-      const newAuditors = workPaperToEdit.auditors || [];
-      
-      // Check if auditors have changed
-      const auditorsChanged = JSON.stringify(currentAuditors.sort()) !== JSON.stringify(newAuditors.sort());
-      
-      if (auditorsChanged) {
-        // First, get existing work_paper_auditor IDs
-        const { data: existingAuditors, error: fetchError } = await supabase
-          .from('work_paper_auditors')
-          .select('id')
-          .eq('work_paper_id', workPaperToEdit.id);
-        
-        if (fetchError) {
-          console.error('Error fetching existing auditors:', fetchError);
-          throw fetchError;
-        }
-        
-        // Delete related audit_counts records first (if any exist)
-        if (existingAuditors && existingAuditors.length > 0) {
-          const auditorIds = existingAuditors.map(a => a.id);
-          
-          console.log('Deleting audit_counts for auditor IDs:', auditorIds);
-          
-          const { error: auditCountsDeleteError } = await supabase
-            .from('audit_counts')
-            .delete()
-            .in('work_paper_auditor_id', auditorIds);
-          
-          if (auditCountsDeleteError) {
-            console.error('Error deleting audit counts:', auditCountsDeleteError);
-            throw auditCountsDeleteError;
-          }
-        }
-        
-        // Now delete the work_paper_auditors
-        const { error: deleteError } = await supabase
-          .from('work_paper_auditors')
-          .delete()
-          .eq('work_paper_id', workPaperToEdit.id);
-          
-        if (deleteError) {
-          console.error('Error deleting work paper auditors:', deleteError);
-          throw deleteError;
-        }
-        
-        // Insert new auditors if any
-        if (newAuditors.length > 0) {
-          const auditorInserts = newAuditors.map(auditor => ({
-            work_paper_id: workPaperToEdit.id!,
-            auditor_name: auditor
-          }));
-          
-          const { error: auditorsError } = await supabase
-            .from('work_paper_auditors')
-            .insert(auditorInserts);
-            
-          if (auditorsError) {
-            console.error('Auditor insert error:', auditorsError);
-            throw auditorsError;
-          }
-        }
       }
       
       // Refresh data and close modal
@@ -705,7 +631,7 @@ const QASection: React.FC = () => {
     return `${day}/${month}/${year}`;
   };
 
-  if (!branches || branches.length < 1) {
+  if (!branches || branches.length < 1 || !auditors || auditors.length < 1) {
     return <Loader />;
   }
 
@@ -803,7 +729,7 @@ const QASection: React.FC = () => {
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search work papers..."
+                placeholder="Search work papers, auditors..."
                 className="pl-8 pr-4 py-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -880,13 +806,14 @@ const QASection: React.FC = () => {
                     </td>
                     <td className="p-3 text-gray-700">{wp.inputted_by}</td>
                     <td className="p-3 text-gray-700">
-                      {wp.work_paper_auditors && wp.work_paper_auditors.length > 0 ? (
-                        <button
-                          onClick={() => handleShowAuditors(wp.work_paper_auditors!)}
-                          className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-full transition-colors"
-                        >
-                          {wp.work_paper_auditors.length} auditor(s)
-                        </button>
+                      {wp.auditor ? (
+                        <div className="text-xs">
+                          {wp.auditor.split(', ').map((auditor, index) => (
+                            <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded mr-1 mb-1">
+                              {auditor.trim()}
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         '-'
                       )}
@@ -959,12 +886,8 @@ const QASection: React.FC = () => {
                 <input 
                   type="text" 
                   value={workPaperToEdit.region || ''} 
-                  onChange={(e) => setWorkPaperToEdit({
-                    ...workPaperToEdit,
-                    region: e.target.value
-                  })}
-                  placeholder="Enter region"
-                  className="border p-2 rounded w-full"
+                  disabled
+                  className="border p-2 rounded w-full bg-gray-100"
                 />
               </div>
               
@@ -1104,12 +1027,9 @@ const QASection: React.FC = () => {
                 <div className="border rounded-md p-3">
                   <SearchableCheckboxGroup
                     options={auditorOptions}
-                    selectedOptions={workPaperToEdit.auditors}
+                    selectedOptions={getAuditorArray(workPaperToEdit.auditor)}
                     onChange={(selectedOptions) => {
-                      setWorkPaperToEdit({
-                        ...workPaperToEdit,
-                        auditors: selectedOptions
-                      });
+                      handleEditAuditorChange(selectedOptions);
                     }}
                   />
                 </div>
@@ -1215,7 +1135,7 @@ const QASection: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
                 <select
                   value={newWorkPaper.branch_name}
-                  onChange={(e) => setNewWorkPaper({...newWorkPaper, branch_name: e.target.value})}
+                  onChange={(e) => handleBranchChange(e.target.value)}
                   required
                   className="border p-2 rounded w-full"
                 >
@@ -1232,10 +1152,10 @@ const QASection: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
                 <input
                   type="text"
-                  placeholder="Enter region"
                   value={newWorkPaper.region || ''}
-                  onChange={(e) => setNewWorkPaper({...newWorkPaper, region: e.target.value})}
-                  className="border p-2 rounded w-full"
+                  disabled
+                  placeholder="Auto-fill"
+                  className="border p-2 rounded w-full bg-gray-100"
                 />
               </div>
 
@@ -1337,12 +1257,9 @@ const QASection: React.FC = () => {
                 <div className="border rounded-md p-3">
                   <SearchableCheckboxGroup
                     options={auditorOptions}
-                    selectedOptions={newWorkPaper.auditors}
+                    selectedOptions={getAuditorArray(newWorkPaper.auditor)}
                     onChange={(selectedOptions) => {
-                      setNewWorkPaper({
-                        ...newWorkPaper,
-                        auditors: selectedOptions
-                      });
+                      handleAuditorChange(selectedOptions);
                     }}
                   />
                 </div>
