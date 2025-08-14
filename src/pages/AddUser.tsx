@@ -1,11 +1,11 @@
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { ChevronDown, ChevronUp, DatabaseBackup, Trash2, UserPen, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, DatabaseBackup, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import { Card, CardContent } from '../components/ui/card';
 import {
   Table,
   TableBody,
@@ -78,6 +78,13 @@ interface PIC {
     | 'Occupied';
 }
 
+interface Auditor {
+  id: string;
+  full_name: string;
+  nik: string | null;
+  auditor_id: string | null;
+}
+
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -89,6 +96,14 @@ interface EditUserModalProps {
   onClose: () => void;
   user: User | null;
   onSubmit: (userId: string, fullName: string, role: string) => Promise<void>;
+}
+
+interface DeleteConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  userName: string;
+  userEmail: string;
 }
 
 const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }) => {
@@ -257,6 +272,100 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, on
   );
 };
 
+const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  userName, 
+  userEmail 
+}) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (error) {
+      console.error('Delete error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all scale-100">
+        {/* Header with Icon */}
+        <div className="px-6 pt-8 pb-2 text-center">
+          <div className="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center ring-8 ring-red-50 mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          
+          <h3 className="text-xl font-bold text-gray-900 mb-2">
+            Delete User
+          </h3>
+          
+          <p className="text-gray-600 leading-relaxed">
+            Are you sure you want to delete this user? This action cannot be undone.
+          </p>
+        </div>
+        
+        {/* User Info Card */}
+        <div className="px-6 py-4">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-4 border border-red-100">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0 w-12 h-12 bg-red-200/70 rounded-full flex items-center justify-center border-2 border-red-300">
+                <span className="text-red-700 font-bold text-sm">
+                  {userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 truncate text-base">{userName}</p>
+                <p className="text-sm text-gray-600 truncate">{userEmail}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="px-6 pb-8 pt-2">
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isDeleting}
+              className="flex-1 px-4 py-3 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={isDeleting}
+              className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-red-600 border-2 border-red-600 rounded-xl hover:bg-red-700 hover:border-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200"
+            >
+              {isDeleting ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  <span>Deleting...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete User</span>
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface EditPICModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -372,6 +481,318 @@ const EditPICModal: React.FC<EditPICModalProps> = ({ isOpen, onClose, pic, onSub
   );
 };
 
+// PIC Management Modal Component
+interface ManagePICModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pics: PIC[] | undefined;
+  isLoading: boolean;
+  onEditPIC: (pic: PIC) => void;
+}
+
+const ManagePICModal: React.FC<ManagePICModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  pics, 
+  isLoading, 
+  onEditPIC 
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Manage PIC</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        
+        <div className="overflow-y-auto max-h-[60vh]">
+          <Table>
+            <TableHeader className="bg-gray-50 sticky top-0">
+              <TableRow>
+                <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
+                <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</TableHead>
+                <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">PIC Area</TableHead>
+                <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
+                <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pics?.map((pic) => (
+                  <TableRow key={pic.id}>
+                    <TableCell className="text-sm text-gray-900">{pic.nama}</TableCell>
+                    <TableCell className="text-sm text-gray-900">{pic.posisi}</TableCell>
+                    <TableCell className="text-sm text-gray-500">{pic.pic_area}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        pic.status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
+                        pic.status === 'Sick' ? 'bg-rose-100 text-rose-800' :
+                        pic.status === 'On leave' ? 'bg-amber-100 text-amber-800' :
+                        pic.status === 'On Branch' ? 'bg-cyan-100 text-cyan-800' :
+                        pic.status === 'Business Trip' ? 'bg-sky-100 text-sky-800' :
+                        pic.status === 'Meeting' ? 'bg-fuchsia-100 text-fuchsia-800' :
+                        pic.status === 'Occupied' ? 'bg-zinc-300 text-zinc-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {pic.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      <button
+                        onClick={() => onEditPIC(pic)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Edit PIC"
+                      >
+                        <UserPen className="h-4 w-4" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Auditor Modal Component
+interface EditAuditorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  auditor: Auditor | null;
+  onSubmit: (id: string, fullName: string, nik: string, auditorId: string) => Promise<void>;
+}
+
+const AddAuditorModal: React.FC<AddAuditorModalProps> = ({ isOpen, onClose, onSubmit }) => {
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [nik, setNik] = useState('');
+  const [auditorId, setAuditorId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
+  // Get users that exist in auth but not in profiles
+  useEffect(() => {
+    const fetchAvailableUsers = async () => {
+      try {
+        const { data: { users }, error: authError } = await supabaseService.auth.admin.listUsers();
+        if (authError) throw authError;
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id');
+        if (profilesError) throw profilesError;
+
+        const profileIds = profiles?.map(p => p.id) || [];
+        const usersNotInProfiles = users?.filter(user => !profileIds.includes(user.id)) || [];
+        
+        setAvailableUsers(usersNotInProfiles);
+      } catch (error) {
+        console.error('Error fetching available users:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchAvailableUsers();
+    }
+  }, [isOpen]);
+
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId);
+    const selectedUser = availableUsers.find(user => user.id === userId);
+    if (selectedUser) {
+      // Auto-fill full name from user metadata or email
+      setFullName(selectedUser.user_metadata?.full_name || selectedUser.email.split('@')[0]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId) {
+      toast.error('Please select a user');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await onSubmit(selectedUserId, fullName, nik, auditorId);
+      setSelectedUserId('');
+      setFullName('');
+      setNik('');
+      setAuditorId('');
+      onClose();
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Add New Auditor</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Select User</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => handleUserSelect(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required
+            >
+              <option value="">Choose a user...</option>
+              {availableUsers.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.email} - {user.user_metadata?.full_name || 'No name'}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Users that exist in authentication but not in profiles
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">NIK</label>
+            <input
+              type="text"
+              value={nik}
+              onChange={(e) => setNik(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">ID Auditor</label>
+            <input
+              type="text"
+              value={auditorId}
+              onChange={(e) => setAuditorId(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !selectedUserId}
+            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Adding...' : 'Add Auditor'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, auditor, onSubmit }) => {
+  const [fullName, setFullName] = useState(auditor?.full_name || '');
+  const [nik, setNik] = useState(auditor?.nik || '');
+  const [auditorId, setAuditorId] = useState(auditor?.auditor_id || '');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (auditor) {
+      setFullName(auditor.full_name);
+      setNik(auditor.nik || '');
+      setAuditorId(auditor.auditor_id || '');
+    }
+  }, [auditor]);
+
+  if (!isOpen || !auditor) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSubmit(auditor.id, fullName, nik, auditorId);
+      onClose();
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Edit Auditor</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Nama Auditor</label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">NIK</label>
+            <input
+              type="text"
+              value={nik}
+              onChange={(e) => setNik(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">ID Auditor</label>
+            <input
+              type="text"
+              value={auditorId}
+              onChange={(e) => setAuditorId(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Manage Auditors Modal Component
 // Add this component after your existing modal components and before UserControlPanel
 
 const BackupLoader = () => {
@@ -626,14 +1047,19 @@ function UserControlPanel() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEditPICModal, setShowEditPICModal] = useState(false);
+  const [showManagePICModal, setShowManagePICModal] = useState(false);
+  const [showEditAuditorModal, setShowEditAuditorModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
+  const [selectedAuditor, setSelectedAuditor] = useState<Auditor | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'users' | 'auditors'>('users');
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [picSectionExpanded, setPicSectionExpanded] = useState(true);
 
-  const { data: users, isLoading, refetch } = useQuery({
+  const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
       console.log('Fetching users...');
@@ -668,6 +1094,25 @@ function UserControlPanel() {
         .select('*');
       if (error) throw error;
       return data as PIC[];
+    }
+  });
+
+  // Update query auditors untuk menampilkan semua profiles, bukan hanya yang punya auditor_id
+  const { data: auditors, isLoading: isLoadingAuditors } = useQuery({
+    queryKey: ['auditors'],
+    queryFn: async () => {
+      console.log('Fetching auditors data...');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, nik, auditor_id')
+        .order('full_name', { ascending: true }); // Hapus filter auditor_id, tampilkan semua profiles
+    
+      console.log('Auditors query result:', { data, error });
+      if (error) {
+        console.error('Auditors query error:', error);
+        throw error;
+      }
+      return data as Auditor[];
     }
   });
 
@@ -756,6 +1201,25 @@ function UserControlPanel() {
     }
   });
 
+  const updateAuditorMutation = useMutation({
+    mutationFn: async ({ id, full_name, nik, auditor_id }: 
+      { id: string; full_name: string; nik: string; auditor_id: string }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name, nik, auditor_id })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auditors'] });
+      toast.success('Auditor updated successfully');
+    },
+    onError: (error) => {
+      console.error('Error updating auditor:', error);
+      toast.error('Failed to update auditor');
+    }
+  });
+
   const handleAddUser = async (email: string, fullName: string, role: string) => {
     await addUserMutation.mutateAsync({ email, fullName, role });
   };
@@ -765,13 +1229,27 @@ function UserControlPanel() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      await deleteUserMutation.mutateAsync(userId);
+    const user = users?.find(u => u.id === userId);
+    if (user) {
+      setUserToDelete(user);
+      setShowDeleteModal(true);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (userToDelete) {
+      await deleteUserMutation.mutateAsync(userToDelete.id);
+      setShowDeleteModal(false);
+      setUserToDelete(null);
     }
   };
 
   const handleEditPIC = async (id: number, nama: string, posisi: string, pic_area: string, status: string) => {
     await updatePICMutation.mutateAsync({ id, nama, posisi, pic_area, status });
+  };
+
+  const handleEditAuditor = async (id: string, full_name: string, nik: string, auditor_id: string) => {
+    await updateAuditorMutation.mutateAsync({ id, full_name, nik, auditor_id });
   };
 
   const handleBackupData = async () => {
@@ -1082,12 +1560,19 @@ function UserControlPanel() {
       {/* Main header unchanged */}
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Users</h1>
-          <p className="text-sm text-gray-500">Manage users within the application and Person In Charge (PIC) data.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Menu</h1>
+          <p className="text-sm text-gray-500">Manage users, backup data, and more.</p>
         </div>
         
-        {/* Moved backup and refresh buttons next to the main header */}
+        {/* Updated buttons section with Manage PIC button and Backup */}
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowManagePICModal(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <UserPen className="h-5 w-5" />
+            Manage PIC
+          </button>
           <button
             onClick={handleBackupData}
             disabled={loading}
@@ -1102,219 +1587,270 @@ function UserControlPanel() {
       {/* Add this line to show the loader when backup is in progress */}
       {loading && <BackupLoader />}
       
-      {/* Change from flex-row to flex-col for stacked layout */}
-      <div className="flex flex-col gap-6">
-        {/* PIC Management section - collapsible */}
-        <div className="w-full bg-white shadow rounded-lg overflow-hidden">
-          <div 
-            className="flex justify-between items-center p-4 cursor-pointer"
-            onClick={() => setPicSectionExpanded(!picSectionExpanded)}
-          >
-            <h2 className="text-xl font-semibold text-gray-900">Manage PIC</h2>
-            <button className="text-gray-500 hover:text-gray-700">
-              {picSectionExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </button>
-          </div>
-          
-          {picSectionExpanded && (
-            <div className="overflow-y-auto max-h-[400px] border-t border-gray-200">
-              <Table>
-                <TableHeader className="bg-gray-50 sticky top-0">
-                  <TableRow>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">PIC Area</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pics?.map((pic) => (
-                    <TableRow key={pic.id}>
-                      <TableCell className="text-sm text-gray-900">{pic.nama}</TableCell>
-                      <TableCell className="text-sm text-gray-900">{pic.posisi}</TableCell>
-                      <TableCell className="text-sm text-gray-500">{pic.pic_area}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          pic.status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
-                          pic.status === 'Sick' ? 'bg-rose-100 text-rose-800' :
-                          pic.status === 'On leave' ? 'bg-amber-100 text-amber-800' :
-                          pic.status === 'On Branch' ? 'bg-cyan-100 text-cyan-800' :
-                          pic.status === 'Business Trip' ? 'bg-sky-100 text-sky-800' :
-                          pic.status === 'Meeting' ? 'bg-fuchsia-100 text-fuchsia-800' :
-                          pic.status === 'Occupied' ? 'bg-zinc-300 text-zinc-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {pic.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent toggle when clicking the button
-                            setSelectedPIC(pic);
-                            setShowEditPICModal(true);
-                          }}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Edit PIC"
-                        >
-                          <UserPen className="h-4 w-4" />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-
-        {/* User List section moved below the PIC section */}
-        <div className="w-full">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center flex-grow">
-              <h2 className="text-xl font-semibold text-gray-900 mr-4">User List</h2>
-              
-              {/* Search bar with modern style */}
-              <div className="relative w-[300px]">
-                <input
-                  type="text"
-                  placeholder="Search by email or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="peer w-full pl-10 pr-2 py-2 text-base border-0 border-b-2 border-gray-300 bg-transparent outline-none transition-colors focus:border-indigo-500"
-                />
-                {/* Underline animation */}
-                <div className="absolute bottom-0 left-0 h-0.5 w-full scale-x-0 bg-indigo-500 transition-transform duration-300 peer-focus:scale-x-100"></div>
-
-                {/* Highlight background on focus */}
-                <div className="absolute bottom-0 left-0 h-full w-0 bg-indigo-500/10 transition-all duration-300 peer-focus:w-full"></div>
-
-                {/* Search icon */}
-                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 peer-focus:text-indigo-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="w-5 h-5">
-                    <path
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      strokeWidth="2"
-                      stroke="currentColor"
-                      d="M21 21L16.65 16.65M19 11C19 15.4183 15.4183 19 11 19C6.58172 19 3 15.4183 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11Z"
-                    ></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            
-            {/* Add User button */}
+      {/* Tab Navigation */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            {/* Users Tab */}
             <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              onClick={() => setActiveTab('users')}
+              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'users'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             >
-              <UserPlus className="h-5 w-5" />
-              Add User
+              User Management
             </button>
-          </div>
-          
-          <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
-            <div className="overflow-y-auto h-full">
-              <Table>
-                <TableHeader className="bg-gray-50 sticky top-0">
-  <TableRow>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider w-10">No.</TableHead>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</TableHead>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</TableHead>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Role</TableHead>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
-    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
-  </TableRow>
-</TableHeader>
-<TableBody>
-  {filteredUsers
-    ?.slice() // copy array agar tidak mutasi
-    .sort((a, b) => {
-      const roleOrder = ['superadmin', 'manager', 'dvs', 'qa', 'risk', 'user'];
-      return roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
-    })
-    .map((user, index) => (
-    <TableRow key={user.id}>
-      <TableCell className="text-sm text-gray-900">{index + 1}</TableCell>
-      <TableCell className="text-sm text-gray-900">{user.email}</TableCell>
-      <TableCell className="text-sm text-gray-900">{user.full_name}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          user.role === 'dvs' ? 'bg-cyan-100 text-cyan-800' :
-                          user.role === 'qa' ? 'bg-blue-100 text-blue-800' :
-                          user.role === 'risk' ? 'bg-teal-100 text-teal-800' :
-                          user.role === 'superadmin' ? 'bg-sky-100 text-sky-800' :
-                          user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
-                          'bg-pink-100 text-pink-800'
-                        }`}>
-                          {user.role.toUpperCase()}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
-                            user.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-rose-400'
-                          }`} />
-                          <span className="text-sm text-gray-500">
-                            {user.status === 'ACTIVE' ? 'Active' : 
-                              user.last_sign_in_at ? 
-                                `Log in, ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
-                                'Never logged in'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowEditModal(true);
-                            }}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Edit user"
-                          >
-                            <UserPen className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete user"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+            
+            {/* Auditors Tab */}
+            <button
+              onClick={() => setActiveTab('auditors')}
+              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'auditors'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Auditor Management
+            </button>
+          </nav>
         </div>
       </div>
 
-      {/* Modals stay unchanged at the bottom */}
-      <AddUserModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddUser}
-      />
+      {/* Tab Content */}
+      {activeTab === 'users' && (
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center flex-grow">
+                <h2 className="text-xl font-semibold text-gray-900 mr-4">User List</h2>
+                
+                {/* Search bar with modern style */}
+                <div className="relative w-[300px]">
+                  <input
+                    type="text"
+                    placeholder="Search by email or name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="peer w-full pl-10 pr-2 py-2 text-base border-0 border-b-2 border-gray-300 bg-transparent outline-none transition-colors focus:border-indigo-500"
+                  />
+                  {/* Underline animation */}
+                  <div className="absolute bottom-0 left-0 h-0.5 w-full scale-x-0 bg-indigo-500 transition-transform duration-300 peer-focus:scale-x-100"></div>
 
-      <EditUserModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        user={selectedUser}
-        onSubmit={handleEditUser}
-      />
+                  {/* Highlight background on focus */}
+                  <div className="absolute bottom-0 left-0 h-full w-0 bg-indigo-500/10 transition-all duration-300 peer-focus:w-full"></div>
 
-      <EditPICModal
-        isOpen={showEditPICModal}
-        onClose={() => setShowEditPICModal(false)}
-        pic={selectedPIC}
-        onSubmit={handleEditPIC}
-      />
+                  {/* Search icon */}
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 peer-focus:text-indigo-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="w-5 h-5">
+                      <path
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        strokeWidth="2"
+                        stroke="currentColor"
+                        d="M21 21L16.65 16.65M19 11C19 15.4183 15.4183 19 11 19C6.58172 19 3 15.4183 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11Z"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Add User button */}
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              >
+                <UserPlus className="h-5 w-5" />
+                Add User
+              </button>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg overflow-hidden">
+              <div className="overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-gray-100 sticky top-0">
+                    <TableRow>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider w-10">No.</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Role</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers
+                      ?.slice() // copy array agar tidak mutasi
+                      .sort((a: any, b: any) => {
+                        const roleOrder = ['superadmin', 'manager', 'dvs', 'qa', 'risk', 'user'];
+                        return roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
+                      })
+                      .map((user: any, index: number) => (
+                      <TableRow key={user.id} className="hover:bg-gray-50">
+                        <TableCell className="text-sm text-gray-900">{index + 1}</TableCell>
+                        <TableCell className="text-sm text-gray-900">{user.email}</TableCell>
+                        <TableCell className="text-sm text-gray-900">{user.full_name}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            user.role === 'dvs' ? 'bg-cyan-100 text-cyan-800' :
+                            user.role === 'qa' ? 'bg-blue-100 text-blue-800' :
+                            user.role === 'risk' ? 'bg-teal-100 text-teal-800' :
+                            user.role === 'superadmin' ? 'bg-sky-100 text-sky-800' :
+                            user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                            'bg-pink-100 text-pink-800'
+                          }`}>
+                            {user.role.toUpperCase()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
+                              user.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-rose-400'
+                            }`} />
+                            <span className="text-sm text-gray-500">
+                              {user.status === 'ACTIVE' ? 'Active' : 
+                                user.last_sign_in_at ? 
+                                  `Log in, ${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 
+                                  'Never logged in'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowEditModal(true);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit user"
+                            >
+                              <UserPen className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete user"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'auditors' && (
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Manage User Auditors</h2>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg overflow-hidden">
+              <div className="overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-gray-100 sticky top-0">
+                    <TableRow>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider w-10">No.</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">ID UUID</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Auditor</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">NIK</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">ID Auditor</TableHead>
+                      <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingAuditors ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      auditors?.map((auditor, index) => (
+                        <TableRow key={auditor.id} className="hover:bg-gray-50">
+                          <TableCell className="text-sm text-gray-900">{index + 1}</TableCell>
+                          <TableCell className="text-xs text-gray-500 font-mono">{auditor.id}</TableCell>
+                          <TableCell className="text-sm text-gray-900">{auditor.full_name}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{auditor.nik || '-'}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{auditor.auditor_id || '-'}</TableCell>
+                          <TableCell className="text-sm text-gray-500">
+                            <button
+                              onClick={() => {
+                                setSelectedAuditor(auditor);
+                                setShowEditAuditorModal(true);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit Auditor"
+                            >
+                              <UserPen className="h-4 w-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+        {/* Modals */}
+        <AddUserModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddUser}
+        />
+
+        <EditUserModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          user={selectedUser}
+          onSubmit={handleEditUser}
+        />
+
+        <EditPICModal
+          isOpen={showEditPICModal}
+          onClose={() => setShowEditPICModal(false)}
+          pic={selectedPIC}
+          onSubmit={handleEditPIC}
+        />
+
+        <ManagePICModal
+          isOpen={showManagePICModal}
+          onClose={() => setShowManagePICModal(false)}
+          pics={pics}
+          isLoading={isLoadingPics}
+          onEditPIC={(pic) => {
+            setSelectedPIC(pic);
+            setShowEditPICModal(true);
+          }}
+        />
+
+        <EditAuditorModal
+          isOpen={showEditAuditorModal}
+          onClose={() => setShowEditAuditorModal(false)}
+          auditor={selectedAuditor}
+          onSubmit={handleEditAuditor}
+        />
+
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleConfirmDelete}
+          userName={userToDelete?.full_name || ''}
+          userEmail={userToDelete?.email || ''}
+        />
     </div>
   );
 }

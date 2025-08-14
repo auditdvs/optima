@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import CountUp from '../components/CountUp';
+import CurrencyCountUp from '../components/CurrencyCountUp';
 import AuditorPerforma from '../components/dashboard/AuditorPerforma';
 import AuditSummary from '../components/dashboard/AuditSummary';
 import FraudData from '../components/dashboard/FraudData';
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { supabase } from '../lib/supabaseClient';
-import '../styles/download-button.css';
+import { formatToRupiah } from '../lib/utils';
 import '../styles/radioButtons.css';
 
 const checkUserAccess = async (supabase: any) => {
@@ -255,9 +256,9 @@ const ManagerDashboard = () => {
         { Metric: 'Special Audits', Value: stats.specialAudits },
         { Metric: 'Fraud Cases', Value: stats.fraudAudits },
         { Metric: 'Total Auditors', Value: stats.totalAuditors },
-        { Metric: 'Total Fraud Amount', Value: stats.totalFraud },
-        { Metric: 'Fraud Recovery', Value: stats.fraudRecovery },
-        { Metric: 'Outstanding Fraud', Value: stats.outstandingFraud },
+        { Metric: 'Total Fraud Amount', Value: formatToRupiah(stats.totalFraud) },
+        { Metric: 'Fraud Recovery', Value: formatToRupiah(stats.fraudRecovery) },
+        { Metric: 'Outstanding Fraud', Value: formatToRupiah(stats.outstandingFraud) },
         { Metric: 'Recovery Percentage', Value: stats.totalFraud > 0 ? 
           ((stats.fraudRecovery / stats.totalFraud) * 100).toFixed(2) + '%' : '0%' }
       ];
@@ -462,7 +463,9 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Total Fraud</p>
-                  <p className="text-base font-bold text-red-600"><CountUp to={stats.totalFraud} duration={1.5} /></p>
+                  <p className="text-base font-bold text-red-600">
+                    <CurrencyCountUp to={stats.totalFraud} duration={1.5} />
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -474,7 +477,9 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Fraud Recovery</p>
-                  <p className="text-base font-bold text-emerald-600"><CountUp to={stats.fraudRecovery} duration={1.5} /></p>
+                  <p className="text-base font-bold text-emerald-600">
+                    <CurrencyCountUp to={stats.fraudRecovery} duration={1.5} />
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -486,7 +491,9 @@ const ManagerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Outstanding Fraud</p>
-                  <p className="text-base font-bold text-yellow-600"><CountUp to={stats.outstandingFraud} duration={1.5} /></p>
+                  <p className="text-base font-bold text-yellow-600">
+                    <CurrencyCountUp to={stats.outstandingFraud} duration={1.5} />
+                  </p>
                 </div>
               </CardContent>
             </Card>
