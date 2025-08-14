@@ -244,15 +244,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     setIsLoading(true); // Set loading when signing out
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Clear local state first
+      setUser(null);
+      setUserRole('user');
+      setAuditor(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('userRole');
       
-      setUserRole('user'); // Reset role on sign out
-      setAuditor(null); // Reset auditor on sign out
-      // Loading state will be handled by the auth state change
+      // Clear inactivity timer
+      if (inactivityTimerId) {
+        clearInterval(inactivityTimerId);
+        setInactivityTimerId(null);
+      }
+      
+      // Check if we have a valid session before attempting to sign out
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Only attempt to sign out if we have a valid session
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.warn('Sign out error (but continuing with local cleanup):', error);
+          // Don't throw the error, just log it since we've already cleared local state
+        }
+      } else {
+        console.log('No active session found, performing local cleanup only');
+      }
+      
     } catch (error) {
-      setIsLoading(false); // Reset loading on error
-      throw error;
+      console.error('Sign out error:', error);
+      // Even if sign out fails, ensure local state is cleared
+      setUser(null);
+      setUserRole('user');
+      setAuditor(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('userRole');
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -260,12 +288,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function refreshSession() {
     try {
       setIsLoading(true);
+      
+      // Check current session first
+      const { data: currentSession } = await supabase.auth.getSession();
+      
+      if (!currentSession.session) {
+        console.log('No session to refresh');
+        await signOut();
+        return;
+      }
+      
       const { data, error } = await supabase.auth.refreshSession();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to refresh session:', error);
+        await signOut();
+        return;
+      }
       
-      setUser(data.user);
-      console.log('Session manually refreshed');
+      if (data.session?.user) {
+        setUser(data.session.user);
+        await Promise.all([
+          fetchUserRole(data.session.user.id),
+          fetchAuditor(data.session.user.id)
+        ]);
+        console.log('Session manually refreshed');
+      }
     } catch (error) {
       console.error('Failed to refresh session:', error);
       // Handle session refresh failure

@@ -123,7 +123,7 @@ function App() {
                 </PrivateRoute>
               } />
               <Route 
-                path="account-settings" // Remove the leading slash to match other routes
+                path="account-settings" 
                 element={
                   <PrivateRoute>
                     <AccountSettingsPage />
