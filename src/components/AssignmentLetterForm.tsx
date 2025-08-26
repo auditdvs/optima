@@ -275,7 +275,8 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
             transport: formData.transport,
             konsumsi: formData.konsumsi,
             etc: formData.etc,
-            file_url: fileUrl // Simpan URL file Excel jika ada
+            file_url: fileUrl, // Simpan URL file Excel jika ada
+            status: 'pending' // Default status adalah pending untuk approval
         });
 
       if (error) throw error;

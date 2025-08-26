@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowLeft, ClipboardList, Download, ExternalLink, File, FileSpreadsheet, Table } from 'lucide-react';
 import { Link, Route, Routes } from 'react-router-dom';
 import COA from '../components/COA';
+import ReportErrorButton from '../components/ToolsError';
 import '../styles/download-button.css';
 
 // Component untuk card yang bisa diklik dengan external link
@@ -229,13 +230,16 @@ function Tools() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Tools & Utilities</h1>
           <p className="text-gray-600">Kumpulan tools untuk membantu proses audit dan pemeriksaan</p>
         </div>
-        <Link 
-          to="/tools/coa"
-          className="bg-lime-500 hover:bg-lime-600 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2"
-        >
-          <Table size={20} />
-          Chart of Accounts
-        </Link>
+        <div className="flex gap-3">
+          <ReportErrorButton />
+          <Link 
+            to="/tools/coa"
+            className="bg-lime-500 hover:bg-lime-600 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2"
+          >
+            <Table size={20} />
+            Chart of Accounts
+          </Link>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -321,7 +325,7 @@ function THCProcessing() {
   ];
 
   return (
-    <div className="mt-6 bg-white rounded-lg shadow p-6">
+    <div className="mt-6 bg-white rounded-lg shadow p-6">      
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Data Processing Workflow</h2>
         <p className="text-gray-600">Ikuti langkah-langkah berikut untuk memproses data THC secara berurutan</p>

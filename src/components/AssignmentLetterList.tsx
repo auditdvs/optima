@@ -1,7 +1,8 @@
-import { Eye } from 'lucide-react';
+import { Eye, FileDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
+import { downloadAssignmentLetterPDF } from '../services/pdfGenerator';
 
 interface AssignmentLetter {
   id: string;
@@ -20,6 +21,8 @@ interface AssignmentLetter {
   etc: number;
   tanggal_input?: string;
   created_by?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string;
 }
 
 interface Account {
@@ -37,6 +40,7 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
   const [loading, setLoading] = useState(true);
   const [selectedLetter, setSelectedLetter] = useState<AssignmentLetter | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLetters();
@@ -117,6 +121,19 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
     return account?.full_name || 'Unknown';
   };
 
+  const getStatusBadge = (status: string | undefined) => {
+    if (!status) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">-</span>;
+    
+    switch (status) {
+      case 'approved':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
+      case 'rejected':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
+      default:
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
+    }
+  };
+
   const formatDateTime = (dateString: string | undefined) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -135,6 +152,30 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
   const handleViewDetail = (letter: AssignmentLetter) => {
     setSelectedLetter(letter);
     setShowDetailModal(true);
+  };
+
+  const handleDownloadPDF = async (letter: AssignmentLetter) => {
+    // Only allow download if approved
+    if (letter.status !== 'approved') {
+      toast.error('Hanya assignment letter yang sudah disetujui yang dapat didownload');
+      return;
+    }
+
+    setPdfLoading(letter.id);
+    try {
+      const fileName = `Surat_Tugas_${letter.audit_type}_${letter.branch_name.replace(/[^a-zA-Z0-9]/g, '_')}_${letter.assigment_letter.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      
+      toast.loading(`Generating PDF untuk ${letter.audit_type}...`, { id: 'pdf-gen' });
+      
+      await downloadAssignmentLetterPDF(letter.id, fileName);
+      
+      toast.success(`PDF ${letter.audit_type} berhasil di-download!`, { id: 'pdf-gen' });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error(`Gagal generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: 'pdf-gen' });
+    } finally {
+      setPdfLoading(null);
+    }
   };
 
   if (loading) {
@@ -162,6 +203,12 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
                 Cabang - Regional
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipe Audit
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Pelaksanaan
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -175,7 +222,7 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
           <tbody className="bg-white divide-y divide-gray-200">
             {letters.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                   Belum ada surat tugas
                 </td>
               </tr>
@@ -192,19 +239,48 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
                     {letter.branch_name} - {letter.region}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      letter.audit_type === 'reguler' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {letter.audit_type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {getStatusBadge(letter.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatAuditPeriod(letter)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
                     {formatTeam(letter.team)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleViewDetail(letter)}
-                      className="text-indigo-600 hover:text-indigo-900 flex items-center"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleViewDetail(letter)}
+                        className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </button>
+                      {letter.status === 'approved' ? (
+                        <button
+                          onClick={() => handleDownloadPDF(letter)}
+                          disabled={pdfLoading === letter.id}
+                          className="text-green-600 hover:text-green-900 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <FileDown className="w-4 h-4 mr-1" />
+                          {pdfLoading === letter.id ? 'Generating...' : 'PDF'}
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 flex items-center text-xs">
+                          <FileDown className="w-4 h-4 mr-1" />
+                          {letter.status === 'pending' ? 'Pending' : letter.status === 'rejected' ? 'Rejected' : 'N/A'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -280,6 +356,18 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
                     </div>
                   </div>
                 </div>
+
+                {/* Rejection Reason Section - Only show if rejected */}
+                {selectedLetter.status === 'rejected' && selectedLetter.rejection_reason && (
+                  <div className="border-t pt-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-red-700 mb-2">Alasan Penolakan</label>
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-sm text-red-800">{selectedLetter.rejection_reason}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Budget Section */}
                 {(selectedLetter.transport !== undefined || selectedLetter.konsumsi !== undefined || selectedLetter.etc !== undefined) && (

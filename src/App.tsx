@@ -130,7 +130,7 @@ function App() {
                   </PrivateRoute>
                 } />
                 <Route path="assignment-letter" element={
-                <PrivateRoute requiredRoles={['superadmin']}>
+                <PrivateRoute requiredRoles={['user', 'dvs', 'qa', 'manager', 'superadmin']}>
                   <AssignmentLetter />
                 </PrivateRoute>
                 } />

@@ -41,6 +41,7 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
   const [showNewTeamDropdown, setShowNewTeamDropdown] = useState(false);
   const [formData, setFormData] = useState({
     letter_id: '',
+    assignment_letter_before: '', // Tambahkan field ini
     addendum_types: [] as string[], // Changed to array for multiple selections
     transport: 0,
     konsumsi: 0,
@@ -98,7 +99,8 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     setSelectedLetter(letter || null);
     setFormData(prev => ({ 
       ...prev, 
-      letter_id: letterId
+      letter_id: letterId,
+      assignment_letter_before: letter?.assigment_letter || '' // Auto-fill dari letter yang dipilih
       // Note: leader will be taken from selectedLetter.leader, not formData.leader
     }));
   };
@@ -146,8 +148,8 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     try {
       setExcelUploadProgress(0);
       
-      // Buat nama folder berdasarkan branch
-      const folderName = branchName.replace(/\s+/g, '_').toLowerCase();
+      // Buat nama folder berdasarkan branch (sama dengan format AssignmentLetterForm)
+      const folderName = branchName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
       
       // Buat nama file Excel berdasarkan nomor addendum
       const fileExtension = file.name.split('.').pop();
@@ -272,13 +274,15 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
         }
       }
 
-            // Prepare data berdasarkan tipe addendum
+      // Prepare data berdasarkan tipe addendum
       const insertData: any = {
         letter_id: formData.letter_id,
         assigment_letter: addendumNumber,
+        assignment_letter_before: formData.assignment_letter_before, // Simpan nomor surat sebelumnya
         addendum_type: formData.addendum_types.join(', '), // Convert array to string
         branch_name: selectedLetterData.branch_name,
         region: selectedLetterData.region,
+        audit_type: selectedLetterData.audit_type, // Tambahkan audit_type dari letter
         team: selectedLetterData.team, // Auto input from selected letter
         leader: selectedLetterData.leader, // Auto input from selected letter
         excel_file_url: excelFileUrl // File Excel untuk tipe tertentu
@@ -375,6 +379,23 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
               ))}
             </select>
           </div>
+
+          {/* Preview Assignment Letter Before - Tampilkan di atas form */}
+          {formData.assignment_letter_before && (
+            <div className="md:col-span-2 mb-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">Nomor Surat Tugas yang akan di-Addendum</h4>
+                <div className="bg-white border border-blue-300 rounded px-3 py-2">
+                  <p className="text-sm text-gray-700 font-mono">
+                    {formData.assignment_letter_before}
+                  </p>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  * Preview - Nomor surat tugas sebelumnya yang akan diubah
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Info Letter yang dipilih */}
           {selectedLetter && (

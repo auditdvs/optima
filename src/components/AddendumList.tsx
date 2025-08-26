@@ -7,19 +7,27 @@ interface Addendum {
   id: string;
   letter_id: string;
   assigment_letter: string;
+  assignment_letter_before?: string; // Added field for original letter
   addendum_type: string;
   branch_name: string;
   region: string;
+  audit_type: string; // Tambahkan field audit_type
   team: string; // Team members
   leader: string; // Team Leader
   transport: number;
   konsumsi: number;
   etc: number;
   keterangan?: string;
+  description?: string;
   start_date?: string;
   end_date?: string;
   tanggal_input?: string;
   created_by?: string;
+  status: 'pending' | 'approved' | 'rejected'; // Add status field
+  excel_file_url?: string; // Add excel file URL field
+  approved_by?: string;
+  approved_at?: string;
+  rejection_reason?: string;
 }
 
 interface Account {
@@ -135,6 +143,65 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
     setShowDetailModal(true);
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
+      case 'rejected':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
+      default:
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
+    }
+  };
+
+  const handleDownloadPDF = async (addendumId: string) => {
+    try {
+      toast.loading('Generating PDF...', { id: 'pdf-gen' });
+      
+      // Fetch data addendum untuk mendapatkan informasi untuk nama file
+      const { data: addendum, error } = await supabase
+        .from('addendum')
+        .select('branch_name, assigment_letter, audit_type, addendum_type')
+        .eq('id', addendumId)
+        .single();
+        
+      if (error) throw error;
+      if (!addendum) throw new Error('Addendum tidak ditemukan');
+      
+      // Generate PDF using the service function
+      const { generateAddendumPDFPreservingPosition } = await import('../services/pdfGeneratorPreservingPosition');
+      const pdfBlob = await generateAddendumPDFPreservingPosition(addendumId);
+      
+      // Format nama file
+      const branchName = addendum.branch_name.replace(/[^a-zA-Z0-9]/g, '_');
+      const assignmentLetter = addendum.assigment_letter.replace(/[^a-zA-Z0-9]/g, '_');
+      const auditType = addendum.audit_type || 'reguler';
+      const fileName = `Addendum_${auditType.toUpperCase()}_${branchName.toUpperCase()}_${assignmentLetter}.pdf`;
+      
+      // Create download link and trigger download
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      // Add to DOM temporarily for download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      toast.success('PDF berhasil diunduh', { id: 'pdf-gen' });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error(`Gagal mengunduh PDF: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: 'pdf-gen' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -166,6 +233,9 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                 Jenis
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Action
               </th>
             </tr>
@@ -173,7 +243,7 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
           <tbody className="bg-white divide-y divide-gray-200">
             {addendums.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                   Belum ada addendum
                 </td>
               </tr>
@@ -195,14 +265,30 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {addendum.addendum_type}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {getStatusBadge(addendum.status)}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleViewDetail(addendum)}
-                      className="text-indigo-600 hover:text-indigo-900 flex items-center"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </button>
+                    <div className="flex space-x-4">
+                      <button
+                        onClick={() => handleViewDetail(addendum)}
+                        className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </button>
+                      {addendum.status === 'approved' && (
+                        <button
+                          onClick={() => handleDownloadPDF(addendum.id)}
+                          className="text-green-600 hover:text-green-900 flex items-center"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                          </svg>
+                          Download PDF
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -230,9 +316,24 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
               </div>
 
               <div className="space-y-4">
+                {/* Assignment Letter Preview Section - Added at the top */}
+                {selectedAddendum.assignment_letter_before && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Nomor Surat Tugas Sebelumnya</h4>
+                    <div className="bg-white border border-blue-300 rounded px-3 py-2">
+                      <p className="text-sm text-gray-700 font-mono">
+                        {selectedAddendum.assignment_letter_before}
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      * Nomor surat tugas yang akan di-addendum
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Nomor Surat</label>
+                    <label className="block text-sm font-medium text-gray-700">Nomor Surat Addendum</label>
                     <p className="text-sm text-gray-900">{selectedAddendum.assigment_letter}</p>
                   </div>
                   <div>
@@ -242,6 +343,10 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Nama Cabang</label>
                     <p className="text-sm text-gray-900">{selectedAddendum.branch_name}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Jenis Audit</label>
+                    <p className="text-sm text-gray-900">{selectedAddendum.audit_type}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Jenis Addendum</label>
@@ -287,6 +392,35 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                   </div>
                 </div>
 
+                {/* Status and Rejection Reason Section */}
+                <div className="mt-6 border-t pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Status</label>
+                      <div className="mt-1">
+                        {getStatusBadge(selectedAddendum.status)}
+                      </div>
+                    </div>
+                    {selectedAddendum.approved_by && selectedAddendum.approved_at && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          {selectedAddendum.status === 'approved' ? 'Disetujui oleh' : 'Diproses oleh'}
+                        </label>
+                        <p className="text-sm text-gray-900">{selectedAddendum.approved_by}</p>
+                        <p className="text-xs text-gray-500">{formatDateTime(selectedAddendum.approved_at)}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Rejection Reason */}
+                  {selectedAddendum.status === 'rejected' && selectedAddendum.rejection_reason && (
+                    <div className="mt-4 p-3 bg-red-50 rounded-md">
+                      <label className="block text-sm font-medium text-red-700">Alasan Penolakan</label>
+                      <p className="text-sm text-red-900 mt-1">{selectedAddendum.rejection_reason}</p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Budget Section */}
                 {(selectedAddendum.transport !== undefined || selectedAddendum.konsumsi !== undefined || selectedAddendum.etc !== undefined) && (
                   <div className="mt-6 border-t pt-4">
@@ -320,7 +454,18 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                   </div>
                 )}
 
-                <div className="flex justify-end mt-6">
+                <div className="flex justify-end space-x-4 mt-6">
+                  {selectedAddendum.status === 'approved' && (
+                    <button
+                      onClick={() => handleDownloadPDF(selectedAddendum.id)}
+                      className="px-4 py-2 flex items-center bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                      </svg>
+                      Download PDF
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowDetailModal(false)}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"

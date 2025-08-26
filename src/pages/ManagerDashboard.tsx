@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowDown, Building2, TrendingUp, Users, Wallet } from "
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
+import AssignmentLetterManager from '../components/AssignmentLetterManager';
 import CountUp from '../components/CountUp';
 import CurrencyCountUp from '../components/CurrencyCountUp';
 import AuditorPerforma from '../components/dashboard/AuditorPerforma';
@@ -93,7 +94,7 @@ const ManagerDashboard = () => {
   const [auditTrends, setAuditTrends] = useState<AuditTrend[]>([]);
   const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [isAuditorListOpen, setIsAuditorListOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'main' | 'auditorCounts' | 'auditSummary' | 'fraudData'>('main');
+  const [activeSection, setActiveSection] = useState<'main' | 'auditorCounts' | 'auditSummary' | 'fraudData' | 'assignmentLetters'>('main');
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -331,74 +332,65 @@ const ManagerDashboard = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="relative flex w-full overflow-hidden rounded-[10px] border border-[#35343439] bg-white text-black mb-10">
-        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
-          <input
-            type="radio"
-            name="managerTab"
-            value="auditorCounts"
-            checked={activeSection === 'auditorCounts'}
-            onChange={() => setActiveSection('auditorCounts')}
-            className="hidden peer"
-          />
-          <span className={activeSection === 'auditorCounts' ? 'text-white' : 'text-gray-700'}>
-            Auditor Performa
-          </span>
-        </label>
-        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
-          <input
-            type="radio"
-            name="managerTab"
-            value="auditSummary"
-            checked={activeSection === 'auditSummary'}
-            onChange={() => setActiveSection('auditSummary')}
-            className="hidden peer"
-          />
-          <span className={activeSection === 'auditSummary' ? 'text-white' : 'text-gray-700'}>
-            Audit Summary
-          </span>
-        </label>
-        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
-          <input
-            type="radio"
-            name="managerTab"
-            value="fraudData"
-            checked={activeSection === 'fraudData'}
-            onChange={() => setActiveSection('fraudData')}
-            className="hidden peer"
-          />
-          <span className={activeSection === 'fraudData' ? 'text-white' : 'text-gray-700'}>
-            Fraud Data
-          </span>
-        </label>
-        <label className="flex w-full cursor-pointer items-center justify-center p-3 font-semibold tracking-tight text-sm peer-checked:text-white transition-colors relative z-10">
-          <input
-            type="radio"
-            name="managerTab"
-            value="main"
-            checked={activeSection === 'main'}
-            onChange={() => setActiveSection('main')}
-            className="hidden peer"
-          />
-          <span className={activeSection === 'main' ? 'text-white' : 'text-gray-700'}>
-            Overview
-          </span>
-        </label>
-        <span 
-          className={`absolute top-0 h-full w-1/4 bg-indigo-600 transition-all duration-300 ease-in-out z-0 ${
-            activeSection === 'auditorCounts' ? 'left-0' : 
-            activeSection === 'auditSummary' ? 'left-1/4' : 
-            activeSection === 'fraudData' ? 'left-2/4' : 
-            'left-3/4'
+      <div className="flex w-full overflow-hidden rounded-md border border-[#35343439] bg-white text-black mb-10">
+        <button
+          onClick={() => setActiveSection('auditorCounts')}
+          className={`flex-1 p-3 text-center font-medium text-sm ${
+            activeSection === 'auditorCounts' 
+              ? 'bg-indigo-600 text-white' 
+              : 'text-gray-700 hover:bg-gray-50'
           }`}
-        />
+        >
+          Auditor Performa
+        </button>
+        <button
+          onClick={() => setActiveSection('auditSummary')}
+          className={`flex-1 p-3 text-center font-medium text-sm ${
+            activeSection === 'auditSummary' 
+              ? 'bg-indigo-600 text-white' 
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          Audit Summary
+        </button>
+        <button
+          onClick={() => setActiveSection('fraudData')}
+          className={`flex-1 p-3 text-center font-medium text-sm ${
+            activeSection === 'fraudData' 
+              ? 'bg-indigo-600 text-white' 
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          Fraud Data
+        </button>
+        <button
+          onClick={() => setActiveSection('assignmentLetters')}
+          className={`flex-1 p-3 text-center font-medium text-sm ${
+            activeSection === 'assignmentLetters' 
+              ? 'bg-indigo-600 text-white' 
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          Assignment Letters
+        </button>
+        <button
+          onClick={() => setActiveSection('main')}
+          className={`flex-1 p-3 text-center font-medium text-sm ${
+            activeSection === 'main' 
+              ? 'bg-indigo-600 text-white' 
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          Overview
+        </button>
       </div>
 
       {/* Render different sections based on activeSection */}
       {activeSection === 'auditorCounts' && <AuditorPerforma />}
       {activeSection === 'auditSummary' && <AuditSummary />}
       {activeSection === 'fraudData' && <FraudData />}
-
+      {activeSection === 'assignmentLetters' && <AssignmentLetterManager />}
+      
       {/* Main Dashboard Section - Always visible when Overview is selected */}
       {activeSection === 'main' && (
         <>
@@ -536,6 +528,14 @@ const ManagerDashboard = () => {
                   <Bar dataKey="fraud" name="Fraud" fill="#e74c3c" radius={4} />
                 </BarChart>
               </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Assignment Letters Management Section */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Assignment Letter Management</h2>
+              <AssignmentLetterManager />
             </CardContent>
           </Card>
         </>
