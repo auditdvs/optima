@@ -473,51 +473,91 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Assignment Letter Management</h2>
-        <div className="text-sm text-gray-500">
-          Total: {activeTab === 'letter' ? letters.length : addendums.length} | 
-          Pending: {activeTab === 'letter' 
-            ? letters.filter(l => l.status === 'pending').length 
-            : addendums.filter(a => a.status === 'pending').length} | 
-          Approved: {activeTab === 'letter' 
-            ? letters.filter(l => l.status === 'approved').length 
-            : addendums.filter(a => a.status === 'approved').length} | 
-          Rejected: {activeTab === 'letter' 
-            ? letters.filter(l => l.status === 'rejected').length 
-            : addendums.filter(a => a.status === 'rejected').length}
-        </div>
-      </div>
       
-      {/* Sub Tab Navigation */}
+      {/* Sub Tab Navigation dengan Statistics */}
       <div className="bg-white rounded-lg shadow-sm mb-4">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveTab('letter')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'letter'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                Surat Tugas
+          <div className="flex items-center justify-between px-6">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('letter')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'letter'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  Surat Tugas
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('addendum')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'addendum'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  Addendum
+                </div>
+              </button>
+            </nav>
+            
+            {/* Statistics */}
+            <div className="flex items-center space-x-2 py-4">
+              {/* Total */}
+              <div className="flex items-center bg-gray-100 px-2 py-1 rounded-md">
+                <div className="flex items-center space-x-1">
+                  <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+                  <span className="text-xs font-medium text-gray-700">Total:</span>
+                  <span className="text-xs font-bold text-gray-900">
+                    {activeTab === 'letter' ? letters.length : addendums.length}
+                  </span>
+                </div>
               </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('addendum')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'addendum'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                Addendum
+              
+              {/* Pending */}
+              <div className="flex items-center bg-yellow-50 px-2 py-1 rounded-md border border-yellow-200">
+                <div className="flex items-center space-x-1">
+                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
+                  <span className="text-xs font-medium text-yellow-700">Pending:</span>
+                  <span className="text-xs font-bold text-yellow-800">
+                    {activeTab === 'letter' 
+                      ? letters.filter(l => l.status === 'pending').length 
+                      : addendums.filter(a => a.status === 'pending').length}
+                  </span>
+                </div>
               </div>
-            </button>
-          </nav>
+              
+              {/* Approved */}
+              <div className="flex items-center bg-green-50 px-2 py-1 rounded-md border border-green-200">
+                <div className="flex items-center space-x-1">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                  <span className="text-xs font-medium text-green-700">Approved:</span>
+                  <span className="text-xs font-bold text-green-800">
+                    {activeTab === 'letter' 
+                      ? letters.filter(l => l.status === 'approved').length 
+                      : addendums.filter(a => a.status === 'approved').length}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Rejected */}
+              <div className="flex items-center bg-red-50 px-2 py-1 rounded-md border border-red-200">
+                <div className="flex items-center space-x-1">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                  <span className="text-xs font-medium text-red-700">Rejected:</span>
+                  <span className="text-xs font-bold text-red-800">
+                    {activeTab === 'letter' 
+                      ? letters.filter(l => l.status === 'rejected').length 
+                      : addendums.filter(a => a.status === 'rejected').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -564,7 +604,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         letter.audit_type === 'reguler' 
                           ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-purple-100 text-purple-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
                         {letter.audit_type}
                       </span>
@@ -591,7 +631,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                         <button
                           onClick={() => handleEdit(letter)}
                           className="text-blue-600 hover:text-blue-900 flex items-center"
-                          title="Edit"
+                          title="Edit Assignment Letter"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -602,7 +642,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                               onClick={() => handleApprove(letter.id)}
                               disabled={processingId === letter.id}
                               className="text-green-600 hover:text-green-900 flex items-center disabled:opacity-50"
-                              title="Approve"
+                              title="Approve Assignment Letter"
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -614,7 +654,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                               }}
                               disabled={processingId === letter.id}
                               className="text-red-600 hover:text-red-900 flex items-center disabled:opacity-50"
-                              title="Reject"
+                              title="Reject Assignment Letter"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -625,7 +665,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                         <button
                           onClick={() => handleDownloadExcel(letter.id)}
                           className="text-blue-600 hover:text-blue-900 flex items-center"
-                          title="Download Excel"
+                          title="Download Excel File"
                         >
                           <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -637,7 +677,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                           <button
                             onClick={() => handleDownloadPDF(letter)}
                             className="text-green-600 hover:text-green-900 flex items-center"
-                            title="Download PDF"
+                            title="Download PDF File"
                           >
                             <FileDown className="w-4 h-4" />
                           </button>
@@ -691,8 +731,8 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                         <div className="text-gray-500">{addendum.region}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 break-words">
                         {addendum.addendum_type || '-'}
                       </span>
                     </td>
@@ -709,7 +749,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                         <button
                           onClick={() => handleViewAddendumDetail(addendum)}
                           className="text-indigo-600 hover:text-indigo-900 flex items-center"
-                          title="View Details"
+                          title="View Addendum Details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -720,7 +760,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                               onClick={() => handleApproveAddendum(addendum.id)}
                               disabled={processingId === addendum.id}
                               className="text-green-600 hover:text-green-900 flex items-center disabled:opacity-50"
-                              title="Approve"
+                              title="Approve Addendum"
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -732,7 +772,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                               }}
                               disabled={processingId === addendum.id}
                               className="text-red-600 hover:text-red-900 flex items-center disabled:opacity-50"
-                              title="Reject"
+                              title="Reject Addendum"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -744,7 +784,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                           <button
                             onClick={() => handleDownloadAddendumExcel(addendum.id)}
                             className="text-blue-600 hover:text-blue-900 flex items-center"
-                            title="Download Excel"
+                            title="Download Addendum Excel File"
                           >
                             <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -757,7 +797,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                           <button
                             onClick={() => handleDownloadAddendumPDF(addendum)}
                             className="text-green-600 hover:text-green-900 flex items-center"
-                            title="Download PDF"
+                            title="Download Addendum PDF File"
                           >
                             <FileDown className="w-4 h-4" />
                           </button>

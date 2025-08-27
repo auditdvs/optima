@@ -18,7 +18,7 @@ import {
   Users,
   Wrench
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -32,12 +32,12 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
   const { userRole } = useAuth();
   const [latestUpdateDate, setLatestUpdateDate] = useState<string>('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    dashboard: true,
-    audittools: true,
-    communication: true,
-    resources: true,
-    userprofile: true,
-    administration: true
+    dashboard: false,
+    audittools: false,
+    communication: false,
+    resources: false,
+    userprofile: false,
+    administration: false
   });
   
   // Fetch the latest update date from work_papers
@@ -78,6 +78,48 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
 
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
+  };
+
+  // Custom Tooltip for mini sidebar
+  const CustomTooltip: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
+    const [show, setShow] = useState(false);
+    return (
+      <div
+        className="relative flex items-center justify-center"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)}
+        onBlur={() => setShow(false)}
+        tabIndex={0}
+        style={{ zIndex: 100 }}
+      >
+        {children}
+        <div
+          className={`pointer-events-none fixed left-16 top-auto z-[9999] transition-all duration-200 ${show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'} origin-left`}
+          style={{
+            minWidth: '90px',
+            marginTop: '-6px',
+            marginLeft: '6px',
+            background: '#fff',
+            color: '#4338ca',
+            borderRadius: '1.5rem',
+            fontWeight: 700,
+            fontSize: '0.82rem',
+            boxShadow: '0 4px 24px 0 rgba(67,56,202,0.10), 0 1.5px 8px 0 #e0e7ff',
+            padding: '6px 18px',
+            border: '1.5px solid #e0e7ff',
+            whiteSpace: 'nowrap',
+            left: '64px',
+            top: 'auto',
+            transform: `translateY(calc(-50% + 16px)) ${show ? '' : 'scale(0.95)'}`,
+            display: show ? 'block' : 'none',
+            letterSpacing: '0.01em',
+          }}
+        >
+          {label}
+        </div>
+      </div>
+    );
   };
 
   const toggleSection = (sectionKey: string) => {
@@ -231,55 +273,75 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
         {menuGroups.map((group) => (
           <div key={group.key} className="mb-2">
             {!isCollapsed ? (
-              // Expanded sidebar with dropdown
-              <div>
-                <button
-                  onClick={() => toggleSection(group.key)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <span>{group.title}</span>
-                  {expandedSections[group.key] ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
+              group.items.length > 1 ? (
+                // Expanded sidebar with dropdown
+                <div>
+                  <button
+                    onClick={() => toggleSection(group.key)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <span>{group.title}</span>
+                    {expandedSections[group.key] ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+                  {expandedSections[group.key] && (
+                    <div className="mt-1 space-y-1">
+                      {group.items.map(({ path, icon: Icon, label }) => (
+                        <Link
+                          key={path}
+                          to={path}
+                          className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ml-2 ${
+                            isActive(path)
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                          title={label}
+                        >
+                          <Icon className="w-5 h-5 mr-3" />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
                   )}
-                </button>
-                {expandedSections[group.key] && (
-                  <div className="mt-1 space-y-1">
-                    {group.items.map(({ path, icon: Icon, label }) => (
-                      <Link
-                        key={path}
-                        to={path}
-                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ml-2 ${
-                          isActive(path)
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                        title={label}
-                      >
-                        <Icon className="w-5 h-5 mr-3" />
-                        {label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Collapsed sidebar - show all items as icons
-              <div className="space-y-1">
-                {group.items.map(({ path, icon: Icon, label }) => (
+                </div>
+              ) : (
+                // Only one item, render as direct link (no dropdown)
+                group.items.map(({ path, icon: Icon, label }) => (
                   <Link
                     key={path}
                     to={path}
-                    className={`flex items-center px-2 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ml-2 ${
                       isActive(path)
                         ? 'bg-indigo-100 text-indigo-700'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                     title={label}
                   >
-                    <Icon className="w-5 h-5 mx-auto" />
+                    <Icon className="w-5 h-5 mr-3" />
+                    {label}
                   </Link>
+                ))
+              )
+            ) : (
+              // Collapsed sidebar - show all items as icons with custom tooltip
+              <div className="space-y-1">
+                {group.items.map(({ path, icon: Icon, label }) => (
+                  <CustomTooltip key={path} label={label}>
+                    <Link
+                      to={path}
+                      className={`flex items-center px-2 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        isActive(path)
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      tabIndex={-1}
+                    >
+                      <Icon className="w-5 h-5 mx-auto" />
+                    </Link>
+                  </CustomTooltip>
                 ))}
               </div>
             )}

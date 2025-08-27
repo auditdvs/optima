@@ -97,10 +97,21 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
     try {
       const teamArray = JSON.parse(team);
       if (Array.isArray(teamArray)) {
-        return teamArray.join(', ');
+        // Bersihkan setiap nama dari spasi ekstra dan format ulang
+        return teamArray
+          .map(member => member.trim())
+          .filter(member => member.length > 0)
+          .join(', '); // Pastikan ada spasi setelah koma
       }
       return team;
     } catch {
+      // Jika bukan JSON, coba split by koma dan format ulang
+      if (team.includes(',')) {
+        return team.split(',')
+          .map(member => member.trim())
+          .filter(member => member.length > 0)
+          .join(', ');
+      }
       return team;
     }
   };
@@ -262,8 +273,10 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatDateRange(addendum)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {addendum.addendum_type}
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    <div className="break-words whitespace-normal max-w-xs">
+                      {addendum.addendum_type}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {getStatusBadge(addendum.status)}

@@ -102,10 +102,21 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
     try {
       const teamArray = JSON.parse(team);
       if (Array.isArray(teamArray)) {
-        return teamArray.join(', ');
+        // Bersihkan setiap nama dari spasi ekstra dan format ulang
+        return teamArray
+          .map(member => member.trim())
+          .filter(member => member.length > 0)
+          .join(', '); // Pastikan ada spasi setelah koma
       }
       return team;
     } catch {
+      // Jika bukan JSON, coba split by koma dan format ulang
+      if (team.includes(',')) {
+        return team.split(',')
+          .map(member => member.trim())
+          .filter(member => member.length > 0)
+          .join(', ');
+      }
       return team;
     }
   };
@@ -253,8 +264,10 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatAuditPeriod(letter)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                    {formatTeam(letter.team)}
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                    <div className="break-words whitespace-normal">
+                      {formatTeam(letter.team)}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
