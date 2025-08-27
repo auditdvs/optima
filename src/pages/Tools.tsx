@@ -321,6 +321,13 @@ function THCProcessing() {
       description: "Format final data THC gabungan dari semua sumber data",
       link: "https://format-data-thc-gabungan.streamlit.app/",
       isInternal: false
+    },
+    {
+      step: "07",
+      title: "Format Data THC Gabungan Final",
+      description: "Melakukan pengolahan sesuai dengan file excel yang tadinya bernama Format Data THC Gabungan",
+      link: "https://format-data-thc-gabungan.streamlit.app/",
+      isInternal: false
     }
   ];
 
