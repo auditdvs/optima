@@ -1,6 +1,7 @@
 import { Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
 interface Addendum {
@@ -45,18 +46,25 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
   const [selectedAddendum, setSelectedAddendum] = useState<Addendum | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchAddendums();
     fetchAccounts();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, user]);
 
   const fetchAddendums = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('addendum')
         .select('*')
+        .eq('created_by', user.id)
         .order('id', { ascending: false });
 
       if (error) {

@@ -1,6 +1,7 @@
 import { Eye, FileDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { downloadAssignmentLetterPDF } from '../services/pdfGenerator';
 
@@ -41,17 +42,24 @@ export default function AssignmentLetterList({ refreshTrigger }: AssignmentLette
   const [selectedLetter, setSelectedLetter] = useState<AssignmentLetter | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchLetters();
     fetchAccounts();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, user]);
 
   const fetchLetters = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('letter')
         .select('*')
+        .eq('created_by', user.id)
         .order('id', { ascending: false });
 
       if (error) {

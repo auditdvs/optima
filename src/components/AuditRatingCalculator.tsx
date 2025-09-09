@@ -26,7 +26,7 @@ function AuditRatingCalculator() {
     } else if (major === 2) {
       if (moderate > 10) {
         setRating("HIGH");
-      } else if (moderate >= 8) {
+      } else if (moderate >= 7) {
         setRating("MEDIUM");
       } else {
         setRating("LOW"); 
@@ -34,7 +34,7 @@ function AuditRatingCalculator() {
     } else if (major === 1) {
       if (moderate > 12) {
         setRating("HIGH");
-      } else if (moderate >= 8) {
+      } else if (moderate >= 7) {
         setRating("MEDIUM");
       } else {
         setRating("LOW");
@@ -42,8 +42,8 @@ function AuditRatingCalculator() {
     } else {
       if (moderate > 15) {
         setRating("HIGH");
-      } else if (moderate >= 8) {
-        setRating("MEDIUM"); 
+      } else if (moderate >= 7) {
+        setRating("MEDIUM");
       } else {
         setRating("LOW");
       }
