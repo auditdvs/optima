@@ -218,7 +218,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: {
     // Message History and Pull Request for all users
     communicationItems.push(
       { path: '/notification-history', icon: History, label: 'Message History' },
-      { path: '/pull-request', icon: GitPullRequest, label: 'Pull Request' }
+      { path: '/pull-request', icon: GitPullRequest, label: 'Database' }
     );
 
     if (communicationItems.length > 0) {
