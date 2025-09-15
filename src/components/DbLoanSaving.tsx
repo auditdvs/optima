@@ -25,15 +25,21 @@ const DbLoanSaving = () => {
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
 
-  // Function to check if current time is between 18:00 and 06:30 WIB
+  // Function to check if current time allows requests (weekends 24/7, weekdays 18:00-06:30 WIB)
   const isRequestTimeAllowed = () => {
     const now = new Date();
     // Convert to WIB (UTC+7)
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     const currentHour = wibTime.getUTCHours();
     const currentMinute = wibTime.getUTCMinutes();
+    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
     
-    // Allow from 18:00 to 23:59 (same day) or from 00:00 to 06:30 (next day)
+    // Allow 24/7 on weekends (Saturday = 6, Sunday = 0)
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return true;
+    }
+    
+    // For weekdays, allow from 18:00 to 23:59 (same day) or from 00:00 to 06:30 (next day)
     return (currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30);
   };
 
@@ -43,13 +49,19 @@ const DbLoanSaving = () => {
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     const currentHour = wibTime.getUTCHours();
     const currentMinute = wibTime.getUTCMinutes();
+    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
     
-    // If already in allowed time, return null
+    // If weekend, always allowed
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return null;
+    }
+    
+    // If already in allowed time on weekdays, return null
     if ((currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30)) {
       return null;
     }
     
-    // Calculate time until 18:00
+    // Calculate time until 18:00 on weekdays
     const hoursUntil = 18 - currentHour - 1;
     const minutesUntil = 60 - currentMinute;
     
@@ -76,7 +88,7 @@ const DbLoanSaving = () => {
   const handleNewRequestClick = () => {
     if (!isRequestTimeAllowed()) {
       const timeLeft = getTimeUntilRequestAllowed();
-      toast.error(`Request data hanya dapat dilakukan antara jam 18:00 - 06:30 WIB. Tersisa ${timeLeft} lagi.`);
+      toast.error(`Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${timeLeft} lagi.`);
       return;
     }
     setShowForm(true);
@@ -405,14 +417,14 @@ const DbLoanSaving = () => {
             title={
               isRequestTimeAllowed()
                 ? "Request Data Pinjaman/Simpanan"
-                : `Request data tersedia antara jam 18:00 - 06:30 WIB. Tersisa ${getTimeUntilRequestAllowed() || '0 menit'}`
+                : `Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${getTimeUntilRequestAllowed() || '0 menit'}`
             }
           >
             Request Data
           </button>
           {!isRequestTimeAllowed() && (
             <p className="text-xs text-gray-500 mt-1 text-center">
-              Tersedia 18:00 - 06:30 WIB
+              Weekend: 24/7 | Weekday: 18:00-06:30 WIB
             </p>
           )}
         </div>
