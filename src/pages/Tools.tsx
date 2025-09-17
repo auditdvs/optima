@@ -138,11 +138,6 @@ function WorkPaperLinks() {
       description: "Kertas kerja untuk sampel anggota PAR"
     },
     {
-      url: "https://kk-konsumsi.streamlit.app/",
-      title: "Analisa Konsumsi",
-      description: "Pengecekkan biaya pengeluaran konsumsi berdasarkan kriteria kuantitas beras, galon, gula, dll"
-    },
-    {
       url: "https://kk-simpanan-pinjaman.streamlit.app/",
       title: "Simpanan & Pinjaman",
       description: "Analisa simpanan dan pinjaman berdasarkan center sampel dari THC"
@@ -150,17 +145,7 @@ function WorkPaperLinks() {
     {
       url: "https://kk-santunan-meninggal.streamlit.app/",
       title: "Santunan Meninggal",
-      description: "Pengecekkan santunan anggota dan suami meninggal"
-    },
-    {
-      url: "https://analysis-trx-bbm.streamlit.app/",
-      title: "Analisa BBM",
-      description: "Ketentuan maksimal jumlah BBM dalam 1 bulan sesuai jabatan"
-    },
-    {
-      url: "https://analysis-trx-fc.streamlit.app/",
-      title: "Analisa Fotocopy",
-      description: "Analisa jumlah form fotocopy berdasarkan kewajaran harga per lembar"
+      description: "kertas kerja santunan anggota dan suami meninggal"
     }
   ];
 
@@ -402,7 +387,7 @@ function WorkPaper() {
                   <ClipboardList className="text-purple-600 mr-3" size={24} />
                   <h3 className="text-xl font-semibold text-gray-900">Kertas Kerja Digital</h3>
                 </div>
-                <p className="text-gray-700">Tools online untuk generate kertas kerja pemeriksaan audit secara otomatis</p>
+                <p className="text-gray-700">Tools online untuk generate kertas kerja pemeriksaan audit secara otomatis agar lebih rapi dan efisien</p>
               </div>
               <div className="mt-4 text-purple-600 font-medium">
                 Akses Tools →
@@ -444,7 +429,7 @@ function AnomalyProcessing() {
       url: "https://anomali-keseluruhan.streamlit.app/",
       title: "Analisa Anomali Keseluruhan",
       description: "Analisa total anomali pinjaman dan simpanan berdasarkan Petugas Lapang dan Center Meeting",
-      category: "General Analysis"
+      category: "THC Analysis"
     },
     {
       url: "https://danaresiko.streamlit.app/",
@@ -465,10 +450,28 @@ function AnomalyProcessing() {
       category: "Financial Analysis"
     },
     {
+      url: "https://analysis-trx-bbm.streamlit.app/",
+      title: "Analisa BBM",
+      description: "Ketentuan maksimal jumlah BBM dalam 1 bulan sesuai jabatan",
+      category: "Financial Analysis"
+    },
+    {
+      url: "https://analysis-trx-fc.streamlit.app/",
+      title: "Analisa Fotocopy",
+      description: "Analisa jumlah form fotocopy berdasarkan kewajaran harga per lembar",
+      category: "Financial Analysis"
+    },
+    {
+      url: "https://kk-konsumsi.streamlit.app/",
+      title: "Analisa Konsumsi",
+      description: "Pengecekkan biaya pengeluaran konsumsi berdasarkan kriteria kuantitas beras, galon, gula, dll",
+      category: "Financial Analysis"
+    },
+    {
       url: "https://top-up.streamlit.app/",
       title: "Analisa Top Up",
       description: "Analisa anomali top up pinjaman",
-      category: "Loan Analysis"
+      category: "Disbursement"
     }
   ];
 
