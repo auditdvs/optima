@@ -2,6 +2,7 @@ import { useState } from 'react';
 import DbLoanSaving from '../components/DbLoanSaving';
 import DetailAnggota from '../components/DetailAnggota';
 import FixAsset from '../components/FixAsset';
+import THC from '../components/THC';
 
 function PullRequestPage() {
   // Add active tab state
@@ -41,12 +42,23 @@ function PullRequestPage() {
         >
           Fix Asset
         </button>
+        <button
+          className={`py-2 px-4 font-medium text-sm ${
+            activeTab === 'thc'
+              ? 'border-b-2 border-indigo-600 text-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveTab('thc')}
+        >
+          THC
+        </button>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'pullRequests' && <DbLoanSaving />}
       {activeTab === 'srssRequests' && <DetailAnggota />}
       {activeTab === 'fixAsset' && <FixAsset />}
+      {activeTab === 'thc' && <THC />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 import { AlertTriangle, DatabaseBackup, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import DatabaseMonitoring from '../components/DatabaseMonitoring';
 import { Card, CardContent } from '../components/ui/card';
 import {
   Table,
@@ -1054,7 +1055,7 @@ function UserControlPanel() {
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
   const [selectedAuditor, setSelectedAuditor] = useState<Auditor | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'auditors'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'auditors' | 'monitoring'>('users');
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1614,6 +1615,18 @@ function UserControlPanel() {
             >
               Auditor Management
             </button>
+            
+            {/* Database Monitoring Tab */}
+            <button
+              onClick={() => setActiveTab('monitoring')}
+              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'monitoring'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Database Monitoring
+            </button>
           </nav>
         </div>
       </div>
@@ -1803,6 +1816,10 @@ function UserControlPanel() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {activeTab === 'monitoring' && (
+        <DatabaseMonitoring />
       )}
 
         {/* Modals */}
