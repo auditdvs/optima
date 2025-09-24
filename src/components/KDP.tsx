@@ -4,100 +4,80 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
-const DbLoanSaving = () => {
+const KDP = () => {
   const { user, userRole } = useAuth();
   
   const [fullName, setFullName] = useState('');
   const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    requestData: '', // Used for branch code
-    message: '',     // Keeping for compatibility but not used in the form
+    branchId: '',
+    startDate: '',
+    endDate: ''
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [adminResponse, setAdminResponse] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [loadingLoanSaving, setLoadingLoanSaving] = useState(true);
-  const [loanSavingError, setLoanSavingError] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [loadingKDP, setLoadingKDP] = useState(true);
+  const [kdpError, setKdpError] = useState(false);
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
 
-  // Function to check if current time allows requests (weekends 24/7, weekdays 18:00-06:30 WIB)
-  const isRequestTimeAllowed = () => {
+  // Check if KDP requests are allowed at current time
+  const isRequestAllowed = () => {
     // Superadmin can request at any time
     if (userRole === 'superadmin') {
       return true;
     }
     
     const now = new Date();
-    // Convert to WIB (UTC+7)
+    // Convert to GMT+7 (WIB)
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const currentHour = wibTime.getUTCHours();
-    const currentMinute = wibTime.getUTCMinutes();
-    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const day = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const hour = wibTime.getUTCHours();
     
-    // Allow 24/7 on weekends (Saturday = 6, Sunday = 0)
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
+    // Weekend (Saturday = 6, Sunday = 0) - 24/7 allowed
+    if (day === 0 || day === 6) {
       return true;
     }
     
-    // For weekdays, allow from 18:00 to 23:59 (same day) or from 00:00 to 06:30 (next day)
-    return (currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30);
+    // Weekdays - only 18:00-05:00 allowed
+    // 18:00-23:59 or 00:00-05:00
+    return hour >= 18 || hour < 5;
   };
 
-  // Function to get the time until next allowed period
-  const getTimeUntilRequestAllowed = () => {
+  const getNextAllowedTime = () => {
     const now = new Date();
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const currentHour = wibTime.getUTCHours();
-    const currentMinute = wibTime.getUTCMinutes();
-    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const day = wibTime.getUTCDay();
+    const hour = wibTime.getUTCHours();
     
-    // If weekend, always allowed
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
+    // If it's weekend, requests are always allowed
+    if (day === 0 || day === 6) {
       return null;
     }
     
-    // If already in allowed time on weekdays, return null
-    if ((currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30)) {
+    // If it's weekday and within allowed hours
+    if (hour >= 18 || hour < 5) {
       return null;
     }
     
-    // Calculate time until 18:00 on weekdays
-    const hoursUntil = 18 - currentHour - 1;
-    const minutesUntil = 60 - currentMinute;
+    // Calculate next allowed time (18:00 today)
+    const nextAllowed = new Date(wibTime);
+    nextAllowed.setUTCHours(18, 0, 0, 0);
     
-    if (hoursUntil === 0) {
-      return `${minutesUntil} menit`;
-    }
-    return `${hoursUntil} jam ${minutesUntil} menit`;
+    // Convert back to local time for display
+    const localTime = new Date(nextAllowed.getTime() - (7 * 60 * 60 * 1000));
+    return localTime;
   };
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
-      fetchLoanSavingRequests();
+      fetchKDPRequests();
     }
-
-    // Update time every minute
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(interval);
   }, [user]);
-
-  const handleNewRequestClick = () => {
-    if (!isRequestTimeAllowed()) {
-      const timeLeft = getTimeUntilRequestAllowed();
-      toast.error(`Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${timeLeft} lagi.`);
-      return;
-    }
-    setShowForm(true);
-  };
 
   const fetchUserProfile = async () => {
     try {
@@ -114,12 +94,12 @@ const DbLoanSaving = () => {
     }
   };
 
-  const fetchLoanSavingRequests = async () => {
-    setLoadingLoanSaving(true);
+  const fetchKDPRequests = async () => {
+    setLoadingKDP(true);
     try {
-      // Query the dbLoanSaving table
+      // Query the kdp table
       let query = supabase
-        .from('dbLoanSaving')
+        .from('kdp')
         .select('*');
         
       // If not admin, only show user's own requests
@@ -127,17 +107,17 @@ const DbLoanSaving = () => {
         query = query.eq('requested_by', user?.id);
       }
       
-      const { data: loanSavingData, error } = await query.order('created_at', { ascending: false });
+      const { data: kdpData, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching loan and saving data:', error);
+        console.error('Error fetching KDP data:', error);
         throw error;
       }
 
       // If we have data, fetch the profile names separately
-      if (loanSavingData && loanSavingData.length > 0) {
+      if (kdpData && kdpData.length > 0) {
         // Get unique user IDs
-        const userIds = [...new Set(loanSavingData.map(req => req.requested_by))];
+        const userIds = [...new Set(kdpData.map(req => req.requested_by))];
         
         // Fetch the profiles for these users
         const { data: profilesData, error: profilesError } = await supabase
@@ -146,11 +126,11 @@ const DbLoanSaving = () => {
           .in('id', userIds);
         
         if (profilesError) {
-          console.error('Error fetching profiles for loan and saving:', profilesError);
+          console.error('Error fetching profiles for KDP:', profilesError);
         }
         
         // Create a user map for easy lookup
-        const userMap = {};
+        const userMap: { [key: string]: any } = {};
         if (profilesData) {
           profilesData.forEach(profile => {
             userMap[profile.id] = profile;
@@ -158,7 +138,7 @@ const DbLoanSaving = () => {
         }
         
         // Combine the data
-        const combinedData = loanSavingData.map(request => ({
+        const combinedData = kdpData.map(request => ({
           ...request,
           profiles: userMap[request.requested_by] || { full_name: 'Unknown' }
         }));
@@ -168,40 +148,59 @@ const DbLoanSaving = () => {
         setRequests([]);
       }
     } catch (error) {
-      console.error('Error fetching loan and saving data:', error);
-      toast.error('Failed to load loan and saving data');
-      setLoanSavingError(true);
+      console.error('Error fetching KDP data:', error);
+      toast.error('Failed to load KDP data');
+      setKdpError(true);
     } finally {
-      setLoading(false);
-      setLoadingLoanSaving(false);
+      setLoadingKDP(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Format branch code to ensure 3 digits (add leading zeros)
-    const formattedBranchCode = formData.requestData.padStart(3, '0');
+    // Check if request is allowed at current time (superadmin bypass)
+    if (!isRequestAllowed()) {
+      const nextTime = getNextAllowedTime();
+      const timeStr = nextTime ? nextTime.toLocaleTimeString('id-ID', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta'
+      }) : '';
+      toast.error(`KDP requests hanya tersedia pada jam 18:00-05:00 (hari kerja) dan 24/7 (weekend). Silakan coba lagi pada jam ${timeStr}.`);
+      return;
+    }
+    
+    // Validate dates
+    const startDate = new Date(formData.startDate);
+    const endDate = new Date(formData.endDate);
+    
+    if (endDate <= startDate) {
+      toast.error('End date must be after start date');
+      return;
+    }
     
     try {
-      // Insert into dbLoanSaving table with the branch code and status 'queued'
+      // Insert into kdp table
       const { error } = await supabase
-        .from('dbLoanSaving')
+        .from('kdp')
         .insert({
           requested_by: user?.id,
-          branch_code: formattedBranchCode,
+          branch_id: formData.branchId,
+          start_date: formData.startDate,
+          end_date: formData.endDate,
           status: 'queued',
         });
 
       if (error) throw error;
       
-      toast.success('Request submitted successfully');
-      setFormData({ requestData: '', message: '' });
+      toast.success('KDP request submitted successfully');
+      setFormData({ branchId: '', startDate: '', endDate: '' });
       setShowForm(false);
-      fetchLoanSavingRequests(); // Refresh the list
+      fetchKDPRequests(); // Refresh the list
     } catch (error) {
-      console.error('Error submitting request:', error);
-      toast.error('Failed to submit request');
+      console.error('Error submitting KDP request:', error);
+      toast.error('Failed to submit KDP request');
     }
   };
 
@@ -210,8 +209,7 @@ const DbLoanSaving = () => {
     if (!selectedRequest) return;
 
     try {
-      let resultPathSaving = selectedRequest.result_path_saving || null;
-      let resultPathLoan = selectedRequest.result_path_loan || null;
+      let resultPath = selectedRequest.result_path || null;
 
       // Upload files if status is completed
       if (selectedFiles.length > 0 && selectedRequest.status === 'completed') {
@@ -230,7 +228,7 @@ const DbLoanSaving = () => {
             console.log("Uploading file:", file.name);
             
             const { error: uploadError } = await supabase.storage
-              .from('db.loansaving') // Use db.loansaving bucket
+              .from('kdp') // Use kdp bucket
               .upload(filePath, file, { upsert: true });
 
             if (uploadError) {
@@ -239,17 +237,11 @@ const DbLoanSaving = () => {
             }
 
             const { data: publicURL } = supabase.storage
-              .from('db.loansaving')
+              .from('kdp')
               .getPublicUrl(filePath);
 
-            // Determine if the file is for saving or loan based on the filename
-            if (file.name.toLowerCase().includes('saving')) {
-              resultPathSaving = publicURL.publicUrl;
-              console.log("Uploaded successfully (saving):", resultPathSaving);
-            } else if (file.name.toLowerCase().includes('loan')) {
-              resultPathLoan = publicURL.publicUrl;
-              console.log("Uploaded successfully (loan):", resultPathLoan);
-            }
+            resultPath = publicURL.publicUrl;
+            console.log("Uploaded successfully:", resultPath);
           }
           
         } catch (uploadError) {
@@ -261,14 +253,12 @@ const DbLoanSaving = () => {
         }
       }
 
-      // Update request with status and result paths
+      // Update request with status and result path
       const { error } = await supabase
-        .from('dbLoanSaving')
+        .from('kdp')
         .update({
           status: selectedRequest.status,
-          result_path_saving: resultPathSaving,
-          result_path_loan: resultPathLoan,
-          updated_by: user?.id // Track who made the update
+          result_path: resultPath
         })
         .eq('id', selectedRequest.id);
 
@@ -278,32 +268,29 @@ const DbLoanSaving = () => {
       setSelectedRequest(null);
       setAdminResponse('');
       setSelectedFiles([]);
-      fetchLoanSavingRequests();
+      fetchKDPRequests();
     } catch (error) {
-      console.error('Error updating request:', error);
-      toast.error('Failed to update request');
+      console.error('Error updating KDP request:', error);
+      toast.error('Failed to update KDP request');
     }
   };
 
-  // Handler untuk delete loan and saving request
+  // Handler untuk delete KDP request
   const handleDeleteRequest = async (request: any) => {
     try {
-      setLoading(true);
-      console.log("Starting delete for loan/saving request:", request.id);
+      console.log("Starting delete for KDP request:", request.id);
       
-      // Handle result_path_saving and result_path_loan deletion if present
-      const deleteFileIfExists = async (fileUrl: string | null) => {
-        if (!fileUrl) return;
-        
+      // Handle result_path deletion if present
+      if (request.result_path) {
         try {
           // Extract file path from the URL
           let filePath;
           try {
-            const urlObj = new URL(fileUrl);
+            const urlObj = new URL(request.result_path);
             
             // Path extraction for storage bucket
-            if (urlObj.pathname.includes('/db.loansaving/')) {
-              const bucketPart = '/db.loansaving/';
+            if (urlObj.pathname.includes('/kdp/')) {
+              const bucketPart = '/kdp/';
               const bucketIndex = urlObj.pathname.indexOf(bucketPart);
               if (bucketIndex !== -1) {
                 filePath = decodeURIComponent(urlObj.pathname.substring(bucketIndex + bucketPart.length));
@@ -315,7 +302,7 @@ const DbLoanSaving = () => {
           
           // Try fallback method if needed
           if (!filePath) {
-            const parts = fileUrl.split('/db.loansaving/');
+            const parts = request.result_path.split('/kdp/');
             if (parts.length > 1) {
               filePath = decodeURIComponent(parts[1].split('?')[0]);
             }
@@ -325,28 +312,19 @@ const DbLoanSaving = () => {
           if (filePath) {
             console.log("Attempting to delete file:", filePath);
             await supabase.storage
-              .from('db.loansaving')
+              .from('kdp')
               .remove([filePath]);
           }
         } catch (fileErr) {
           console.error("Error deleting file:", fileErr);
           // Continue with deletion even if file removal fails
         }
-      };
-      
-      // Delete both saving and loan files if they exist
-      if (request.result_path_saving) {
-        await deleteFileIfExists(request.result_path_saving);
-      }
-      
-      if (request.result_path_loan) {
-        await deleteFileIfExists(request.result_path_loan);
       }
       
       // Delete the database record
-      console.log("Deleting database record for request:", request.id);
+      console.log("Deleting database record for KDP request:", request.id);
       const { error } = await supabase
-        .from('dbLoanSaving')
+        .from('kdp')
         .delete()
         .eq('id', request.id);
       
@@ -355,18 +333,16 @@ const DbLoanSaving = () => {
         throw error;
       }
 
-      toast.success('Request deleted successfully');
+      toast.success('KDP request deleted successfully');
       
       // Update UI immediately while waiting for refresh
       setRequests((current) => current.filter(item => item.id !== request.id));
       
       // Refresh data to ensure consistency
-      await fetchLoanSavingRequests();
+      await fetchKDPRequests();
     } catch (err) {
-      console.error('Error deleting request:', err);
-      toast.error('Failed to delete request');
-    } finally {
-      setLoading(false);
+      console.error('Error deleting KDP request:', err);
+      toast.error('Failed to delete KDP request');
     }
   };
 
@@ -389,49 +365,43 @@ const DbLoanSaving = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-2xl font-bold">Db Loan and Saving</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Request data pinjaman dan simpanan berdasarkan kriteria.
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold">KDP</h1>
+            <p className="text-m text-gray-500 mt-1">
+              Request KDP data berdasarkan <strong>kode cabang</strong> dan <strong>periode transaksi</strong>. Mohon dibaca baik-baik, ini mengambil data KDP (Kuitansi Dana Pinjaman).
             </p>
           </div>
           <button
             onClick={() => {
-              setLoadingLoanSaving(true);
-              fetchLoanSavingRequests();
+              setLoadingKDP(true);
+              fetchKDPRequests();
             }}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
             title="Refresh data"
-            disabled={loadingLoanSaving}
+            disabled={loadingKDP}
           >
-            <RefreshCw size={18} className={`text-gray-500 ${loadingLoanSaving ? 'animate-spin' : ''}`} />
+            <RefreshCw size={18} className={`text-gray-500 ${loadingKDP ? 'animate-spin' : ''}`} />
           </button>
         </div>
         
-        <div>
+        <div className="flex-shrink-0">
           <button
-            onClick={handleNewRequestClick}
-            disabled={!isRequestTimeAllowed()}
-            className={`px-4 py-2 rounded transition-colors ${
-              isRequestTimeAllowed()
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+            onClick={() => setShowForm(true)}
+            disabled={!isRequestAllowed()}
+            className={`w-full sm:w-auto px-6 py-2 rounded transition-colors min-w-[140px] ${
+              isRequestAllowed() 
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
-            title={
-              isRequestTimeAllowed()
-                ? "Request Data Pinjaman/Simpanan"
-                : `Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${getTimeUntilRequestAllowed() || '0 menit'}`
-            }
+            title={!isRequestAllowed() ? 'Request hanya tersedia pada jam 18:00-05:00 (hari kerja) dan 24/7 (weekend)' : ''}
           >
-            Request Data
+            Request KDP
           </button>
-          {!isRequestTimeAllowed() && (
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              {userRole === 'superadmin' ? 'Superadmin: 24/7 Access' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
-            </p>
-          )}
+          <div className="text-xs text-gray-500 mt-1 text-center">
+            {userRole === 'superadmin' ? ' ' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
+          </div>
         </div>
       </div>
 
@@ -439,7 +409,7 @@ const DbLoanSaving = () => {
       <div className="mb-4 flex flex-wrap gap-4 items-center">
         <div className="flex items-center gap-2">
           <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">queued</span>
-          <span className="text-sm text-gray-600">: Menunggu pemrosesan otomatis</span>
+          <span className="text-sm text-gray-600">: Menunggu pemrosesan</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">completed</span>
@@ -451,8 +421,8 @@ const DbLoanSaving = () => {
         </div>
       </div>
 
-      {/* Db Loan and Saving Table */}
-      {loadingLoanSaving ? (
+      {/* KDP Table */}
+      {loadingKDP ? (
         <div className="flex justify-center items-center h-64">
           <div className="loader">
             <div className="loader-ring loader-ring-a"></div>
@@ -460,7 +430,7 @@ const DbLoanSaving = () => {
             <div className="loader-ring loader-ring-c"></div>
           </div>
         </div>
-      ) : loanSavingError ? (
+      ) : kdpError ? (
         <div className="flex flex-col items-center justify-center p-8 bg-rose-50 border border-rose-200 rounded-lg text-center">
           <div className="text-rose-600 mb-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -468,12 +438,12 @@ const DbLoanSaving = () => {
             </svg>
           </div>
           <h3 className="text-lg font-medium text-rose-800">Gagal Memuat Data</h3>
-          <p className="text-rose-700 mt-1">Terjadi kesalahan saat mengambil data loan dan saving.</p>
+          <p className="text-rose-700 mt-1">Terjadi kesalahan saat mengambil data KDP.</p>
           <button 
             onClick={() => {
-              setLoanSavingError(false);
-              setLoadingLoanSaving(true);
-              fetchLoanSavingRequests();
+              setKdpError(false);
+              setLoadingKDP(true);
+              fetchKDPRequests();
             }}
             className="mt-4 px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 focus:outline-none"
           >
@@ -482,7 +452,7 @@ const DbLoanSaving = () => {
         </div>
       ) : requests.length === 0 ? (
         <div className="text-center text-gray-500 py-8">
-          No requests found.
+          No KDP requests found.
         </div>
       ) : (
         <div className="flex-1 overflow-auto">
@@ -494,13 +464,19 @@ const DbLoanSaving = () => {
                     Requested By
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kode Cabang
+                    Branch ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Start Date
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    End Date
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
+                    Created Date
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -516,7 +492,17 @@ const DbLoanSaving = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{request.branch_code}</div>
+                      <div className="text-sm text-gray-900">{request.branch_id}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(request.start_date).toLocaleDateString('id-ID')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(request.end_date).toLocaleDateString('id-ID')}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -559,27 +545,27 @@ const DbLoanSaving = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
-                        {request.result_path_saving && (
+                        {request.result_path && (
                           <button
                             type="button"
                             className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
-                            title="Download saving data"
-                            onClick={() => handleCustomDownload(request.result_path_saving, `DbSaving-${request.branch_code}.csv`)}
+                            title="Download KDP data"
+                            onClick={() => handleCustomDownload(request.result_path, `KDP-${request.branch_id}-${request.start_date}-${request.end_date}.csv`)}
                           >
                             <Download className='text-emerald-600' size={18} />
-                            <span className="ml-1 text-xs">Saving</span>
                           </button>
                         )}
 
-                        {request.result_path_loan && (
+                        {/* Admin edit action */}
+                        {isAdmin && (
                           <button
-                            type="button"
-                            className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
-                            title="Download loan data"
-                            onClick={() => handleCustomDownload(request.result_path_loan, `DbLoan-${request.branch_code}.csv`)}
+                            onClick={() => setSelectedRequest(request)}
+                            className="text-blue-600 hover:text-blue-800 p-1.5 rounded-full hover:bg-blue-50"
+                            title="Edit request"
                           >
-                            <Download className='text-blue-600' size={18} />
-                            <span className="ml-1 text-xs">Loan</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                            </svg>
                           </button>
                         )}
 
@@ -588,7 +574,7 @@ const DbLoanSaving = () => {
                           <button
                             onClick={() => {
                               // Confirm before deleting
-                              if (window.confirm(`Are you sure you want to delete this request for branch ${request.branch_code}?`)) {
+                              if (window.confirm(`Are you sure you want to delete this KDP request for branch ${request.branch_id}?`)) {
                                 handleDeleteRequest(request);
                               }
                             }}
@@ -612,7 +598,7 @@ const DbLoanSaving = () => {
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Request Db Loan and Saving</h2>
+            <h2 className="text-xl font-semibold mb-4">Request KDP</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label className="block text-gray-700 mb-2">Requested By</label>
@@ -625,22 +611,37 @@ const DbLoanSaving = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Kode Cabang (3 digit)</label>
+                <label className="block text-gray-700 mb-2">Branch Code</label>
                 <input
                   type="text"
-                  value={formData.requestData}
-                  onChange={(e) => {
-                    // Only allow numbers and limit to 3 characters
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 3);
-                    setFormData({...formData, requestData: value});
-                  }}
+                  value={formData.branchId}
+                  onChange={(e) => setFormData({...formData, branchId: e.target.value})}
                   className="w-full p-2 border rounded"
                   placeholder="e.g. 080"
                   required
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Masukkan kode cabang (akan otomatis ditambahkan leading zeros jika kurang dari 3 digit)
-                </p>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">End Date</label>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  className="w-full p-2 border rounded"
+                  required
+                />
               </div>
               
               <div className="flex justify-end gap-2 mt-6">
@@ -667,7 +668,7 @@ const DbLoanSaving = () => {
       {isAdmin && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Respond to Request</h2>
+            <h2 className="text-xl font-semibold mb-4">Respond to KDP Request</h2>
             <form onSubmit={handleAdminResponse}>
               <div className="mb-4">
                 <label className="block text-gray-700 mb-2">Requested By</label>
@@ -680,22 +681,23 @@ const DbLoanSaving = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Kode Cabang</label>
+                <label className="block text-gray-700 mb-2">Branch Code</label>
                 <input
                   type="text"
-                  value={selectedRequest.branch_code}
+                  value={selectedRequest.branch_id}
                   disabled
                   className="w-full p-2 border rounded bg-gray-100"
                 />
               </div>
               
               <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Request Details</label>
-                <textarea
-                  value={selectedRequest.message}
+                <label className="block text-gray-700 mb-2">Period</label>
+                <input
+                  type="text"
+                  value={`${new Date(selectedRequest.start_date).toLocaleDateString('id-ID')} - ${new Date(selectedRequest.end_date).toLocaleDateString('id-ID')}`}
                   disabled
-                  className="w-full p-2 border rounded min-h-[100px] bg-gray-100"
-                ></textarea>
+                  className="w-full p-2 border rounded bg-gray-100"
+                />
               </div>
               
               <div className="mb-4">
@@ -712,61 +714,30 @@ const DbLoanSaving = () => {
               </div>
               
               {selectedRequest.status === 'completed' && (
-                <>
-                  <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Upload Saving Data File</label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            // Add "saving_" prefix to identify file type
-                            const file = e.target.files[0];
-                            const renamedFile = new File([file], `saving_${file.name}`, { type: file.type });
-                            setSelectedFiles([renamedFile]);
-                          }
-                        }}
-                        className={`w-full p-2 border rounded ${uploading ? 'opacity-50' : ''}`}
-                        disabled={uploading}
-                      />
-                      {uploading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
-                          <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-                        </div>
-                      )}
-                      <p className="mt-1 text-xs text-gray-500">
-                        Select saving data file
-                      </p>
-                    </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2">Upload Result File</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          setSelectedFiles([e.target.files[0]]);
+                        }
+                      }}
+                      className={`w-full p-2 border rounded ${uploading ? 'opacity-50' : ''}`}
+                      disabled={uploading}
+                      accept=".csv,.xlsx,.xls"
+                    />
+                    {uploading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
+                        <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Select KDP result file
+                    </p>
                   </div>
-                  
-                  <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Upload Loan Data File</label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            // Add "loan_" prefix to identify file type
-                            const file = e.target.files[0];
-                            const renamedFile = new File([file], `loan_${file.name}`, { type: file.type });
-                            setSelectedFiles(current => [...current, renamedFile]);
-                          }
-                        }}
-                        className={`w-full p-2 border rounded ${uploading ? 'opacity-50' : ''}`}
-                        disabled={uploading}
-                      />
-                      {uploading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
-                          <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-                        </div>
-                      )}
-                      <p className="mt-1 text-xs text-gray-500">
-                        Select loan data file
-                      </p>
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
               
               {selectedFiles.length > 0 && (
@@ -779,7 +750,7 @@ const DbLoanSaving = () => {
                         className="text-red-500 hover:underline"
                         onClick={() => setSelectedFiles([])}
                       >
-                        Hapus
+                        Remove
                       </button>
                     </li>
                   ))}
@@ -826,4 +797,4 @@ const DbLoanSaving = () => {
   );
 };
 
-export default DbLoanSaving;
+export default KDP;

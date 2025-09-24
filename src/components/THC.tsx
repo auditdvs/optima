@@ -26,6 +26,11 @@ const THC = () => {
 
   // Check if THC requests are allowed at current time
   const isRequestAllowed = () => {
+    // Superadmin can request at any time
+    if (userRole === 'superadmin') {
+      return true;
+    }
+    
     const now = new Date();
     // Convert to GMT+7 (WIB)
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
@@ -154,7 +159,7 @@ const THC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if request is allowed at current time
+    // Check if request is allowed at current time (superadmin bypass)
     if (!isRequestAllowed()) {
       const nextTime = getNextAllowedTime();
       const timeStr = nextTime ? nextTime.toLocaleTimeString('id-ID', { 
@@ -397,7 +402,7 @@ const THC = () => {
             Request THC
           </button>
           <div className="text-xs text-gray-500 mt-1 text-center">
-            Weekend: 24/7 | Weekday: 18:00-06:30 WIB
+            {userRole === 'superadmin' ? ' ' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
           </div>
         </div>
       </div>

@@ -22,6 +22,11 @@ const DetailAnggota = () => {
 
   // Function to check if current time allows requests (weekends 24/7, weekdays 18:00-06:30 WIB)
   const isRequestTimeAllowed = () => {
+    // Superadmin can request at any time
+    if (userRole === 'superadmin') {
+      return true;
+    }
+    
     const now = new Date();
     // Convert to WIB (UTC+7)
     const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
@@ -276,7 +281,7 @@ const DetailAnggota = () => {
           </button>
           {!isRequestTimeAllowed() && (
             <p className="text-xs text-gray-500 mt-1 text-center">
-              Weekend: 24/7 | Weekday: 18:00-06:30 WIB
+              {userRole === 'superadmin' ? 'Superadmin: 24/7 Access' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
             </p>
           )}
         </div>
