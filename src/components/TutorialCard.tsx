@@ -1,12 +1,13 @@
 import { Download } from 'lucide-react';
+import React from 'react';
 import { Button } from '../components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
 } from '../components/ui/card';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -14,9 +15,11 @@ interface TutorialCardProps {
   title: string;
   description: string;
   url: string;
+  buttonText?: string;
+  icon?: React.ReactNode;
 }
 
-export function TutorialCard({ title, description, url }: TutorialCardProps) {
+export function TutorialCard({ title, description, url, buttonText = "Download Tutorial", icon }: TutorialCardProps) {
   const { themeColor } = useTheme();
   
   const themeClasses = {
@@ -91,11 +94,13 @@ export function TutorialCard({ title, description, url }: TutorialCardProps) {
             download
             className="flex items-center justify-center"
           >
-            <Download
-              size={16}
-              className="transition-transform group-hover:animate-bounce"
-            />
-            <span>Download Tutorial</span>
+            {icon || (
+              <Download
+                size={16}
+                className="transition-transform group-hover:animate-bounce"
+              />
+            )}
+            <span>{buttonText}</span>
           </a>
         </Button>
       </CardFooter>
