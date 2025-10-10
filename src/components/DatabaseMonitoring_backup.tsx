@@ -1,4 +1,4 @@
-import { Clock, RefreshCw } from 'lucide-react';
+import { RefreshCw, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -305,7 +305,7 @@ const DatabaseMonitoring = () => {
             onClick={() => {
               setLoading(true);
               fetchAllRequests();
-              fetchComponentAccess();
+              checkCurrentAccessStatus();
             }}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors"
             title="Refresh data"
@@ -325,7 +325,7 @@ const DatabaseMonitoring = () => {
               Component Access Control
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Manage access settings for each data component. Applies to all users (User, QA, DVS, Manager).
+              Manage access settings for each data component
             </p>
           </div>
         </div>
@@ -350,7 +350,7 @@ const DatabaseMonitoring = () => {
                   End Time
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Current Status
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -552,6 +552,310 @@ const DatabaseMonitoring = () => {
           </div>
         </div>
       )}
+      
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <ScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => {
+            setShowScheduleModal(false);
+            setEditingSchedule(null);
+          }}
+          schedule={editingSchedule}
+          onSave={() => {
+            fetchSchedules();
+            setShowScheduleModal(false);
+            setEditingSchedule(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Schedule Modal Component
+interface ScheduleModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  schedule: DataAccessSchedule | null;
+  onSave: () => void;
+}
+
+const ScheduleModal: React.FC<ScheduleModalProps> = ({ isOpen, onClose, schedule, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    is_enabled: true,
+    schedule_type: '24/7' as '24/7' | 'custom' | 'business_hours',
+    start_time: '00:00',
+    end_time: '23:59',
+    timezone: 'Asia/Jakarta',
+    allowed_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (schedule) {
+      setFormData({
+        name: schedule.name,
+        description: schedule.description || '',
+        is_enabled: schedule.is_enabled,
+        schedule_type: schedule.schedule_type,
+        start_time: schedule.start_time.slice(0, 5),
+        end_time: schedule.end_time.slice(0, 5),
+        timezone: schedule.timezone,
+        allowed_days: schedule.allowed_days
+      });
+    } else {
+      // Reset form for new schedule
+      setFormData({
+        name: '',
+        description: '',
+        is_enabled: true,
+        schedule_type: '24/7',
+        start_time: '00:00',
+        end_time: '23:59',
+        timezone: 'Asia/Jakarta',
+        allowed_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+      });
+    }
+  }, [schedule]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const scheduleData = {
+        ...formData,
+        start_time: formData.start_time + ':00',
+        end_time: formData.end_time + ':00',
+        updated_at: new Date().toISOString()
+      };
+
+      if (schedule) {
+        // Update existing schedule
+        const { error } = await supabase
+          .from('data_access_schedule')
+          .update(scheduleData)
+          .eq('id', schedule.id);
+        
+        if (error) throw error;
+        toast.success('Schedule updated successfully');
+      } else {
+        // Create new schedule
+        const { error } = await supabase
+          .from('data_access_schedule')
+          .insert([{
+            ...scheduleData,
+            created_by: (await supabase.auth.getUser()).data.user?.id
+          }]);
+        
+        if (error) throw error;
+        toast.success('Schedule created successfully');
+      }
+
+      onSave();
+    } catch (error) {
+      console.error('Error saving schedule:', error);
+      toast.error('Failed to save schedule');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDayToggle = (day: string) => {
+    setFormData(prev => ({
+      ...prev,
+      allowed_days: prev.allowed_days.includes(day)
+        ? prev.allowed_days.filter(d => d !== day)
+        : [...prev.allowed_days, day]
+    }));
+  };
+
+  if (!isOpen) return null;
+
+  const daysOfWeek = [
+    { key: 'monday', label: 'Mon' },
+    { key: 'tuesday', label: 'Tue' },
+    { key: 'wednesday', label: 'Wed' },
+    { key: 'thursday', label: 'Thu' },
+    { key: 'friday', label: 'Fri' },
+    { key: 'saturday', label: 'Sat' },
+    { key: 'sunday', label: 'Sun' }
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">
+              {schedule ? 'Edit Schedule' : 'Add New Schedule'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <Settings className="h-6 w-6" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Schedule Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="e.g., Business Hours Only"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Schedule Type *
+                </label>
+                <select
+                  value={formData.schedule_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, schedule_type: e.target.value as any }))}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="24/7">24/7 Access</option>
+                  <option value="business_hours">Business Hours</option>
+                  <option value="custom">Custom Schedule</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                rows={3}
+                placeholder="Optional description of this schedule"
+              />
+            </div>
+
+            {/* Time Settings */}
+            {formData.schedule_type !== '24/7' && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.start_time}
+                      onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.end_time}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Timezone
+                    </label>
+                    <select
+                      value={formData.timezone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                      <option value="Asia/Makassar">Asia/Makassar (WITA)</option>
+                      <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Days Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Allowed Days
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {daysOfWeek.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleDayToggle(key)}
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          formData.allowed_days.includes(key)
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Enable Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">Enable Schedule</h4>
+                <p className="text-sm text-gray-500">
+                  When enabled, this schedule will control data access
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_enabled}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_enabled: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {loading ? 'Saving...' : (schedule ? 'Update' : 'Create')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

@@ -24,54 +24,6 @@ const THC = () => {
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
 
-  // Check if THC requests are allowed at current time
-  const isRequestAllowed = () => {
-    // Superadmin can request at any time
-    if (userRole === 'superadmin') {
-      return true;
-    }
-    
-    const now = new Date();
-    // Convert to GMT+7 (WIB)
-    const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const day = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
-    const hour = wibTime.getUTCHours();
-    
-    // Weekend (Saturday = 6, Sunday = 0) - 24/7 allowed
-    if (day === 0 || day === 6) {
-      return true;
-    }
-    
-    // Weekdays - only 18:00-05:00 allowed
-    // 18:00-23:59 or 00:00-05:00
-    return hour >= 18 || hour < 5;
-  };
-
-  const getNextAllowedTime = () => {
-    const now = new Date();
-    const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const day = wibTime.getUTCDay();
-    const hour = wibTime.getUTCHours();
-    
-    // If it's weekend, requests are always allowed
-    if (day === 0 || day === 6) {
-      return null;
-    }
-    
-    // If it's weekday and within allowed hours
-    if (hour >= 18 || hour < 5) {
-      return null;
-    }
-    
-    // Calculate next allowed time (18:00 today)
-    const nextAllowed = new Date(wibTime);
-    nextAllowed.setUTCHours(18, 0, 0, 0);
-    
-    // Convert back to local time for display
-    const localTime = new Date(nextAllowed.getTime() - (7 * 60 * 60 * 1000));
-    return localTime;
-  };
-
   useEffect(() => {
     if (user) {
       fetchUserProfile();
@@ -158,18 +110,6 @@ const THC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check if request is allowed at current time (superadmin bypass)
-    if (!isRequestAllowed()) {
-      const nextTime = getNextAllowedTime();
-      const timeStr = nextTime ? nextTime.toLocaleTimeString('id-ID', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        timeZone: 'Asia/Jakarta'
-      }) : '';
-      toast.error(`THC requests hanya tersedia pada jam 18:00-05:00 (hari kerja) dan 24/7 (weekend). Silakan coba lagi pada jam ${timeStr}.`);
-      return;
-    }
     
     // Validate dates
     const startDate = new Date(formData.startDate);
@@ -391,19 +331,11 @@ const THC = () => {
         <div className="flex-shrink-0">
           <button
             onClick={() => setShowForm(true)}
-            disabled={!isRequestAllowed()}
-            className={`w-full sm:w-auto px-6 py-2 rounded transition-colors min-w-[140px] ${
-              isRequestAllowed() 
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-            title={!isRequestAllowed() ? 'Request hanya tersedia pada jam 18:00-05:00 (hari kerja) dan 24/7 (weekend)' : ''}
+            className="w-full sm:w-auto px-6 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded transition-colors min-w-[140px]"
+            title="Request THC Data"
           >
             Request THC
           </button>
-          <div className="text-xs text-gray-500 mt-1 text-center">
-            {userRole === 'superadmin' ? ' ' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
-          </div>
         </div>
       </div>
 

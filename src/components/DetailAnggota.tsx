@@ -16,81 +16,17 @@ const DetailAnggota = () => {
   const [srssRequests, setSrssRequests] = useState<any[]>([]);
   const [loadingSrss, setLoadingSrss] = useState(true);
   const [srssError, setSrssError] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
-
-  // Function to check if current time allows requests (weekends 24/7, weekdays 18:00-06:30 WIB)
-  const isRequestTimeAllowed = () => {
-    // Superadmin can request at any time
-    if (userRole === 'superadmin') {
-      return true;
-    }
-    
-    const now = new Date();
-    // Convert to WIB (UTC+7)
-    const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const currentHour = wibTime.getUTCHours();
-    const currentMinute = wibTime.getUTCMinutes();
-    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
-    
-    // Allow 24/7 on weekends (Saturday = 6, Sunday = 0)
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      return true;
-    }
-    
-    // For weekdays, allow from 18:00 to 23:59 (same day) or from 00:00 to 06:30 (next day)
-    return (currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30);
-  };
-
-  // Function to get the time until next allowed period
-  const getTimeUntilRequestAllowed = () => {
-    const now = new Date();
-    const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const currentHour = wibTime.getUTCHours();
-    const currentMinute = wibTime.getUTCMinutes();
-    const dayOfWeek = wibTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
-    
-    // If weekend, always allowed
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      return null;
-    }
-    
-    // If already in allowed time on weekdays, return null
-    if ((currentHour >= 18) || (currentHour < 6) || (currentHour === 6 && currentMinute <= 30)) {
-      return null;
-    }
-    
-    // Calculate time until 18:00 on weekdays
-    const hoursUntil = 18 - currentHour - 1;
-    const minutesUntil = 60 - currentMinute;
-    
-    if (hoursUntil === 0) {
-      return `${minutesUntil} menit`;
-    }
-    return `${hoursUntil} jam ${minutesUntil} menit`;
-  };
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
       fetchSrssRequests();
     }
-
-    // Update time every minute
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(interval);
   }, [user]);
 
   const handleRequestClick = () => {
-    if (!isRequestTimeAllowed()) {
-      const timeLeft = getTimeUntilRequestAllowed();
-      toast.error(`Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${timeLeft} lagi.`);
-      return;
-    }
     setShowSrssForm(true);
   };
 
@@ -265,25 +201,11 @@ const DetailAnggota = () => {
         <div>
           <button
             onClick={handleRequestClick}
-            disabled={!isRequestTimeAllowed()}
-            className={`px-4 py-2 rounded transition-colors ${
-              isRequestTimeAllowed()
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-            }`}
-            title={
-              isRequestTimeAllowed()
-                ? "Request Data Anggota"
-                : `Request data tersedia 24/7 di weekend, atau jam 18:00 - 06:30 WIB di hari kerja. Tersisa ${getTimeUntilRequestAllowed() || '0 menit'}`
-            }
+            className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded transition-colors"
+            title="Request Data Anggota"
           >
             Request Data
           </button>
-          {!isRequestTimeAllowed() && (
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              {userRole === 'superadmin' ? 'Superadmin: 24/7 Access' : 'Weekend: 24/7 | Weekday: 18:00-06:30 WIB'}
-            </p>
-          )}
         </div>
       </div>
 

@@ -1,13 +1,12 @@
 import { useState } from 'react';
+import ComponentAccessGuard from '../components/ComponentAccessGuard';
 import DbLoanSaving from '../components/DbLoanSaving';
 import DetailAnggota from '../components/DetailAnggota';
 import FixAsset from '../components/FixAsset';
-import THC from '../components/THC';
-import TLP from '../components/TLP';
-// Import TAK dan KDP
-// Pastikan file TAK.tsx dan KDP.tsx sudah ada di ../components
 import KDP from '../components/KDP';
 import TAK from '../components/TAK';
+import THC from '../components/THC';
+import TLP from '../components/TLP';
 
 function PullRequestPage() {
   // Add active tab state
@@ -102,13 +101,41 @@ function PullRequestPage() {
 
       {/* Tab Content */}
       <div className="flex-1">
-        {activeTab === 'pullRequests' && <DbLoanSaving />}
-        {activeTab === 'srssRequests' && <DetailAnggota />}
-        {activeTab === 'fixAsset' && <FixAsset />}
-        {activeTab === 'thc' && <THC />}
-        {activeTab === 'tak' && <TAK />}
-        {activeTab === 'tlp' && <TLP />}
-        {activeTab === 'kdp' && <KDP />}
+        {activeTab === 'pullRequests' && (
+          <ComponentAccessGuard componentName="db_loan_saving">
+            <DbLoanSaving />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'srssRequests' && (
+          <ComponentAccessGuard componentName="detail_anggota">
+            <DetailAnggota />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'fixAsset' && (
+          <ComponentAccessGuard componentName="fix_asset">
+            <FixAsset />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'thc' && (
+          <ComponentAccessGuard componentName="thc">
+            <THC />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'tak' && (
+          <ComponentAccessGuard componentName="tak">
+            <TAK />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'tlp' && (
+          <ComponentAccessGuard componentName="tlp">
+            <TLP />
+          </ComponentAccessGuard>
+        )}
+        {activeTab === 'kdp' && (
+          <ComponentAccessGuard componentName="kdp">
+            <KDP />
+          </ComponentAccessGuard>
+        )}
       </div>
     </div>
   );
