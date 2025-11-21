@@ -1,6 +1,7 @@
 import { Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
 interface AssignmentLetter {
@@ -39,6 +40,7 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [excelUploadProgress, setExcelUploadProgress] = useState(0);
   const [showNewTeamDropdown, setShowNewTeamDropdown] = useState(false);
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     letter_id: '',
     assignment_letter_before: '', // Tambahkan field ini
@@ -47,6 +49,7 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     konsumsi: 0,
     etc: 0,
     keterangan: '', // Untuk perubahan
+    link_file: '', // Tambahkan field untuk link file pada perubahan sampel DAPA
     tanggal_perpanjangan_dari: '', // Untuk perpanjangan
     tanggal_perpanjangan_sampai: '', // Untuk perpanjangan
     new_leader: '', // Ketua Tim baru
@@ -55,15 +58,24 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
   const [selectedLetter, setSelectedLetter] = useState<AssignmentLetter | null>(null);
 
   useEffect(() => {
-    fetchLetters();
-    fetchAuditors();
-  }, []);
+    if (user) {
+      fetchLetters();
+      fetchAuditors();
+    }
+  }, [user]);
 
   const fetchLetters = async () => {
     try {
+      if (!user) {
+        setLetters([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('letter')
         .select('id, assigment_letter, branch_name, region, audit_type, audit_period_start, audit_period_end, audit_start_date, audit_end_date, team, leader, risk, priority, transport, konsumsi, etc')
+        .eq('status', 'approved') // Hanya tampilkan surat tugas yang sudah diapprove
+        .eq('created_by', user.id) // Hanya tampilkan surat tugas yang dibuat oleh user yang login
         .order('id', { ascending: false });
 
       if (error) throw error;
@@ -118,6 +130,29 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     setFormData(prev => ({
       ...prev,
       new_team: prev.new_team.filter(t => t !== teamMember)
+    }));
+  };
+
+  const handleLinkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.trim();
+    
+    // Jika input kosong, biarkan kosong
+    if (!value) {
+      setFormData(prev => ({ 
+        ...prev, 
+        link_file: '' 
+      }));
+      return;
+    }
+    
+    // Auto-prefix dengan https:// jika user tidak memasukkan protocol
+    if (!value.match(/^https?:\/\//i)) {
+      value = `https://${value}`;
+    }
+    
+    setFormData(prev => ({ 
+      ...prev, 
+      link_file: value 
     }));
   };
 
@@ -199,9 +234,15 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     }
 
     // Validasi field yang diperlukan berdasarkan jenis addendum
-    if (formData.addendum_types.includes('Perubahan Sampel DAPA') && !formData.keterangan.trim()) {
-      toast.error('Keterangan perubahan sampel DAPA wajib diisi');
-      return;
+    if (formData.addendum_types.includes('Perubahan Sampel DAPA')) {
+      if (!formData.keterangan.trim()) {
+        toast.error('Keterangan perubahan sampel DAPA wajib diisi');
+        return;
+      }
+      if (!formData.link_file.trim()) {
+        toast.error('Link file untuk perubahan sampel DAPA wajib diisi');
+        return;
+      }
     }
 
     if (formData.addendum_types.includes('Perpanjangan Waktu')) {
@@ -304,6 +345,9 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
       if (formData.addendum_types.includes('Perubahan Sampel DAPA')) {
         if (formData.keterangan) {
           insertData.keterangan = formData.keterangan;
+        }
+        if (formData.link_file) {
+          insertData.link_file = formData.link_file;
         }
       }
 
@@ -519,18 +563,37 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
 
           {/* Field Conditional untuk Perubahan */}
           {formData.addendum_types.includes('Perubahan Sampel DAPA') && (
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Keterangan Perubahan Sampel DAPA *
-              </label>
-              <textarea
-                required
-                value={formData.keterangan}
-                onChange={(e) => setFormData(prev => ({ ...prev, keterangan: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24"
-                placeholder="Jelaskan perubahan yang dilakukan..."
-              />
-            </div>
+            <>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Keterangan Perubahan Sampel DAPA *
+                </label>
+                <textarea
+                  required
+                  value={formData.keterangan}
+                  onChange={(e) => setFormData(prev => ({ ...prev, keterangan: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24"
+                  placeholder="Jelaskan perubahan yang dilakukan..."
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Link File *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.link_file}
+                  onChange={handleLinkFileChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="example.com/file.pdf atau drive.google.com/file/..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 Tip: Cukup ketik domain tanpa https://, akan otomatis ditambahkan
+                </p>
+              </div>
+            </>
           )}
 
           {/* Field Conditional untuk Perpanjangan & Perubahan Tim - Tanggal */}
@@ -615,6 +678,47 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
           {/* Fields untuk Penambahan/Perubahan Tim - 2 kolom sejajar */}
           {formData.addendum_types.includes('Perubahan Tim') && (
             <>
+              {/* Tim Comparison Section */}
+              <div className="md:col-span-2 mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-3">Perbandingan Tim</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Tim Sebelumnya */}
+                    <div className="bg-red-50 p-3 rounded border border-red-300">
+                      <h5 className="text-xs font-semibold text-red-800 mb-2">Tim Sebelumnya</h5>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-xs text-red-700">Ketua Tim</label>
+                          <p className="text-sm bg-white p-2 rounded border text-gray-900">{selectedLetter?.leader || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-red-700">Anggota Tim</label>
+                          <p className="text-sm bg-white p-2 rounded border text-gray-900">{selectedLetter?.team || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tim Baru */}
+                    <div className="bg-green-50 p-3 rounded border border-green-300">
+                      <h5 className="text-xs font-semibold text-green-800 mb-2">Tim Baru</h5>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-xs text-green-700">Ketua Tim Baru</label>
+                          <p className="text-sm bg-white p-2 rounded border text-gray-900">{formData.new_leader || 'Belum dipilih'}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-green-700">Anggota Tim Baru</label>
+                          <p className="text-sm bg-white p-2 rounded border text-gray-900">
+                            {formData.new_team.length > 0 ? formData.new_team.join(', ') : 'Belum ada anggota'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ketua Tim (Baru) *

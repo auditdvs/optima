@@ -1,4 +1,4 @@
-import { Check, Edit, Eye, FileDown, X, XCircle } from 'lucide-react';
+import { Check, Eye, FileDown, X, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import AssignmentLetterManagerEdit from '../components/AssignmentLetterManagerEdit';
@@ -422,6 +422,17 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
 
       toast.success('Addendum berhasil disetujui');
       fetchAddendums();
+      
+      // Update selectedAddendum status untuk UI update langsung
+      if (selectedAddendum && selectedAddendum.id === addendumId) {
+        setSelectedAddendum({
+          ...selectedAddendum,
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          rejection_reason: null
+        });
+      }
     } catch (error) {
       console.error('Error approving addendum:', error);
       toast.error('Gagal menyetujui addendum');
@@ -455,6 +466,17 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
       setShowAddendumRejectModal(false);
       setAddendumRejectionReason('');
       fetchAddendums();
+      
+      // Update selectedAddendum status untuk UI update langsung
+      if (selectedAddendum && selectedAddendum.id === addendumId) {
+        setSelectedAddendum({
+          ...selectedAddendum,
+          status: 'rejected',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          rejection_reason: reason
+        });
+      }
     } catch (error) {
       console.error('Error rejecting addendum:', error);
       toast.error('Gagal menolak addendum');
@@ -572,6 +594,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Surat</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Audit Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dibuat oleh</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
@@ -581,7 +604,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
             <tbody className="bg-white divide-y divide-gray-200">
               {letters.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     Belum ada surat tugas
                   </td>
                 </tr>
@@ -610,6 +633,18 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="text-sm">
+                        <div className="font-medium text-green-700">
+                          Rp {((letter.transport || 0) + (letter.konsumsi || 0) + (letter.etc || 0)).toLocaleString('id-ID')}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          T: {(letter.transport || 0).toLocaleString('id-ID')} | 
+                          K: {(letter.konsumsi || 0).toLocaleString('id-ID')} | 
+                          L: {(letter.etc || 0).toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getStatusBadge(letter.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -619,70 +654,14 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       {letter.tanggal_input ? new Date(letter.tanggal_input).toLocaleDateString('id-ID') : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewDetail(letter)}
-                          className="text-indigo-600 hover:text-indigo-900 flex items-center"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => handleEdit(letter)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center"
-                          title="Edit Assignment Letter"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-
-                        {letter.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(letter.id)}
-                              disabled={processingId === letter.id}
-                              className="text-green-600 hover:text-green-900 flex items-center disabled:opacity-50"
-                              title="Approve Assignment Letter"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            
-                            <button
-                              onClick={() => {
-                                setSelectedLetter(letter);
-                                setShowRejectModal(true);
-                              }}
-                              disabled={processingId === letter.id}
-                              className="text-red-600 hover:text-red-900 flex items-center disabled:opacity-50"
-                              title="Reject Assignment Letter"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-
-                        {/* Excel download - always available */}
-                        <button
-                          onClick={() => handleDownloadExcel(letter.id)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center"
-                          title="Download Excel File"
-                        >
-                          <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </button>
-
-                        {/* PDF download - only for approved */}
-                        {letter.status === 'approved' && (
-                          <button
-                            onClick={() => handleDownloadPDF(letter)}
-                            className="text-green-600 hover:text-green-900 flex items-center"
-                            title="Download PDF File"
-                          >
-                            <FileDown className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => handleViewDetail(letter)}
+                        className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -701,7 +680,8 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor ST</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link File</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -709,7 +689,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
             <tbody className="bg-white divide-y divide-gray-200">
               {addendums.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     Belum ada addendum
                   </td>
                 </tr>
@@ -737,72 +717,56 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className="line-clamp-2 max-w-xs">
-                        {addendum.description || addendum.keterangan || '-'}
-                      </span>
+                      <div className="text-sm">
+                        {((addendum.transport || 0) + (addendum.konsumsi || 0) + (addendum.etc || 0)) > 0 ? (
+                          <>
+                            <div className="font-medium text-green-700">
+                              Rp {((addendum.transport || 0) + (addendum.konsumsi || 0) + (addendum.etc || 0)).toLocaleString('id-ID')}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              T: {(addendum.transport || 0).toLocaleString('id-ID')} | 
+                              K: {(addendum.konsumsi || 0).toLocaleString('id-ID')} | 
+                              L: {(addendum.etc || 0).toLocaleString('id-ID')}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 italic">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {addendum.link_file ? (
+                        <a
+                          href={addendum.link_file}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline"
+                          title="Klik untuk membuka link"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          <span className="max-w-32 truncate">Link File</span>
+                          <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic">No link</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getStatusBadge(addendum.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewAddendumDetail(addendum)}
-                          className="text-indigo-600 hover:text-indigo-900 flex items-center"
-                          title="View Addendum Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-
-                        {addendum.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleApproveAddendum(addendum.id)}
-                              disabled={processingId === addendum.id}
-                              className="text-green-600 hover:text-green-900 flex items-center disabled:opacity-50"
-                              title="Approve Addendum"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            
-                            <button
-                              onClick={() => {
-                                setSelectedAddendum(addendum);
-                                setShowAddendumRejectModal(true);
-                              }}
-                              disabled={processingId === addendum.id}
-                              className="text-red-600 hover:text-red-900 flex items-center disabled:opacity-50"
-                              title="Reject Addendum"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-
-                        {/* Excel download - always available if file exists */}
-                        {addendum.excel_file_url && (
-                          <button
-                            onClick={() => handleDownloadAddendumExcel(addendum.id)}
-                            className="text-blue-600 hover:text-blue-900 flex items-center"
-                            title="Download Addendum Excel File"
-                          >
-                            <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </button>
-                        )}
-
-                        {/* PDF download - only for approved */}
-                        {addendum.status === 'approved' && (
-                          <button
-                            onClick={() => handleDownloadAddendumPDF(addendum)}
-                            className="text-green-600 hover:text-green-900 flex items-center"
-                            title="Download Addendum PDF File"
-                          >
-                            <FileDown className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => handleViewAddendumDetail(addendum)}
+                        className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                        title="View Addendum Details"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -819,12 +783,6 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Detail Assignment Letter</h3>
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle className="w-6 h-6" />
-                </button>
               </div>
 
               <div className="space-y-4">
@@ -933,6 +891,31 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                 </div>
 
                 <div className="flex justify-end mt-6 space-x-3">
+                  {/* Approve/Reject buttons - only for pending */}
+                  {selectedLetter.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedLetter(selectedLetter);
+                          setShowRejectModal(true);
+                        }}
+                        disabled={processingId === selectedLetter.id}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleApprove(selectedLetter.id)}
+                        disabled={processingId === selectedLetter.id}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        {processingId === selectedLetter.id ? 'Processing...' : 'Approve'}
+                      </button>
+                    </>
+                  )}
+                  
                   {/* Excel download - always available */}
                   <button
                     onClick={() => handleDownloadExcel(selectedLetter.id)}
@@ -954,6 +937,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       Download PDF
                     </button>
                   )}
+                  
                   <button
                     onClick={() => setShowDetailModal(false)}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
@@ -1047,12 +1031,6 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Detail Addendum</h3>
-                <button
-                  onClick={() => setShowAddendumDetailModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle className="w-6 h-6" />
-                </button>
               </div>
 
               <div className="space-y-4">
@@ -1093,6 +1071,111 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                   </div>
                 </div>
 
+                {/* Link File Section */}
+                {selectedAddendum.link_file && (
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3">Link File</h4>
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <a
+                        href={selectedAddendum.link_file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        {selectedAddendum.link_file}
+                        <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tim Comparison Section - Untuk Perubahan Tim */}
+                {(selectedAddendum.addendum_type && (
+                  selectedAddendum.addendum_type.includes('Perubahan Tim') || 
+                  selectedAddendum.addendum_type.toLowerCase().includes('perubahan tim')
+                ) || selectedAddendum.new_leader || selectedAddendum.new_team) && (
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3">Perbandingan Tim</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Tim Sebelumnya */}
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <h5 className="text-sm font-semibold text-red-800 mb-3 flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Tim Sebelumnya
+                        </h5>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-red-700 mb-1">Ketua Tim Sebelumnya</label>
+                            <div className="bg-white p-2 rounded border border-red-300">
+                              <p className="text-sm text-gray-900">{selectedAddendum.leader || '-'}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-red-700 mb-1">Anggota Tim Sebelumnya</label>
+                            <div className="bg-white p-2 rounded border border-red-300 min-h-[60px]">
+                              <p className="text-sm text-gray-900">{formatTeam(selectedAddendum.team || '')}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tim Sekarang */}
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h5 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Tim Sekarang
+                        </h5>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">Ketua Tim Baru</label>
+                            <div className="bg-white p-2 rounded border border-green-300">
+                              <p className="text-sm text-gray-900">{selectedAddendum.new_leader || '-'}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">Anggota Tim Baru</label>
+                            <div className="bg-white p-2 rounded border border-green-300 min-h-[60px]">
+                              <p className="text-sm text-gray-900">
+                                {selectedAddendum.new_team ? 
+                                  (selectedAddendum.new_team.split(',').filter((member: string) => member.trim()).join(', ') || 'Tidak ada anggota tambahan') 
+                                  : 'Tidak ada anggota tambahan'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Summary perubahan tim */}
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <h6 className="text-sm font-semibold text-blue-800 mb-2">Ringkasan Perubahan</h6>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        {selectedAddendum.leader !== selectedAddendum.new_leader && (
+                          <p>• Ketua Tim berubah dari "{selectedAddendum.leader || 'Tidak ada'}" menjadi "{selectedAddendum.new_leader || 'Tidak ada'}"</p>
+                        )}
+                        {selectedAddendum.new_team && selectedAddendum.new_team.trim() && (
+                          <p>• Anggota tim baru ditambahkan: {selectedAddendum.new_team.split(',').filter((member: string) => member.trim()).join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status Information */}
                 <div className="border-t pt-4 mt-4">
                   <h4 className="text-base font-semibold text-gray-900 mb-3">Informasi Status</h4>
@@ -1132,6 +1215,31 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                 </div>
 
                 <div className="flex justify-end mt-6 space-x-3">
+                  {/* Approve/Reject buttons - only for pending */}
+                  {selectedAddendum.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedAddendum(selectedAddendum);
+                          setShowAddendumRejectModal(true);
+                        }}
+                        disabled={processingId === selectedAddendum.id}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleApproveAddendum(selectedAddendum.id)}
+                        disabled={processingId === selectedAddendum.id}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        {processingId === selectedAddendum.id ? 'Processing...' : 'Approve'}
+                      </button>
+                    </>
+                  )}
+                  
                   {/* Excel download - always available if file exists */}
                   {selectedAddendum.excel_file_url && (
                     <button
@@ -1155,6 +1263,7 @@ export default function AssignmentLetterManager({ refreshTrigger }: AssignmentLe
                       Download PDF
                     </button>
                   )}
+                  
                   <button
                     onClick={() => setShowAddendumDetailModal(false)}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"

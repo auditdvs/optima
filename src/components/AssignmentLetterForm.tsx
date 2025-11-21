@@ -87,32 +87,20 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
 
   const generateLetterNumber = async () => {
     try {
+      const { data, error } = await supabase
+        .rpc('generate_letter_number');
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error generating letter number:', error);
+      // Fallback jika function gagal
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth() + 1;
       const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
       const romanMonth = romanMonths[currentMonth - 1];
-
-      const pattern = `%/KMD-AUDIT/${romanMonth}/${currentYear}`;
-      
-      const { data, error } = await supabase
-        .from('letter')
-        .select('assigment_letter')
-        .ilike('assigment_letter', pattern)
-        .order('assigment_letter', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      let nextNumber = 1;
-      if (data && data.length > 0) {
-        const lastNumber = data[0].assigment_letter.split('/')[0];
-        nextNumber = parseInt(lastNumber) + 1;
-      }
-
-      return `${nextNumber.toString().padStart(3, '0')}/KMD-AUDIT/${romanMonth}/${currentYear}`;
-    } catch (error) {
-      console.error('Error getting last assignment number:', error);
-      return `001/KMD-AUDIT/I/${new Date().getFullYear()}`;
+      return `001/KMD-AUDIT/${romanMonth}/${currentYear}`;
     }
   };
 

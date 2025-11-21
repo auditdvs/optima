@@ -15,6 +15,8 @@ interface Addendum {
   audit_type: string; // Tambahkan field audit_type
   team: string; // Team members
   leader: string; // Team Leader
+  new_team?: string; // New team members for team changes
+  new_leader?: string; // New team leader for team changes
   transport: number;
   konsumsi: number;
   etc: number;
@@ -29,6 +31,7 @@ interface Addendum {
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;
+  link_file?: string; // Add link file field
 }
 
 interface Account {
@@ -441,6 +444,111 @@ export default function AddendumList({ refreshTrigger }: AddendumListProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Link File Section */}
+                {selectedAddendum.link_file && (
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3">Link File</h4>
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <a
+                        href={selectedAddendum.link_file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        {selectedAddendum.link_file}
+                        <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tim Comparison Section - Untuk Perubahan Tim */}
+                {(selectedAddendum.addendum_type && (
+                  selectedAddendum.addendum_type.includes('Perubahan Tim') || 
+                  selectedAddendum.addendum_type.toLowerCase().includes('perubahan tim')
+                ) || selectedAddendum.new_leader || selectedAddendum.new_team) && (
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-base font-semibold text-gray-900 mb-3">Perbandingan Tim</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Tim Sebelumnya */}
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <h5 className="text-sm font-semibold text-red-800 mb-3 flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Tim Sebelumnya
+                        </h5>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-red-700 mb-1">Ketua Tim Sebelumnya</label>
+                            <div className="bg-white p-2 rounded border border-red-300">
+                              <p className="text-sm text-gray-900">{selectedAddendum.leader || '-'}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-red-700 mb-1">Anggota Tim Sebelumnya</label>
+                            <div className="bg-white p-2 rounded border border-red-300 min-h-[60px]">
+                              <p className="text-sm text-gray-900">{formatTeam(selectedAddendum.team || '')}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tim Sekarang */}
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h5 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Tim Sekarang
+                        </h5>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">Ketua Tim Baru</label>
+                            <div className="bg-white p-2 rounded border border-green-300">
+                              <p className="text-sm text-gray-900">{selectedAddendum.new_leader || '-'}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">Anggota Tim Baru</label>
+                            <div className="bg-white p-2 rounded border border-green-300 min-h-[60px]">
+                              <p className="text-sm text-gray-900">
+                                {selectedAddendum.new_team ? 
+                                  (selectedAddendum.new_team.split(',').filter((member: string) => member.trim()).join(', ') || 'Tidak ada anggota tambahan') 
+                                  : 'Tidak ada anggota tambahan'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Summary perubahan tim */}
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <h6 className="text-sm font-semibold text-blue-800 mb-2">Ringkasan Perubahan</h6>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        {selectedAddendum.leader !== selectedAddendum.new_leader && (
+                          <p>• Ketua Tim berubah dari "{selectedAddendum.leader || 'Tidak ada'}" menjadi "{selectedAddendum.new_leader || 'Tidak ada'}"</p>
+                        )}
+                        {selectedAddendum.new_team && selectedAddendum.new_team.trim() && (
+                          <p>• Anggota tim baru ditambahkan: {selectedAddendum.new_team.split(',').filter((member: string) => member.trim()).join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Budget Section */}
                 {(selectedAddendum.transport !== undefined || selectedAddendum.konsumsi !== undefined || selectedAddendum.etc !== undefined) && (
