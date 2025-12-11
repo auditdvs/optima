@@ -287,19 +287,13 @@ const KDP = () => {
   };
 
   // Custom download handler
-  const handleCustomDownload = async (url: string, filename: string) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(link.href);
-    } catch (err) {
-      toast.error('Gagal mengunduh file');
+  const handleCustomDownload = (resultPath: string) => {
+    if (resultPath.includes('mega.nz')) {
+      // MEGA link - open di tab baru
+      window.open(resultPath, '_blank');
+    } else {
+      // Supabase link - download langsung
+      window.location.href = resultPath;
     }
   };
 
@@ -482,7 +476,7 @@ const KDP = () => {
                             type="button"
                             className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
                             title="Download KDP data"
-                            onClick={() => handleCustomDownload(request.result_path, `KDP-${request.branch_id}-${request.start_date}-${request.end_date}.csv`)}
+                            onClick={() => handleCustomDownload(request.result_path)}
                           >
                             <Download className='text-emerald-600' size={18} />
                           </button>
