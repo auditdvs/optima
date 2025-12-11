@@ -307,19 +307,13 @@ const DbLoanSaving = () => {
   };
 
   // Custom download handler
-  const handleCustomDownload = async (url: string, filename: string) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(link.href);
-    } catch (err) {
-      toast.error('Gagal mengunduh file');
+  const handleCustomDownload = (resultPath: string) => {
+    if (resultPath.includes('mega.nz')) {
+      // MEGA link - open di tab baru
+      window.open(resultPath, '_blank');
+    } else {
+      // Supabase link - download langsung
+      window.location.href = resultPath;
     }
   };
 
@@ -486,7 +480,7 @@ const DbLoanSaving = () => {
                             type="button"
                             className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
                             title="Download saving data"
-                            onClick={() => handleCustomDownload(request.result_path_saving, `DbSaving-${request.branch_code}.csv`)}
+                            onClick={() => handleCustomDownload(request.result_path_saving)}
                           >
                             <Download className='text-emerald-600' size={18} />
                             <span className="ml-1 text-xs">Saving</span>
@@ -498,7 +492,7 @@ const DbLoanSaving = () => {
                             type="button"
                             className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center p-1.5 rounded-full hover:bg-indigo-50"
                             title="Download loan data"
-                            onClick={() => handleCustomDownload(request.result_path_loan, `DbLoan-${request.branch_code}.csv`)}
+                            onClick={() => handleCustomDownload(request.result_path_loan)}
                           >
                             <Download className='text-blue-600' size={18} />
                             <span className="ml-1 text-xs">Loan</span>
