@@ -5,15 +5,15 @@ import JSZip from 'jszip';
 import { AlertTriangle, DatabaseBackup, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import DatabaseMonitoring from '../components/DatabaseMonitoring';
+import DatabaseMonitoring from '../components/add-user/DatabaseMonitoring';
 import { Card, CardContent } from '../components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "../components/ui/table";
 import { supabase } from '../lib/supabase';
 import { supabaseService } from '../lib/supabaseService';

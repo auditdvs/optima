@@ -3,8 +3,10 @@ import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
-import Layout from './components/Layout';
+import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { DashboardCacheProvider } from './contexts/DashboardCacheContext';
+import { MapCacheProvider } from './contexts/MapCacheContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import AssignmentLetter from './pages/AssignmentLetter';
@@ -13,7 +15,6 @@ import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
-import GrammarCorrectionPage from './pages/GrammarCorrectionPage';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
 import NotificationHistory from './pages/NotificationHistory';
@@ -21,9 +22,10 @@ import PullRequestPage from './pages/PullRequestPage';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
-import RiskDashboard from './pages/RiskDashboard';
+import SupportTickets from './pages/SupportTickets';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
+import UnauthorizedPage from './pages/UnauthorizedPage';
 import UpdateLocation from './pages/UpdateLocation';
 
 const queryClient = new QueryClient();
@@ -32,10 +34,18 @@ function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'superadmin','d
   children: React.ReactNode;
   requiredRoles?: string[];
 }) {
-  const { user, userRole } = useAuth();
+  const { user, userRole, isLoading } = useAuth();
   
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (!user) {
-    return <Navigate to="/login" />;
+    return <UnauthorizedPage />;
   }
   
   if (!requiredRoles.includes(userRole)) {
@@ -49,18 +59,24 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={
-              <PrivateRoute>
-                <Layout />
-              </PrivateRoute>
-            }>
+        <MapCacheProvider>
+          <DashboardCacheProvider>
+            <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={
+                <PrivateRoute>
+                  <Layout />
+                </PrivateRoute>
+              }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="/pull-request" element={<PullRequestPage />} />
+              <Route path="/pull-request" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <PullRequestPage />
+                </PrivateRoute>
+              } />
               <Route path="tools/*" element={
                 <PrivateRoute requiredRoles={['user', 'qa', 'superadmin','dvs','manager', 'risk']}>
                   <Tools />
@@ -81,7 +97,11 @@ function App() {
                   <Broadcast />
                 </PrivateRoute>
               } />
-              <Route path="companyRegulations" element={<CompanyRegulations />} />
+              <Route path="companyRegulations" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <CompanyRegulations />
+                </PrivateRoute>
+              } />
               <Route path="update-location" element={
                 <PrivateRoute requiredRoles={['user', 'qa', 'superadmin','dvs','manager', 'risk']}>
                   <UpdateLocation />
@@ -97,11 +117,6 @@ function App() {
                   <QAManagement />
                 </PrivateRoute>
               } />
-              <Route path="risk-dashboard" element={
-                <PrivateRoute requiredRoles={['superadmin','dvs', 'manager', 'risk']}>
-                  <RiskDashboard />
-                </PrivateRoute>
-              } />
               <Route path="add-user" element={
                 <PrivateRoute requiredRoles={['superadmin']}>
                   <AddUser />
@@ -115,11 +130,6 @@ function App() {
               <Route path="email-address" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
                   <EmailAddress />
-                </PrivateRoute>
-              } />
-              <Route path="grammar-correction" element={
-                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
-                  <GrammarCorrectionPage />
                 </PrivateRoute>
               } />
               <Route 
@@ -139,6 +149,11 @@ function App() {
                   <BranchDirectory />
                 </PrivateRoute>
                 } />
+                <Route path="support-tickets" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <SupportTickets />
+                </PrivateRoute>
+                } />
             </Route>
           </Routes>
           <ToastContainer position="top-right" autoClose={5000} />
@@ -152,8 +167,10 @@ function App() {
             }}
           />
         </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+      </DashboardCacheProvider>
+    </MapCacheProvider>
+    </AuthProvider>
+  </QueryClientProvider>
   );
 }
 

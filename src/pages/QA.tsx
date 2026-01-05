@@ -1,9 +1,7 @@
-import { Edit, Search, Trash2, X } from 'lucide-react';
+import { Plus, Search, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import Loader from '../components/Loader';
-import { CheckboxGroup, CheckboxOption } from '../components/ui/checkbox';
 import { supabase } from '../lib/supabaseClient';
 
 interface Auditor {
@@ -11,18 +9,48 @@ interface Auditor {
   full_name: string;
 }
 
-interface WorkPaper {
-  id?: string;
+interface AuditMaster {
+  id: string;
   branch_name: string;
-  region?: string; 
+  region: string;
+  audit_type: 'regular' | 'fraud';
   audit_start_date: string;
   audit_end_date: string;
-  audit_type: 'regular' | 'fraud';
-  fraud_amount?: number;
-  fraud_staff?: string;
-  rating: 'high' | 'medium' | 'low';
-  inputted_by: string;
-  auditor: string; 
+  rating?: 'high' | 'medium' | 'low' ;
+  inputted_by?: string;
+  auditors?: string[]; // Array of strings based on new schema
+  leader?: string;
+  team?: string;
+  fraud_amount?: number; // For display in table if needed, though it's in work_paper_persons
+  is_real_fraud?: boolean; // Whether the fraud audit confirmed actual fraud
+  has_field_fraud?: boolean; // Whether regular audit found fraud in the field (addendum case)
+  // Regular fields
+  dapa_reg?: boolean;
+  revised_dapa_reg?: boolean;
+  dapa_supporting_data_reg?: boolean;
+  assignment_letter_reg?: boolean;
+  entrance_agenda_reg?: boolean;
+  audit_wp_reg?: boolean;
+  exit_meeting_minutes_reg?: boolean;
+  exit_attendance_list_reg?: boolean;
+  audit_result_letter_reg?: boolean;
+  rta_reg?: boolean;
+  monitoring_reg?: string;
+  comment_reg?: string;
+  // Fraud fields
+  data_prep?: boolean;
+  assignment_letter_fr?: boolean;
+  audit_wp_fr?: boolean;
+  audit_report_fr?: boolean;
+  detailed_findings_fr?: boolean;
+  comment_fr?: string;
+}
+
+interface WorkPaperPerson {
+  id?: string;
+  audit_master_id: string;
+  fraud_staff: string;
+  fraud_amount: number;
 }
 
 interface Branch {
@@ -31,102 +59,36 @@ interface Branch {
   region: string; 
 }
 
-interface InputterSummary {
-  name: string;
-  count: number;
-}
-
-const SearchableCheckboxGroup = ({ options, selectedOptions, onChange }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // Filter options based on search term
-  const filteredOptions = options.filter(option => 
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  return (
-    <div className="space-y-3">
-      <div className="relative mb-2">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search auditors..."
-          className="pl-9 pr-8 py-2 w-full border rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {searchTerm && (
-          <button 
-            onClick={() => setSearchTerm('')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2"
-          >
-            <X className="h-4 w-4 text-gray-400" />
-          </button>
-        )}
-      </div>
-      
-      <div className="max-h-52 overflow-y-auto pr-1">
-        <CheckboxGroup
-          options={filteredOptions}
-          selectedOptions={selectedOptions}
-          onChange={onChange}
-        />
-      </div>
-    </div>
-  );
-};
-
 const QASection: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
-  const [workPapers, setWorkPapers] = useState<WorkPaper[]>([]);
+  const [auditMasters, setAuditMasters] = useState<AuditMaster[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [auditors, setAuditors] = useState<Auditor[]>([]); // Add auditors state
+  const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAuditors, setShowAuditors] = useState(false);
-  const [inputterSummary, setInputterSummary] = useState<InputterSummary[]>([]);
-  const [newWorkPaper, setNewWorkPaper] = useState<WorkPaper>({
-    branch_name: '',
-    region: '', // Add region to initial state
-    audit_start_date: '',
-    audit_end_date: '',
-    audit_type: 'regular',
-    fraud_amount: undefined,
-    fraud_staff: undefined,
-    rating: 'low',
-    inputted_by: '',
-    auditor: '' // Changed from auditors array to single auditor string
-  });
+  
+  // State for Input/Edit Modal
+  const [isInputModalOpen, setIsInputModalOpen] = useState(false);
+  const [selectedAudit, setSelectedAudit] = useState<AuditMaster | null>(null);
+  
+  // Form states
+  const [rating, setRating] = useState<'high' | 'medium' | 'low'>('medium');
+  const [isRealFraud, setIsRealFraud] = useState<boolean>(false);
+  const [hasFieldFraud, setHasFieldFraud] = useState<boolean>(false); // For regular audits with fraud findings
+  const [fraudPersons, setFraudPersons] = useState<WorkPaperPerson[]>([]);
+  
+  // Search and Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingWorkPaper, setEditingWorkPaper] = useState<string | null>(null);
-
-  // New state variables for editing
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [workPaperToEdit, setWorkPaperToEdit] = useState<WorkPaper | null>(null);
-
-  // Add a new state to control the delete confirmation modal
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [workPaperToDelete, setWorkPaperToDelete] = useState<string | null>(null);
-
-  // First, add a new state variable to control the add work paper modal
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  // Add these state variables near your other state declarations
-  const [showAuditorDetails, setShowAuditorDetails] = useState(false);
-  const [selectedAuditorDetails, setSelectedAuditorDetails] = useState<{ auditor_name: string }[]>([]);
-
-  // Add month filter state
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-  const [selectedRegion, setSelectedRegion] = useState<string>(''); // Add region filter state
-
-  const inputterOptions = ['Ayu', 'Lise', 'Ganjar', 'Dede', 'Afan'];
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     setLoading(true);
     fetchBranches();
-    fetchAuditors(); // Add fetch auditors
-    fetchWorkPapers();
+    fetchAuditors();
+    fetchAuditMasters();
 
     const timer = setTimeout(() => {
       setLoading(false);
@@ -135,61 +97,41 @@ const QASection: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Add a new useEffect to calculate the inputter summary when workPapers changes
-  useEffect(() => {
-    calculateInputterSummary();
-  }, [workPapers]);
-
-  // Check authentication status
+  // Check authentication status and fetch profile
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        // Redirect to login if not authenticated
         navigate('/login');
         return;
       }
       setUser(data.session.user);
+
+      try {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching profile:', error);
+        } else if (profileData) {
+          setUserProfile(profileData);
+        }
+      } catch (err) {
+        console.error('Error in profile fetch:', err);
+      }
     };
     
     checkAuth();
   }, [navigate]);
 
-  const calculateInputterSummary = () => {
-    // Initialize with required inputters set to 0
-    const summary: Record<string, number> = {
-      'Afan': 0,
-      'Lise': 0, 
-      'Ayu': 0,
-      'Ganjar': 0,
-      'Dede': 0
-    };
-    
-    // Count work papers by inputter
-    workPapers.forEach(wp => {
-      if (wp.inputted_by) {
-        if (summary[wp.inputted_by] !== undefined) {
-          summary[wp.inputted_by]++;
-        } else {
-          summary[wp.inputted_by] = 1;
-        }
-      }
-    });
-    
-    // Convert to array format for display
-    const summaryArray = Object.entries(summary).map(([name, count]) => ({
-      name,
-      count
-    }));
-    
-    setInputterSummary(summaryArray);
-  };
-  
   const fetchBranches = async () => {
     try {
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, region') // Tambah kolom region
+        .select('id, name, region')
         .order('name');
       
       if (error) throw error;
@@ -209,7 +151,6 @@ const QASection: React.FC = () => {
       
       if (error) throw error;
       if (data) {
-        // Filter out auditors with empty full_name
         const filteredAuditors = data.filter(auditor => auditor.full_name && auditor.full_name.trim() !== '');
         setAuditors(filteredAuditors);
       }
@@ -219,228 +160,194 @@ const QASection: React.FC = () => {
     }
   };
 
-  const fetchWorkPapers = async () => {
+  const fetchAuditMasters = async () => {
     try {
+      // Fetch audit_master data
+      // Note: We might need to join with work_paper_persons to get total fraud amount if needed for display
+      // For now, just fetching audit_master
       const { data, error } = await supabase
-        .from('work_papers')
-        .select('*');
+        .from('audit_master')
+        .select('*')
+        .order('audit_start_date', { ascending: false });
       
       if (error) throw error;
       if (data) {
-        setWorkPapers(data);
+        setAuditMasters(data);
       }
     } catch (error) {
-      console.error('Error fetching work papers:', error);
-      toast.error('Failed to fetch work papers');
+      console.error('Error fetching audit masters:', error);
+      toast.error('Failed to fetch audit data');
     }
   };
 
-
-  // Handler untuk mengubah branch dan auto-fill region
-  const handleBranchChange = (branchName: string) => {
-    const branch = branches.find(b => b.name === branchName);
-    setNewWorkPaper({
-      ...newWorkPaper,
-      branch_name: branchName,
-      region: branch?.region || ''
-    });
-  };
-
-  // Handler untuk multiple auditor selection
-  const handleAuditorChange = (selectedAuditors: string[]) => {
-    setNewWorkPaper({
-      ...newWorkPaper,
-      auditor: selectedAuditors.join(', ') // Join multiple auditors with comma
-    });
-  };
-
-  // Handler untuk edit auditor selection
-  const handleEditAuditorChange = (selectedAuditors: string[]) => {
-    if (workPaperToEdit) {
-      setWorkPaperToEdit({
-        ...workPaperToEdit,
-        auditor: selectedAuditors.join(', ') // Join multiple auditors with comma
-      });
-    }
-  };
-
-  // Helper to convert comma-separated string to array
-  const getAuditorArray = (auditorString: string): string[] => {
-    return auditorString ? auditorString.split(', ').filter(a => a.trim()) : [];
-  };
-
-  const handleDeleteWorkPaper = async (id: string) => {
-    // Instead of using confirm(), set the workPaperToDelete and show the confirmation modal
-    setWorkPaperToDelete(id);
-    setShowDeleteConfirmation(true);
-  };
-
-  // Add a new function to handle the actual deletion after confirmation
-  const confirmDelete = async () => {
-    if (!workPaperToDelete) return;
-    
+  const fetchFraudPersons = async (auditId: string) => {
     try {
-      setLoading(true);
+      const { data, error } = await supabase
+        .from('work_paper_persons')
+        .select('*')
+        .eq('audit_master_id', auditId);
+        
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching fraud persons:', error);
+      return [];
+    }
+  };
+
+  const handleOpenInputModal = async (audit: AuditMaster) => {
+    setSelectedAudit(audit);
+    setRating(audit.rating || 'medium');
+    
+    if (audit.audit_type === 'fraud') {
+      // Set the is_real_fraud checkbox state
+      setIsRealFraud(audit.is_real_fraud || false);
+      setHasFieldFraud(false); // Reset field fraud for fraud audits
       
-      // First, get all work_paper_auditor IDs for this work paper
-      const { data: existingAuditors, error: fetchError } = await supabase
-        .from('work_paper_auditors')
-        .select('id')
-        .eq('work_paper_id', workPaperToDelete);
-      
-      if (fetchError) {
-        console.error('Error fetching existing auditors:', fetchError);
-        throw fetchError;
+      // If is_real_fraud is true, lock rating to high
+      if (audit.is_real_fraud) {
+        setRating('high');
       }
       
-      // Delete related audit_counts records first (if any exist)
-      if (existingAuditors && existingAuditors.length > 0) {
-        const auditorIds = existingAuditors.map(a => a.id);
+      const persons = await fetchFraudPersons(audit.id);
+      if (persons.length > 0) {
+        setFraudPersons(persons);
+      } else {
+        // Initialize with one empty row
+        setFraudPersons([{ audit_master_id: audit.id, fraud_staff: '', fraud_amount: 0 }]);
+      }
+    } else {
+      // Regular audit
+      setIsRealFraud(false);
+      setHasFieldFraud(audit.has_field_fraud || false);
+      
+      // Fetch fraud persons if has_field_fraud is true
+      if (audit.has_field_fraud) {
+        const persons = await fetchFraudPersons(audit.id);
+        if (persons.length > 0) {
+          setFraudPersons(persons);
+        } else {
+          setFraudPersons([{ audit_master_id: audit.id, fraud_staff: '', fraud_amount: 0 }]);
+        }
+      } else {
+        setFraudPersons([]);
+      }
+    }
+    
+    setIsInputModalOpen(true);
+  };
+
+  const handleAddFraudPersonRow = () => {
+    if (selectedAudit) {
+      setFraudPersons([
+        ...fraudPersons, 
+        { audit_master_id: selectedAudit.id, fraud_staff: '', fraud_amount: 0 }
+      ]);
+    }
+  };
+
+  const handleRemoveFraudPersonRow = (index: number) => {
+    const newPersons = [...fraudPersons];
+    newPersons.splice(index, 1);
+    setFraudPersons(newPersons);
+  };
+
+  const handleFraudPersonChange = (index: number, field: keyof WorkPaperPerson, value: any) => {
+    const newPersons = [...fraudPersons];
+    newPersons[index] = { ...newPersons[index], [field]: value };
+    setFraudPersons(newPersons);
+  };
+
+  const handleSaveWorkPaper = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAudit) return;
+
+    try {
+      setLoading(true);
+
+      // 1. Update audit_master
+      const updateData: any = {};
+
+      if (selectedAudit.audit_type === 'regular') {
+        updateData.rating = rating;
+        updateData.has_field_fraud = hasFieldFraud;
+      } 
+      
+      if (selectedAudit.audit_type === 'fraud') {
+         // For fraud audits, also update is_real_fraud
+         updateData.is_real_fraud = isRealFraud;
+         // If is_real_fraud is true, rating is 'high'; if false, rating is null
+         updateData.rating = isRealFraud ? 'high' : null;
+      }
+
+      const { error: updateError } = await supabase
+        .from('audit_master')
+        .update(updateData)
+        .eq('id', selectedAudit.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Handle Fraud Persons - for fraud audits with is_real_fraud OR regular audits with has_field_fraud
+      const shouldSaveFraudPersons = 
+        (selectedAudit.audit_type === 'fraud' && isRealFraud) || 
+        (selectedAudit.audit_type === 'regular' && hasFieldFraud);
+      
+      // Always delete existing fraud persons first
+      const { error: deleteError } = await supabase
+        .from('work_paper_persons')
+        .delete()
+        .eq('audit_master_id', selectedAudit.id);
         
-        console.log('Deleting audit_counts for auditor IDs:', auditorIds);
+      if (deleteError) throw deleteError;
+
+      // Only insert fraud persons if applicable
+      if (shouldSaveFraudPersons) {
+        // Filter out empty rows
+        const validPersons = fraudPersons.filter(p => p.fraud_staff.trim() !== '');
         
-        const { error: auditCountsDeleteError } = await supabase
-          .from('audit_counts')
-          .delete()
-          .in('work_paper_auditor_id', auditorIds);
-        
-        if (auditCountsDeleteError) {
-          console.error('Error deleting audit counts:', auditCountsDeleteError);
-          throw auditCountsDeleteError;
+        if (validPersons.length > 0) {
+          const personsToInsert = validPersons.map(p => ({
+            audit_master_id: selectedAudit.id,
+            fraud_staff: p.fraud_staff,
+            fraud_amount: p.fraud_amount
+          }));
+
+          const { error: insertError } = await supabase
+            .from('work_paper_persons')
+            .insert(personsToInsert);
+            
+          if (insertError) throw insertError;
         }
       }
-      
-      // Now delete the work_paper_auditors
-      const { error: deleteError } = await supabase
-        .from('work_paper_auditors')
-        .delete()
-        .eq('work_paper_id', workPaperToDelete);
-        
-      if (deleteError) {
-        console.error('Error deleting work paper auditors:', deleteError);
-        throw deleteError;
-      }
-      
-      // Finally delete the work paper
-      const { error: workPaperError } = await supabase
-        .from('work_papers')
-        .delete()
-        .eq('id', workPaperToDelete);
 
-      if (workPaperError) {
-        console.error('Error deleting work paper:', workPaperError);
-        throw workPaperError;
-      }
-
-      // Update state and show toast
-      setWorkPapers(workPapers.filter(wp => wp.id !== workPaperToDelete));
-      toast.success('Work paper deleted successfully');
-    } catch (error) {
-      console.error('Error deleting work paper:', error);
-      debugError(error, 'confirmDelete');
-      toast.error('Failed to delete work paper. Check console for details.');
+      toast.success('Work paper updated successfully');
+      setIsInputModalOpen(false);
+      fetchAuditMasters(); // Refresh list
+    } catch (error: any) {
+      console.error('Error saving work paper:', error);
+      toast.error(`Failed to save: ${error.message || 'Unknown error'}`);
     } finally {
-      setShowDeleteConfirmation(false);
-      setWorkPaperToDelete(null);
       setLoading(false);
     }
   };
 
-  const handleAuditTypeChange = (type: 'regular' | 'fraud') => {
-    setNewWorkPaper({
-      ...newWorkPaper,
-      audit_type: type,
-      rating: type === 'fraud' ? 'high' : newWorkPaper.rating,
-      fraud_amount: type === 'regular' ? undefined : newWorkPaper.fraud_amount,
-      fraud_staff: type === 'regular' ? undefined : newWorkPaper.fraud_staff
-    });
-  };
-
-  const handleAddWorkPaper = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate inputs
-    if (new Date(newWorkPaper.audit_start_date) > new Date(newWorkPaper.audit_end_date)) {
-      toast.error('Start date cannot be after end date');
-      return;
-    }
-
-    if (newWorkPaper.audit_type === 'fraud' && !newWorkPaper.fraud_amount) {
-      toast.error('Please provide a fraud amount for fraud audit type');
-      return;
-    }
-
-    if (newWorkPaper.audit_type === 'fraud' && !newWorkPaper.fraud_staff) {
-      toast.error('Please provide fraud staff name for fraud audit type');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      // Insert work paper with auditor column
-      const { error: workPaperError } = await supabase
-        .from('work_papers')
-        .insert({
-          branch_name: newWorkPaper.branch_name,
-          region: newWorkPaper.region,
-          audit_start_date: newWorkPaper.audit_start_date,
-          audit_end_date: newWorkPaper.audit_end_date,
-          audit_type: newWorkPaper.audit_type,
-          fraud_amount: newWorkPaper.fraud_amount,
-          fraud_staff: newWorkPaper.fraud_staff,
-          rating: newWorkPaper.rating,
-          inputted_by: newWorkPaper.inputted_by,
-          auditor: newWorkPaper.auditor // Store auditors as comma-separated string
-        });
-
-      if (workPaperError) throw workPaperError;
-
-      // Refresh work papers and reset form
-      await fetchWorkPapers();
-      setNewWorkPaper({
-        branch_name: '',
-        region: '',
-        audit_start_date: '',
-        audit_end_date: '',
-        audit_type: 'regular',
-        fraud_amount: undefined,
-        fraud_staff: undefined,
-        rating: 'medium',
-        inputted_by: '',
-        auditor: '' // Reset auditor string
-      });
-
-      // Close the modal
-      setIsAddModalOpen(false);
-      
-      toast.success('Work paper added successfully!');
-      setTimeout(() => {
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Error adding work paper:', error);
-      toast.error('Failed to add work paper');
-      setLoading(false);
-    }
-  };
-
-  // Filter workPapers based on search term, month/year, and region
-  const filteredWorkPapers = workPapers.filter(wp => {
+  // Filter auditMasters
+  const filteredAudits = auditMasters.filter(audit => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = (
-      wp.branch_name.toLowerCase().includes(searchLower) ||
-      wp.inputted_by.toLowerCase().includes(searchLower) ||
-      wp.audit_type.toLowerCase().includes(searchLower) ||
-      (wp.fraud_staff && wp.fraud_staff.toLowerCase().includes(searchLower)) ||
-      (wp.region && wp.region.toLowerCase().includes(searchLower)) ||
-      (wp.auditor && wp.auditor.toLowerCase().includes(searchLower)) // Add auditor to search
+      audit.branch_name.toLowerCase().includes(searchLower) ||
+      (audit.leader && audit.leader.toLowerCase().includes(searchLower)) ||
+      (audit.team && audit.team.toLowerCase().includes(searchLower)) ||
+      audit.audit_type.toLowerCase().includes(searchLower) ||
+      (audit.region && audit.region.toLowerCase().includes(searchLower)) ||
+      (audit.auditors && audit.auditors.some(a => a.toLowerCase().includes(searchLower)))
     );
 
     // Month/Year filter
     let matchesDate = true;
     if (selectedMonth || selectedYear) {
-      const startDate = new Date(wp.audit_start_date);
-      const endDate = new Date(wp.audit_end_date);
+      const startDate = new Date(audit.audit_start_date);
+      const endDate = new Date(audit.audit_end_date);
       
       if (selectedYear) {
         const year = parseInt(selectedYear);
@@ -451,36 +358,28 @@ const QASection: React.FC = () => {
       
       if (selectedMonth) {
         const month = parseInt(selectedMonth);
-        const startMonth = startDate.getMonth() + 1; // getMonth() returns 0-11
+        const startMonth = startDate.getMonth() + 1;
         const endMonth = endDate.getMonth() + 1;
         matchesDate = matchesDate && (startMonth === month || endMonth === month);
       }
     }
 
     // Region filter
-    const matchesRegion = !selectedRegion || wp.region === selectedRegion;
+    const matchesRegion = !selectedRegion || audit.region === selectedRegion;
 
     return matchesSearch && matchesDate && matchesRegion;
   });
 
-  // Get available years from work papers
   const availableYears = Array.from(new Set(
-    workPapers.flatMap(wp => [
-      new Date(wp.audit_start_date).getFullYear(),
-      new Date(wp.audit_end_date).getFullYear()
+    auditMasters.flatMap(audit => [
+      new Date(audit.audit_start_date).getFullYear(),
+      new Date(audit.audit_end_date).getFullYear()
     ])
   )).sort((a, b) => b - a);
 
-  // Get available regions from work papers
   const availableRegions = Array.from(new Set(
-    workPapers.map(wp => wp.region).filter(region => region && region.trim() !== '')
+    auditMasters.map(audit => audit.region).filter(region => region && region.trim() !== '')
   )).sort();
-
-  // Create auditorOptions from database auditors
-  const auditorOptions: CheckboxOption[] = auditors.map(auditor => ({
-    label: auditor.full_name,
-    value: auditor.full_name
-  }));
 
   const months = [
     { value: '', label: 'All Months' },
@@ -498,239 +397,73 @@ const QASection: React.FC = () => {
     { value: '12', label: 'December' },
   ];
 
-  const handleEditWorkPaper = (id: string) => {
-    // Find the work paper to edit
-    const workPaperToEdit = workPapers.find(wp => wp.id === id);
-    if (workPaperToEdit) {
-      setWorkPaperToEdit(workPaperToEdit);
-      // Open the modal
-      setIsEditModalOpen(true);
-    } else {
-      toast.error('Work paper not found');
-    }
-  };
-  
-  // Tambahkan fungsi debug
-  const debugError = (error: any, context: string) => {
-    console.group(`Error in ${context}:`);
-    console.log('Error object:', error);
-    console.log('Error message:', error?.message);
-    console.log('Error code:', error?.code);
-    console.log('Error details:', error?.details);
-    console.log('Error hint:', error?.hint);
-    console.groupEnd();
-  };
-
-  const handleUpdateWorkPaper = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!workPaperToEdit || !workPaperToEdit.id) {
-      toast.error('No work paper to update');
-      return;
-    }
-    
-    // Add validation for dates
-    if (new Date(workPaperToEdit.audit_start_date) > new Date(workPaperToEdit.audit_end_date)) {
-      toast.error('Start date cannot be after end date');
-      return;
-    }
-    
-    // Validate inputs for fraud type
-    if (workPaperToEdit.audit_type === 'fraud' && !workPaperToEdit.fraud_amount) {
-      toast.error('Please provide a fraud amount for fraud audit type');
-      return;
-    }
-    
-    if (workPaperToEdit.audit_type === 'fraud' && !workPaperToEdit.fraud_staff) {
-      toast.error('Please provide fraud staff name for fraud audit type');
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Update the work paper including auditor column
-      const updateData: any = {
-        audit_start_date: workPaperToEdit.audit_start_date,
-        audit_end_date: workPaperToEdit.audit_end_date,
-        rating: workPaperToEdit.rating,
-        inputted_by: workPaperToEdit.inputted_by,
-        auditor: workPaperToEdit.auditor // Update auditor column
-      };
-
-      // Only add region if it's not empty
-      if (workPaperToEdit.region && workPaperToEdit.region.trim() !== '') {
-        updateData.region = workPaperToEdit.region;
-      }
-
-      // Only add fraud fields if it's a fraud type
-      if (workPaperToEdit.audit_type === 'fraud') {
-        if (workPaperToEdit.fraud_amount) {
-          updateData.fraud_amount = workPaperToEdit.fraud_amount;
-        }
-        if (workPaperToEdit.fraud_staff) {
-          updateData.fraud_staff = workPaperToEdit.fraud_staff;
-        }
-      }
-
-      const { error: workPaperError } = await supabase
-        .from('work_papers')
-        .update(updateData)
-        .eq('id', workPaperToEdit.id);
-        
-      if (workPaperError) {
-        console.error('Work paper update error:', workPaperError);
-        throw workPaperError;
-      }
-      
-      // Refresh data and close modal
-      await fetchWorkPapers();
-      setIsEditModalOpen(false);
-      setWorkPaperToEdit(null);
-      toast.success('Work paper updated successfully!');
-    } catch (error) {
-      debugError(error, 'handleUpdateWorkPaper');
-      
-      // More detailed error message
-      if (error && typeof error === 'object' && 'message' in error) {
-        toast.error(`Failed to update work paper: ${error.message}`);
-      } else if (error && typeof error === 'object' && 'code' in error) {
-        toast.error(`Database error (${error.code}): Please check console for details.`);
-      } else {
-        toast.error('Failed to update work paper. Please check console for details.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleAuditTypeChangeForEdit = (type: 'regular' | 'fraud') => {
-    if (!workPaperToEdit) return;
-    
-    setWorkPaperToEdit({
-      ...workPaperToEdit,
-      audit_type: type,
-      rating: type === 'fraud' ? 'high' : workPaperToEdit.rating,
-      fraud_amount: type === 'regular' ? undefined : workPaperToEdit.fraud_amount,
-      fraud_staff: type === 'regular' ? undefined : workPaperToEdit.fraud_staff
-    });
-  };
-  
-  // Add this function with your other handler functions
-  const handleShowAuditors = (auditors: { auditor_name: string }[]) => {
-    setSelectedAuditorDetails(auditors);
-    setShowAuditorDetails(true);
-  };
-
-  // Add function to format date
   const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
+    const year = date.getFullYear().toString().slice(-2);
     return `${day}/${month}/${year}`;
   };
 
   if (!branches || branches.length < 1 || !auditors || auditors.length < 1) {
-    return <Loader />;
+    // return <Loader />; // Can uncomment if you want to block UI until loaded
   }
 
   return (
     <div className="space-y-2 p-0 mb-2 flex flex-col">
-      {/* Inputter Summary Table */}
-      <div className="rounded-md border mb-4">
-        <div className="bg-gray-50 p-2 rounded-t-md">
-          <h3 className="text-xl font-medium text-gray-700">Inputter Summary</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {inputterOptions.slice(0, 5).map((name) => (
-                  <th key={name} scope="col" className="px-4 py-2 text-center font-medium text-gray-500">
-                    {name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              <tr>
-                {inputterOptions.slice(0, 5).map((name) => {
-                  const entry = inputterSummary.find(item => item.name === name);
-                  return (
-                    <td key={name} className="px-4 py-2 text-center text-gray-700 font-medium">
-                      {entry ? entry.count : 0}
-                    </td>
-                  );
-                })}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
       <h2 className="text-2xl font-bold">Update data input audits</h2>
 
-      {/* Search bar and table container with shadcn styling */}
+      {/* Search bar and table container */}
       <div className="rounded-md border shadow-sm">
-        {/* Table header with search, filters and add button */}
-        <div className="bg-white p-4 border-b flex justify-between items-center">
-          <h3 className="text-lg font-medium">Work Papers</h3>
-          <div className="flex items-center space-x-4">
-            {/* Region Filter */}
+        {/* Filters */}
+        <div className="bg-white p-4 border-b flex justify-between items-center flex-wrap gap-4">
+          <h3 className="text-lg font-medium">Audit Tasks</h3>
+          <div className="flex items-center space-x-4 flex-wrap">
             <div className="w-32">
               <select
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                className="w-full px-3 py-2 border rounded-md text-sm"
               >
                 <option value="">All Regions</option>
                 {availableRegions.map(region => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
+                  <option key={region} value={region}>{region}</option>
                 ))}
               </select>
             </div>
 
-            {/* Month Filter */}
             <div className="w-32">
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                className="w-full px-3 py-2 border rounded-md text-sm"
               >
                 {months.map(month => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
+                  <option key={month.value} value={month.value}>{month.label}</option>
                 ))}
               </select>
             </div>
 
-            {/* Year Filter */}
             <div className="w-24">
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                className="w-full px-3 py-2 border rounded-md text-sm"
               >
                 <option value="">All Years</option>
                 {availableYears.map(year => (
-                  <option key={year} value={year.toString()}>
-                    {year}
-                  </option>
+                  <option key={year} value={year.toString()}>{year}</option>
                 ))}
               </select>
             </div>
 
-            {/* Search Input */}
             <div className="relative w-64">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search work papers, auditors..."
-                className="pl-8 pr-4 py-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Search branch, auditors..."
+                className="pl-8 pr-4 py-2 w-full border rounded-md"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -743,18 +476,10 @@ const QASection: React.FC = () => {
                 </button>
               )}
             </div>
-
-            {/* Add Button */}
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-            >
-              <span className="mr-1">+</span> Add Work Paper
-            </button>
           </div>
         </div>
 
-        {/* Table with shadcn styling */}
+        {/* Table */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -764,84 +489,102 @@ const QASection: React.FC = () => {
                 <th className="p-3 font-medium text-gray-600">Start Date</th>
                 <th className="p-3 font-medium text-gray-600">End Date</th>
                 <th className="p-3 font-medium text-gray-600">Type</th>
-                <th className="p-3 font-medium text-gray-600">Fraud Amount</th>
-                <th className="p-3 font-medium text-gray-600">Fraud Staff</th>
                 <th className="p-3 font-medium text-gray-600">Rating</th>
-                <th className="p-3 font-medium text-gray-600">Inputted By</th>
                 <th className="p-3 font-medium text-gray-600">Auditors</th>
                 <th className="p-3 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredWorkPapers.length > 0 ? (
-                filteredWorkPapers.map((wp) => (
-                  <tr key={wp.id} className="hover:bg-gray-50 bg-white">
-                    <td className="p-3 text-gray-700">{wp.branch_name}</td>
-                    <td className="p-3 text-gray-700">{wp.region || '-'}</td>
-                    <td className="p-3 text-gray-700">{formatDate(wp.audit_start_date)}</td>
-                    <td className="p-3 text-gray-700">{formatDate(wp.audit_end_date)}</td>
+              {filteredAudits.length > 0 ? (
+                filteredAudits.map((audit) => (
+                  <tr key={audit.id} className="hover:bg-gray-50 bg-white">
+                    <td className="p-3 text-gray-700">{audit.branch_name}</td>
+                    <td className="p-3 text-gray-700">{audit.region || '-'}</td>
+                    <td className="p-3 text-gray-700">{formatDate(audit.audit_start_date)}</td>
+                    <td className="p-3 text-gray-700">{formatDate(audit.audit_end_date)}</td>
                     <td className="p-3 text-gray-700">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        wp.audit_type === 'fraud' 
+                        audit.audit_type === 'fraud' 
                           ? 'bg-red-100 text-red-800' 
                           : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {wp.audit_type}
+                        {audit.audit_type}
                       </span>
                     </td>
                     <td className="p-3 text-gray-700">
-                      {wp.fraud_amount ? `Rp ${wp.fraud_amount.toLocaleString()}` : '-'}
-                    </td>
-                    <td className="p-3 text-gray-700">{wp.fraud_staff || '-'}</td>
-                    <td className="p-3 text-gray-700">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        wp.rating === 'high' 
-                          ? 'bg-red-100 text-red-800' 
-                          : wp.rating === 'medium'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                      }`}>
-                        {wp.rating}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-700">{wp.inputted_by}</td>
-                    <td className="p-3 text-gray-700">
-                      {wp.auditor ? (
-                        <div className="text-xs">
-                          {wp.auditor.split(', ').map((auditor, index) => (
-                            <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded mr-1 mb-1">
-                              {auditor.trim()}
-                            </span>
-                          ))}
-                        </div>
+                      {audit.rating ? (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          audit.rating === 'high' 
+                            ? 'bg-red-100 text-red-800' 
+                            : audit.rating === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                        }`}>
+                          {audit.rating}
+                        </span>
                       ) : (
-                        '-'
+                        // Differentiate between "not yet inputted" and "no rating (fraud not confirmed)"
+                        audit.audit_type === 'fraud' && audit.is_real_fraud === false ? (
+                          <span className="text-gray-400 italic text-xs">No rating</span>
+                        ) : (
+                          <span className="text-orange-500 text-xs font-medium">Belum diinput</span>
+                        )
                       )}
                     </td>
                     <td className="p-3 text-gray-700">
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => wp.id && handleEditWorkPaper(wp.id)}
-                          className="text-blue-500 hover:text-blue-700"
-                          title="Edit work paper"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button 
-                          onClick={() => wp.id && handleDeleteWorkPaper(wp.id)}
-                          className="text-red-500 hover:text-red-700"
-                          title="Delete work paper"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                      {audit.leader || audit.team ? (
+                        <div className="text-xs">
+                          {audit.leader && (
+                            <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded mr-1 mb-1 font-medium">
+                              {audit.leader} (Leader)
+                            </span>
+                          )}
+                          {audit.team && audit.team.split(',')
+                            .map(m => m.trim())
+                            .filter(member => {
+                              // Filter out academic titles
+                              const academicTitles = [
+                                'S.E', 'SE', 'S.E.', 'S.Tr', 'S.Tr.', 'S.Tr.Akun', 'S.Akun',
+                                'M.M', 'MM', 'M.M.', 'M.Ak', 'M.Sc', 'M.Si',
+                                'S.H', 'SH', 'S.H.', 'S.Kom', 'S.T', 'ST',
+                                'Dr', 'Dr.', 'Drs', 'Drs.', 'Ir', 'Ir.',
+                                'MBA', 'M.B.A', 'Ph.D', 'PhD',
+                                'S.Sos', 'S.Pd', 'S.Ag', 'S.IP', 'S.Psi',
+                                'Ak', 'Ak.', 'CA', 'CPA', 'CIA', 'CFE', 'CRMP',
+                                'S.Akt', 'S.Stat', 'S.Si', 'S.Hum',
+                                'MP', 'M.P', 'M.Eng', 'M.T',
+                                ''
+                              ];
+                              const upperMember = member.toUpperCase();
+                              return !academicTitles.some(title => 
+                                upperMember === title.toUpperCase() || 
+                                upperMember === title.toUpperCase().replace('.', '')
+                              );
+                            })
+                            .map((member, index) => (
+                              <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded mr-1 mb-1">
+                                {member}
+                              </span>
+                            ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-gray-700">
+                      <button 
+                        onClick={() => handleOpenInputModal(audit)}
+                        className="text-blue-600 hover:text-blue-800 font-medium text-xs border border-blue-600 px-3 py-1 rounded hover:bg-blue-50 transition-colors"
+                      >
+                        {audit.rating || audit.fraud_amount ? 'Edit Input' : 'Input Data'}
+                      </button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={11} className="p-4 text-center text-gray-500">
-                    {searchTerm || selectedMonth || selectedYear || selectedRegion ? 'No results found for your filters' : 'No work papers available'}
+                  <td colSpan={9} className="p-4 text-center text-gray-500">
+                    No audit tasks found
                   </td>
                 </tr>
               )}
@@ -849,473 +592,243 @@ const QASection: React.FC = () => {
           </table>
         </div>
       </div>
-      
-      {/* Edit Work Paper Modal */}
-      {isEditModalOpen && workPaperToEdit && (
+
+      {/* Input/Edit Modal */}
+      {isInputModalOpen && selectedAudit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Edit Work Paper</h3>
+              <h3 className="text-xl font-bold">
+                {selectedAudit.inputted_by ? 'Edit Work Paper' : 'Input Work Paper'}
+              </h3>
               <button 
-                onClick={() => setIsEditModalOpen(false)}
+                onClick={() => setIsInputModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X size={24} />
               </button>
             </div>
             
-            <form onSubmit={handleUpdateWorkPaper} className="grid grid-cols-2 gap-4">
-              {/* Branch Name - Read Only */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Branch
-                </label>
-                <input 
-                  type="text" 
-                  value={workPaperToEdit.branch_name} 
-                  disabled
-                  className="border p-2 rounded w-full bg-gray-100"
-                />
+            <form onSubmit={handleSaveWorkPaper} className="space-y-4">
+              {/* Read-only Info Section */}
+              <div className="bg-gray-50 p-4 rounded-md grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="block text-gray-500">Branch</span>
+                  <span className="font-medium">{selectedAudit.branch_name}</span>
+                </div>
+                <div>
+                  <span className="block text-gray-500">Region</span>
+                  <span className="font-medium">{selectedAudit.region}</span>
+                </div>
+                <div>
+                  <span className="block text-gray-500">Date</span>
+                  <span className="font-medium">
+                    {formatDate(selectedAudit.audit_start_date)} - {formatDate(selectedAudit.audit_end_date)}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-gray-500">Type</span>
+                  <span className={`font-medium ${selectedAudit.audit_type === 'fraud' ? 'text-red-600' : 'text-blue-600'}`}>
+                    {selectedAudit.audit_type.toUpperCase()}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <span className="block text-gray-500">Auditors</span>
+                  <span className="font-medium">
+                    {selectedAudit.leader && `${selectedAudit.leader} (Leader)`}
+                    {selectedAudit.leader && selectedAudit.team && ', '}
+                    {selectedAudit.team || (!selectedAudit.leader && '-')}
+                  </span>
+                </div>
               </div>
 
-              {/* Region - Editable */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Region
-                </label>
-                <input 
-                  type="text" 
-                  value={workPaperToEdit.region || ''} 
-                  disabled
-                  className="border p-2 rounded w-full bg-gray-100"
-                />
-              </div>
-              
-              {/* Dates - Editable */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input 
-                    type="date" 
-                    value={workPaperToEdit.audit_start_date} 
-                    onChange={(e) => setWorkPaperToEdit({
-                      ...workPaperToEdit,
-                      audit_start_date: e.target.value
-                    })}
-                    className="border p-2 rounded w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input 
-                    type="date" 
-                    value={workPaperToEdit.audit_end_date} 
-                    onChange={(e) => setWorkPaperToEdit({
-                      ...workPaperToEdit,
-                      audit_end_date: e.target.value
-                    })}
-                    className="border p-2 rounded w-full"
-                    required
-                  />
-                </div>
-              </div>
-              
-              {/* Audit Type - Read Only */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type
-                </label>
-                <input
-                  type="text"
-                  value={workPaperToEdit.audit_type === 'regular' ? 'Regular' : 'Fraud'}
-                  disabled
-                  className="border p-2 rounded w-full bg-gray-100"
-                />
-              </div>
-              
-              {/* Inputted By */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Inputted By
-                </label>
-                <select
-                  value={workPaperToEdit.inputted_by}
-                  onChange={(e) => setWorkPaperToEdit({
-                    ...workPaperToEdit,
-                    inputted_by: e.target.value
-                  })}
-                  className="border p-2 rounded w-full"
-                  required
-                >
-                  <option value="">Select Inputter</option>
-                  {inputterOptions.map(inputter => (
-                    <option key={inputter} value={inputter}>{inputter}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Fraud details - shown only for fraud type */}
-              {workPaperToEdit.audit_type === 'fraud' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fraud Amount
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Fraud Amount"
-                      value={workPaperToEdit.fraud_amount || ''}
-                      onChange={(e) => setWorkPaperToEdit({
-                        ...workPaperToEdit,
-                        fraud_amount: Number(e.target.value)
-                      })}
-                      className="border p-2 rounded w-full"
-                      required
-                    />
-                  </div>
+              {/* Input Fields */}
+              <div className="border-t pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Rating - Only show for regular audits OR fraud audits with is_real_fraud = true */}
+                  {(selectedAudit.audit_type === 'regular' || (selectedAudit.audit_type === 'fraud' && isRealFraud)) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rating
+                      </label>
+                      <select
+                        value={rating}
+                        onChange={(e) => setRating(e.target.value as any)}
+                        className={`border p-2 rounded w-full ${selectedAudit.audit_type === 'fraud' && isRealFraud ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={selectedAudit.audit_type === 'fraud' && isRealFraud}
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                      {selectedAudit.audit_type === 'fraud' && isRealFraud && (
+                        <p className="text-xs text-gray-500 mt-1">Rating locked to High for confirmed fraud</p>
+                      )}
+                    </div>
+                  )}
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fraud Staff
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Fraud Staff Name"
-                      value={workPaperToEdit.fraud_staff || ''}
-                      onChange={(e) => setWorkPaperToEdit({
-                        ...workPaperToEdit,
-                        fraud_staff: e.target.value
-                      })}
-                      className="border p-2 rounded w-full"
-                      required
-                    />
-                  </div>
-                </>
-              )}
-              
-              {/* Rating */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rating
-                </label>
-                <select
-                  value={workPaperToEdit.rating}
-                  onChange={(e) => setWorkPaperToEdit({
-                    ...workPaperToEdit,
-                    rating: e.target.value as 'high' | 'medium' | 'low'
-                  })}
-                  className="border p-2 rounded w-full"
-                  required
-                  disabled={workPaperToEdit.audit_type === 'fraud'}
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              
-              {/* Auditors Section */}
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Auditors
-                </label>
-                <div className="border rounded-md p-3">
-                  <SearchableCheckboxGroup
-                    options={auditorOptions}
-                    selectedOptions={getAuditorArray(workPaperToEdit.auditor)}
-                    onChange={(selectedOptions) => {
-                      handleEditAuditorChange(selectedOptions);
-                    }}
-                  />
+                  {/* Show info when fraud is not confirmed */}
+                  {selectedAudit.audit_type === 'fraud' && !isRealFraud && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rating
+                      </label>
+                      <div className="border p-2 rounded w-full bg-gray-50 text-gray-400 italic text-sm">
+                        No rating (fraud not confirmed)
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Is Real Fraud Checkbox - Only for fraud audit type */}
+                  {selectedAudit.audit_type === 'fraud' && (
+                    <div className="flex items-center">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={isRealFraud}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setIsRealFraud(checked);
+                              if (checked) {
+                                setRating('high'); // Lock to high when confirmed fraud
+                              }
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-red-300 peer-checked:bg-red-500 transition-colors"></div>
+                          <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
+                        </div>
+                        <div>
+                          <span className={`text-sm font-medium ${isRealFraud ? 'text-red-600' : 'text-gray-700'}`}>
+                            Is fraud?
+                          </span>
+                          <p className="text-xs text-gray-500">
+                            {isRealFraud ? 'Confirmed fraud case' : 'Mark if fraud is confirmed'}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+                  
+                  {/* Has Field Fraud Checkbox - Only for regular audit type */}
+                  {selectedAudit.audit_type === 'regular' && (
+                    <div className="flex items-center">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={hasFieldFraud}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setHasFieldFraud(checked);
+                              if (checked && fraudPersons.length === 0) {
+                                // Initialize with one empty row when checking
+                                setFraudPersons([{ audit_master_id: selectedAudit.id, fraud_staff: '', fraud_amount: 0 }]);
+                              }
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-orange-300 peer-checked:bg-orange-500 transition-colors"></div>
+                          <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
+                        </div>
+                        <div>
+                          <span className={`text-sm font-medium ${hasFieldFraud ? 'text-orange-600' : 'text-gray-700'}`}>
+                            Ada temuan fraud?
+                          </span>
+                          <p className="text-xs text-gray-500">
+                            {hasFieldFraud ? 'Ditemukan fraud saat audit' : 'Centang jika ada temuan fraud'}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
-              </div>
-              
-              {/* Form buttons */}
-              <div className="col-span-2 flex justify-end space-x-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-                >
-                  Update Work Paper
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmation && (
-        <div className="fixed inset-0 z-10 w-screen overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg
-                      aria-hidden="true"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="h-6 w-6 text-red-600"
-                    >
-                      <path
-                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      ></path>
-                    </svg>
-                  </div>
-                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                    <h3
-                      id="modal-title"
-                      className="text-base font-semibold leading-6 text-gray-900"
-                    >
-                      Delete Work Paper
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        Are you sure you want to delete this work paper? All related data will be permanently removed.
-                        This action cannot be undone.
-                      </p>
+                {/* Dynamic Fraud Rows - Show for fraud audits with is_real_fraud OR regular audits with has_field_fraud */}
+                {((selectedAudit.audit_type === 'fraud' && isRealFraud) || (selectedAudit.audit_type === 'regular' && hasFieldFraud)) && (
+                  <div className="mt-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Fraud Details (Staff & Amount)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAddFraudPersonRow}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+                      >
+                        <Plus size={16} className="mr-1" /> Add Person
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {fraudPersons.map((person, index) => (
+                        <div key={index} className="flex gap-2 items-start">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Staff Name"
+                              value={person.fraud_staff}
+                              onChange={(e) => handleFraudPersonChange(index, 'fraud_staff', e.target.value)}
+                              className="border p-2 rounded w-full text-sm"
+                              required
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              placeholder="Amount"
+                              value={person.fraud_amount}
+                              onChange={(e) => handleFraudPersonChange(index, 'fraud_amount', Number(e.target.value))}
+                              className="border p-2 rounded w-full text-sm"
+                              required
+                            />
+                            {person.fraud_amount > 0 && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {new Intl.NumberFormat('id-ID', { 
+                                  style: 'currency', 
+                                  currency: 'IDR',
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0
+                                }).format(person.fraud_amount)}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFraudPersonRow(index)}
+                            className="p-2 text-red-500 hover:text-red-700"
+                            disabled={fraudPersons.length === 1} // Prevent deleting the last row if desired, or allow it
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      ))}
+                      {fraudPersons.length === 0 && (
+                        <div className="text-sm text-gray-500 italic">No fraud staff added. Click "Add Person" to start.</div>
+                      )}
                     </div>
                   </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button
-                  className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
-                  type="button"
-                  onClick={confirmDelete}
-                >
-                  Delete
-                </button>
-                <button
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-                  type="button"
-                  onClick={() => setShowDeleteConfirmation(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Work Paper Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Add New Work Paper</h3>
-              <button 
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddWorkPaper} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
-                <select
-                  value={newWorkPaper.branch_name}
-                  onChange={(e) => handleBranchChange(e.target.value)}
-                  required
-                  className="border p-2 rounded w-full"
-                >
-                  <option value="">Select Branch</option>          
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.name}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
-                <input
-                  type="text"
-                  value={newWorkPaper.region || ''}
-                  disabled
-                  placeholder="Auto-fill"
-                  className="border p-2 rounded w-full bg-gray-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={newWorkPaper.audit_start_date}
-                    onChange={(e) => setNewWorkPaper({...newWorkPaper, audit_start_date: e.target.value})}
-                    required
-                    className="border p-2 rounded w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={newWorkPaper.audit_end_date}
-                    onChange={(e) => setNewWorkPaper({...newWorkPaper, audit_end_date: e.target.value})}
-                    required
-                    className="border p-2 rounded w-full"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Audit Type</label>
-                <select
-                  value={newWorkPaper.audit_type}
-                  onChange={(e) => handleAuditTypeChange(e.target.value as 'regular' | 'fraud')}
-                  className="border p-2 rounded w-full"
-                >
-                  <option value="regular">Regular</option>
-                  <option value="fraud">Fraud</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inputted By</label>
-                <select
-                  value={newWorkPaper.inputted_by}
-                  onChange={(e) => setNewWorkPaper({...newWorkPaper, inputted_by: e.target.value})}
-                  className="border p-2 rounded w-full"
-                  required
-                >
-                  <option value="">Select Inputter</option>
-                  {inputterOptions.map(inputter => (
-                    <option key={inputter} value={inputter}>{inputter}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {newWorkPaper.audit_type === 'fraud' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fraud Amount</label>
-                    <input
-                      type="number"
-                      placeholder="Fraud Amount"
-                      value={newWorkPaper.fraud_amount || ''}
-                      onChange={(e) => setNewWorkPaper({...newWorkPaper, fraud_amount: Number(e.target.value)})}
-                      className="border p-2 rounded w-full"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fraud Staff</label>
-                    <input
-                      type="text"
-                      placeholder="Fraud Staff Name"
-                      value={newWorkPaper.fraud_staff || ''}
-                      onChange={(e) => setNewWorkPaper({...newWorkPaper, fraud_staff: e.target.value})}
-                      className="border p-2 rounded w-full"
-                      required
-                    />
-                  </div>
-                </>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
-                <select
-                  value={newWorkPaper.rating}
-                  onChange={(e) => setNewWorkPaper({...newWorkPaper, rating: e.target.value as 'high' | 'medium' | 'low'})}
-                  className="border p-2 rounded w-full"
-                  required
-                  disabled={newWorkPaper.audit_type === 'fraud'}
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Auditors</label>
-                <div className="border rounded-md p-3">
-                  <SearchableCheckboxGroup
-                    options={auditorOptions}
-                    selectedOptions={getAuditorArray(newWorkPaper.auditor)}
-                    onChange={(selectedOptions) => {
-                      handleAuditorChange(selectedOptions);
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div className="col-span-2 flex justify-end space-x-3 mt-4">
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => setIsInputModalOpen(false)}
                   className="px-4 py-2 border border-gray-300 rounded shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  disabled={loading}
+                  className="px-4 py-2 border border-transparent rounded shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  Add Work Paper
+                  {loading ? 'Saving...' : 'Save Work Paper'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Auditor Details Modal */}
-      {showAuditorDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Auditor Details</h3>
-
-            </div>
-            <div className="space-y-2">
-              {selectedAuditorDetails.map((auditor, index) => (
-                <div 
-                  key={index}
-                  className="p-2 bg-gray-50 rounded-md flex items-center space-x-2"
-                >
-                  <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                    <span className="text-indigo-600 font-medium">
-                      {auditor.auditor_name.charAt(0)}
-                    </span>
-                  </div>
-                  <span className="text-gray-700">{auditor.auditor_name}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setShowAuditorDetails(false)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}

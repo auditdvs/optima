@@ -1,8 +1,10 @@
-import { Edit, RefreshCcw, Trash2, Plus } from 'lucide-react';
+import { Edit, Plus, RefreshCcw, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Ganti ke react-toastify
+import EChartComponent from '../components/common/EChartComponent';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { useMapCache } from '../contexts/MapCacheContext';
 import { supabase } from '../lib/supabaseClient';
 
 // Modal sederhana
@@ -61,6 +63,9 @@ function extractLatLng(input: string): { lat: number, lng: number } | null {
 }
 
 const BranchDirectory: React.FC = () => {
+  // Use cached map data from context
+  const { branchesGeo: cachedBranchesGeo } = useMapCache();
+  
   const [branches, setBranches] = useState<BranchData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState<string>('');
@@ -77,27 +82,45 @@ const BranchDirectory: React.FC = () => {
   const [showSuccessPopup, setShowSuccessPopup] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
+  // Use cached branchesGeo from context
+  const branchesGeo = cachedBranchesGeo;
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Fetch branch data from database (for table display)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchBranchData = async () => {
       const { data } = await supabase.from('branches_info').select('*');
       setBranches(data || []);
     };
-    fetchData();
+    fetchBranchData();
   }, []);
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!userId) return;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('user_role')
-        .eq('user_id', userId)
-        .single();
-      if (data?.user_role) setUserRole(data.user_role);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+        if (!userId) return;
+        
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('user_role')
+          .eq('user_id', userId)
+          .single();
+        
+        if (error) {
+          // If error (like 400 or RLS policy), silently set default role
+          console.log('Could not fetch user role, using default');
+          setUserRole('user'); // Set default role
+          return;
+        }
+        
+        if (data?.user_role) setUserRole(data.user_role);
+      } catch (err) {
+        // Suppress error and use default role
+        console.log('Error fetching user role, using default');
+        setUserRole('user');
+      }
     };
     fetchUserRole();
   }, []);
@@ -136,9 +159,9 @@ const BranchDirectory: React.FC = () => {
 
   const filtered = sortedBranches.filter(item => {
     const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.region.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.region || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesRegion = regionFilter ? item.region === regionFilter : true;
 
@@ -286,143 +309,529 @@ const BranchDirectory: React.FC = () => {
     setTimeout(() => setIsRefreshing(false), 600); // animasi tetap terlihat walau data cepat
   };
 
-  return (
-    <div className="p-6">
-      {/* Header Section */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Branch Directory</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Tombol Refresh dengan animasi */}
-            <button
-              className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 shadow hover:bg-indigo-50 text-indigo-500 flex items-center gap-2 transition font-medium"
-              title="Refresh"
-              type="button"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCcw
-                size={18}
-                className={`inline-block align-middle transition-transform ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              <span className="text-sm">Refresh</span>
-            </button>
-<button
-  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
-  onClick={() => setShowAddModal(true)}
->
-  <Plus size={18} /> {/* Icon dengan ukuran sama seperti Refresh */}
-  <span className="text-sm font-medium">Add Branch</span>
-</button>
-          </div>
-        </div>
+  // Tab state: 'map' or 'table'
+  const [currentView, setCurrentView] = useState<'map' | 'table'>('map');
 
-        {/* Search dan filter region */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
-              <button
-                key={region}
-                className={`px-3 py-1 rounded transition ${
-                  regionFilter === region
-                    ? 'bg-indigo-400 text-white'
-                    : 'bg-gray-200 hover:bg-indigo-400 hover:text-white'
-                }`}
-                onClick={() => setRegionFilter(region)}
-              >
-                {region}
-              </button>
-            ))}
-            <button
-              className={`px-3 py-1 rounded transition ${
-                regionFilter === '' ? 'bg-gray-400' : 'bg-gray-300 hover:bg-gray-400'
-              }`}
-              onClick={() => setRegionFilter('')}
-            >
-              All
-            </button>
-          </div>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Search branch, region, or email..."
-            className="pl-3 pr-3 py-2 h-10 w-64 rounded-md border border-gray-300"
-          />
+  return (
+    <div className="p-4 md:p-6 min-h-screen bg-gray-50/50">
+      {/* Header Section */}
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-900">
+          Branch Directory
+        </h1>
+        <p className="text-sm md:text-base text-gray-500 mt-1">Manage and visualize branch locations across Indonesia.</p>
+        
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1 mt-6 border-b border-gray-200 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => setCurrentView('map')}
+            className={`px-4 md:px-6 py-3 text-sm font-medium transition-all relative whitespace-nowrap flex-shrink-0 ${
+              currentView === 'map'
+                ? 'text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${currentView === 'map' ? 'bg-indigo-600' : 'bg-transparent'}`}></span>
+              Branch Locations Map
+            </div>
+            {currentView === 'map' && (
+              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full"></div>
+            )}
+          </button>
+          
+          <button
+            onClick={() => setCurrentView('table')}
+            className={`px-4 md:px-6 py-3 text-sm font-medium transition-all relative whitespace-nowrap flex-shrink-0 ${
+              currentView === 'table'
+                ? 'text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${currentView === 'table' ? 'bg-indigo-600' : 'bg-transparent'}`}></span>
+              Branch Data & List
+            </div>
+            {currentView === 'table' && (
+              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full"></div>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Table Container */}
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">No.</TableHead>
-                <TableHead>Branch Name</TableHead>
-                <TableHead>Region</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((branch, idx) => (
-                <TableRow key={branch.id}>
-                  <TableCell>{idx + 1}</TableCell>
-                  <TableCell>{branch.name}</TableCell>
-                  <TableCell>{branch.region}</TableCell>
-                  <TableCell>
-                    {branch.email
-                      ? branch.email
-                          .split(',')
-                          .map((email, i, arr) => (
-                            <React.Fragment key={i}>
-                              <span>{email.trim()}</span>
-                              {i < arr.length - 1 && <br />}
-                            </React.Fragment>
-                          ))
-                      : <span className="text-gray-400">No email</span>
+      {/* Content Area */}
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        
+        {/* VIEW 1: MAP */}
+        {currentView === 'map' && (
+          <Card className="shadow-lg border-indigo-100 bg-white overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="flex flex-wrap gap-2 text-sm font-medium text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex">
+                    {/* Special Categories Only */}
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-green-500 ring-2 ring-green-100"></span>
+                      <span>Head Office</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-red-500 ring-2 ring-red-100"></span>
+                      <span>Regional</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-yellow-500 ring-2 ring-yellow-100"></span>
+                      <span>Komida</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-purple-500 ring-2 ring-purple-100"></span>
+                      <span>Yamida</span>
+                    </div>
+                  </div>
+                </div>
+                <span className="text-sm font-medium px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
+                  Total: {branchesGeo.length} Locations Mapped
+                </span>
+              </div>
+              
+              <div className="h-[calc(100vh-280px)] min-h-[500px] w-full rounded-xl border border-indigo-50 bg-gradient-to-br from-slate-50 to-indigo-50/50 overflow-hidden relative">
+                <EChartComponent
+                  option={{
+                    backgroundColor: 'transparent',
+                    tooltip: {
+                      trigger: 'item',
+                      triggerOn: 'click', // UBAH KE CLICK: Biar mantap gak ilang-ilang kecuali klik tempat lain
+                      enterable: true,
+                      hideDelay: 1000, 
+                      position: 'top', // PENTING: Tooltip DIAM di atas pin, gak lari ngikutin mouse
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    borderColor: '#EEF2FF',
+                    textStyle: { color: '#1E293B' },
+                    extraCssText: 'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); border-radius: 12px; padding: 0;', // Padding 0 untuk kontrol penuh layout
+                    formatter: (params: any) => {
+                      const data = params.data;
+                      if (!data) return '';
+                      const isRegional = data.name.startsWith('REGIONAL');
+                      const isHeadOffice = data.name.includes('KANTOR PUSAT');
+                      const isKomida = data.name.includes('KOMIDA PRINTING');
+                      const isYamida = data.name.includes('YAMIDA');
+                      const lat = data.value?.[1];
+                      const lng = data.value?.[0];
+                      const gmapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                      
+                      // Determine colors and label based on type
+                      let pinColor = '#3b82f6'; // blue default
+                      let bgColor = '#eff6ff';
+                      let borderColor = '#bfdbfe';
+                      let textColor = '#1e40af';
+                      let label = 'BRANCH';
+                      
+                      if (isKomida) {
+                        pinColor = '#eab308'; // yellow
+                        bgColor = '#fefce8';
+                        borderColor = '#fde047';
+                        textColor = '#854d0e';
+                        label = 'KOMIDA PRINTING';
+                      } else if (isYamida) {
+                        pinColor = '#a855f7'; // purple
+                        bgColor = '#faf5ff';
+                        borderColor = '#e9d5ff';
+                        textColor = '#6b21a8';
+                        label = 'YAMIDA';
+                      } else if (isHeadOffice) {
+                        pinColor = '#10b981'; // green
+                        bgColor = '#f0fdf4';
+                        borderColor = '#bbf7d0';
+                        textColor = '#065f46';
+                        label = 'HEAD OFFICE';
+                      } else if (isRegional) {
+                        pinColor = '#ef4444'; // red
+                        bgColor = '#fef2f2';
+                        borderColor = '#fca5a5';
+                        textColor = '#b91c1c';
+                        label = 'REGIONAL';
+                      }
+                      
+                      return `
+                        <div style="padding: 12px; font-family: sans-serif; min-width: 200px;">
+                          <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <strong style="font-size: 15px; color: ${pinColor};">${data.name || 'Unknown'}</strong>
+                            <span style="font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: 600; border: 1px solid ${borderColor}; color: ${textColor}; background: ${bgColor};">
+                              ${label}
+                            </span>
+                          </div>
+                          
+                          <div style="margin-bottom: 12px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Region:</span> <span style="font-weight: 600; color: #334155;">${data.region || '-'}</span>
+                          </div>
+
+                          <a href="${gmapsUrl}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 6px; background-color: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; transition: background 0.2s;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                              <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            Open in Google Maps
+                          </a>
+                        </div>
+                      `;
                     }
-                  </TableCell>
-                  <TableCell>
-                    {branch.coordinates ? (
-                      <a
-                        href={`https://www.google.com/maps?q=${getCoordinatesText(branch.coordinates)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
+                  },
+                    geo: {
+                      map: 'indonesia',
+                      roam: true,
+                      zoom: 1.25,
+                      center: [118, -2],
+                      itemStyle: {
+                        areaColor: '#e0e7ff',
+                        borderColor: '#818cf8',
+                        borderWidth: 0.5
+                      },
+                      emphasis: {
+                        itemStyle: {
+                          areaColor: '#c7d2fe',
+                          shadowBlur: 10,
+                          shadowColor: 'rgba(99, 102, 241, 0.2)'
+                        }
+                      },
+                      label: { show: false }
+                    },
+                    series: [{
+                      name: 'Branches',
+                      type: 'scatter',
+                      coordinateSystem: 'geo',
+                      data: branchesGeo.map(branch => {
+                        const isRegional = branch.name.startsWith('REGIONAL');
+                        const isHeadOffice = branch.name.includes('KANTOR PUSAT');
+                        const isKomida = branch.name.includes('KOMIDA PRINTING');
+                        const isYamida = branch.name.includes('YAMIDA');
+                        
+                        // Region color mapping
+                        const regionColors: { [key: string]: string } = {
+                          'A': '#3b82f6',
+                          'B': '#06b6d4',
+                          'C': '#8b5cf6',
+                          'D': '#ec4899',
+                          'E': '#f97316',
+                          'F': '#14b8a6',
+                          'G': '#6366f1',
+                          'H': '#0ea5e9',
+                          'I': '#84cc16',
+                          'J': '#f59e0b',
+                          'K': '#22c55e',
+                          'L': '#a78bfa',
+                          'M': '#fb923c',
+                          'N': '#2dd4bf',
+                          'O': '#94a3b8',
+                          'P': '#f472b6',
+                          'Q': '#facc15',
+                          'R': '#4ade80',
+                          'S': '#c084fc',
+                        };
+                        
+                        let pinColor = '#3b82f6'; // blue default
+                        let pinSize = 20;
+                        
+                        if (isKomida) {
+                          pinColor = '#eab308'; // yellow
+                          pinSize = 28;
+                        } else if (isYamida) {
+                          pinColor = '#a855f7'; // purple
+                          pinSize = 28;
+                        } else if (isHeadOffice) {
+                          pinColor = '#10b981'; // green
+                          pinSize = 35; // biggest
+                        } else if (isRegional) {
+                          pinColor = '#ef4444'; // red
+                          pinSize = 30;
+                        } else {
+                          // Standard branch - use region color
+                          pinColor = regionColors[branch.region] || '#3b82f6';
+                          pinSize = 20;
+                        }
+                        
+                        return {
+                          name: branch.name,
+                          value: [...branch.coordinates],
+                          region: branch.region,
+                          symbol: 'pin',
+                          symbolSize: pinSize,
+                          itemStyle: {
+                            color: pinColor,
+                            shadowBlur: 2,
+                            shadowColor: 'rgba(0,0,0,0.2)'
+                          }
+                        };
+                      }),
+                      label: { show: false },
+                      emphasis: {
+                        scale: 1.5,
+                        label: {
+                          show: true,
+                          formatter: '{b}',
+                          position: 'top',
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          color: '#1e3a8a',
+                          backgroundColor: '#fff',
+                          padding: [4, 8],
+                          borderRadius: 4,
+                          borderColor: '#bfdbfe',
+                          borderWidth: 1,
+                          shadowBlur: 4,
+                          shadowColor: 'rgba(0,0,0,0.1)'
+                        }
+                      }
+                    }]
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* VIEW 2: TABLE DATA */}
+        {currentView === 'table' && (
+          <div className="flex flex-col gap-6">
+            
+            {/* Control Panel */}
+            <Card className="border-gray-200 shadow-sm bg-white">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="relative w-full md:w-auto md:flex-1 md:max-w-xl">
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Search branch name, region, or email..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm"
+                      />
+                      <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex w-full md:w-auto gap-3">
+                      <button
+                        className="flex-1 md:flex-none justify-center px-4 py-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 flex items-center gap-2 transition hover:shadow-sm text-sm font-medium"
+                        title="Refresh Data"
+                        type="button"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
                       >
-                        View on Maps
-                      </a>
+                        <RefreshCcw
+                          size={18}
+                          className={`transition-transform ${isRefreshing ? "animate-spin text-indigo-600" : ""}`}
+                        />
+                        <span className="hidden sm:inline">Refresh</span>
+                      </button>
+                      <button
+                        className="flex-1 md:flex-none justify-center px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 shadow-md shadow-indigo-200 transition-all font-medium text-sm"
+                        onClick={() => setShowAddModal(true)}
+                      >
+                        <Plus size={18} />
+                        Add Branch
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Region Filters */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                      <div className="flex-none text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2 sticky left-0 bg-white z-10 pr-2">
+                         Filter Region:
+                      </div>
+                      <button
+                        className={`flex-none px-3 py-1 text-xs rounded-full transition border whitespace-nowrap ${
+                          regionFilter === '' 
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                        }`}
+                        onClick={() => setRegionFilter('')}
+                      >
+                        All
+                      </button>
+                      {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
+                        <button
+                          key={region}
+                          className={`flex-none px-3 py-1 text-xs rounded-full transition border whitespace-nowrap ${
+                            regionFilter === region
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          onClick={() => setRegionFilter(region)}
+                        >
+                          {region}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mobile Cards View (Visible on small screens) */}
+            <div className="block md:hidden space-y-4">
+              {filtered.length > 0 ? (
+                filtered.map((branch) => (
+                  <Card key={branch.id} className="border-gray-200 shadow-sm bg-white overflow-hidden">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{branch.name}</h3>
+                          <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                            Region {branch.region}
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 rounded-lg"
+                            onClick={() => openEditModal(branch)}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 rounded-lg"
+                            onClick={() => openDeleteModal(branch)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {branch.email && (
+                        <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-md break-all">
+                           {branch.email}
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                         {branch.coordinates ? (
+                            <a
+                              href={`https://www.google.com/maps?q=${getCoordinatesText(branch.coordinates)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 text-xs font-medium flex items-center gap-1 hover:underline"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              View Location
+                            </a>
+                         ) : (
+                           <span className="text-gray-400 text-xs italic">No location set</span>
+                         )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+                  No branches found
+                </div>
+              )}
+            </div>
+
+            {/* Table */}
+            <Card className="border-gray-200 shadow-sm overflow-hidden bg-white hidden md:block">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-gray-50/80">
+                    <TableRow>
+                      <TableHead className="w-16 font-semibold text-gray-700 text-center">No.</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Branch Name</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Region</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Email Contact</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Location</TableHead>
+                      <TableHead className="text-right font-semibold text-gray-700 pr-8">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.length > 0 ? (
+                      filtered.map((branch, idx) => (
+                        <TableRow key={branch.id} className="hover:bg-indigo-50/30 transition-colors">
+                          <TableCell className="font-medium text-gray-500 text-center">{idx + 1}</TableCell>
+                          <TableCell>
+                            <span className="font-medium text-gray-900 block">{branch.name}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                              Reg {branch.region}
+                            </span>
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                             {branch.email ? (
+                               <div className="text-sm text-gray-600">
+                                 {branch.email.split(',').map((e, i) => (
+                                   <div key={i} className="truncate">{e.trim()}</div>
+                                 ))}
+                               </div>
+                             ) : (
+                               <span className="text-gray-400 text-xs italic">No email</span>
+                             )}
+                          </TableCell>
+                          <TableCell>
+                            {branch.coordinates ? (
+                              <a
+                                href={`https://www.google.com/maps?q=${getCoordinatesText(branch.coordinates)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                View Map
+                              </a>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right pr-6">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                title="Edit Branch"
+                                onClick={() => openEditModal(branch)}
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Delete Branch"
+                                onClick={() => openDeleteModal(branch)}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     ) : (
-                      <span className="text-gray-400">No location</span>
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-32 text-center">
+                          <div className="flex flex-col items-center justify-center text-gray-400">
+                             <div className="p-3 bg-gray-50 rounded-full mb-2">
+                               <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                               </svg>
+                             </div>
+                             <p>No branches found matching your search.</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      className="text-indigo-600 hover:text-indigo-900 mr-2"
-                      title="Edit"
-                      onClick={() => openEditModal(branch)}
-                    >
-                      <Edit size={20} />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete"
-                      onClick={() => openDeleteModal(branch)}
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="p-3 border-t bg-gray-50 text-xs text-gray-500 text-center font-medium">
+                Showing {filtered.length} branches
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
 
       {/* Modal Edit */}
       <Modal open={showEditModal} onClose={() => setShowEditModal(false)}>

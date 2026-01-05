@@ -18,12 +18,13 @@ interface SplitTextProps {
   rootMargin?: string;
   textAlign?: "left" | "center" | "right" | "justify";
   onLetterAnimationComplete?: () => void;
+  startDelay?: number; // New prop for local delay
 }
 
 const SplitText = ({
   text,
   className = "",
-  delay = 100,
+  delay = 100, // Stagger delay per character
   duration = 0.6,
   ease = "power3.out",
   splitType = "chars",
@@ -33,21 +34,26 @@ const SplitText = ({
   rootMargin = "-100px",
   textAlign = "center",
   onLetterAnimationComplete,
+  startDelay = 0, // Default 0
 }: SplitTextProps) => {
   const ref = useRef<HTMLParagraphElement>(null);
   const animationCompletedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollTrigger | null>(null);
 
   useEffect(() => {
+    // ... useEffect dependency array will need startDelay too, but I'll replace the whole affected block.
     if (typeof window === "undefined" || !ref.current || !text) return;
 
     const el = ref.current;
     
     animationCompletedRef.current = false;
 
+    // ... setup code ...
+    
+    // (GSAP Setup omitted for brevity in replacement, focusing on animation part)
     const absoluteLines = splitType === "lines";
     if (absoluteLines) el.style.position = "relative";
-
+    
     let splitter;
     try {
       splitter = new GSAPSplitText(el, {
@@ -121,7 +127,8 @@ const SplitText = ({
       ...to,
       duration,
       ease,
-      stagger: delay / 1000,
+      delay: startDelay / 1000, // Use startDelay for initial wait
+      stagger: delay / 1000,    // Use delay for stagger
       force3D: true,
     });
 
@@ -147,12 +154,14 @@ const SplitText = ({
     threshold,
     rootMargin,
     onLetterAnimationComplete,
+    startDelay, // Added dependency
   ]);
 
+  // ... render ... 
   return (
     <p
       ref={ref}
-      className={`split-parent overflow-hidden inline-block whitespace-normal ${className}`}
+      className={`split-parent whitespace-normal ${className}`}
       style={{
         textAlign,
         wordWrap: "break-word",

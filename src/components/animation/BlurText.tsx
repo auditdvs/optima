@@ -31,6 +31,7 @@ interface BlurTextProps {
   easing?: (t: number) => number;
   onAnimationComplete?: () => void;
   stepDuration?: number;
+  startDelay?: number; // New prop for initial start delay
 }
 
 const BlurText = ({
@@ -46,6 +47,7 @@ const BlurText = ({
   easing = (t) => t,
   onAnimationComplete,
   stepDuration = 0.35,
+  startDelay = 0, // Default 0
 }: BlurTextProps) => {
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
   const [inView, setInView] = useState(false);
@@ -106,7 +108,7 @@ const BlurText = ({
         const spanTransition = {
           duration: totalDuration,
           times,
-          delay: (index * delay) / 1000,
+          delay: startDelay / 1000 + (index * delay) / 1000, // Incorporate startDelay
           ease: easing,
         };
 

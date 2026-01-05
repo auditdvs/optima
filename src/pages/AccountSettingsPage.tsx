@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import AccountSettings from '../components/AccountSettings';
-import AuditStats from '../components/AuditStats';
-import TotalStatsContainer from '../components/TotalStatsContainer';
+import AuditStats from '../components/account-settings/AuditStats';
+import TotalStatsContainer from '../components/account-settings/TotalStatsContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -60,8 +59,294 @@ const AccountSettingsPage = () => {
   const [auditScheduleData, setAuditScheduleData] = useState<AuditSchedule[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState<string>('A');
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'performance' | 'issues' | 'schedule'>('performance');
 
   useEffect(() => {
+    // Function to fetch audit schedule data - DEFINED FIRST
+    const fetchAuditScheduleData = async () => {
+      try {
+        setLoadingSchedule(true);
+        
+        // Get audit_schedule data (for priority, branch_name, region)
+        const { data: scheduleData, error: scheduleError } = await supabase
+          .from('audit_schedule')
+          .select('id, no, branch_name, region')
+          .order('no', { ascending: true });
+
+        console.log('=== AUDIT SCHEDULE DEBUG ===');
+        console.log('Schedule Data:', scheduleData);
+        console.log('Schedule Error:', scheduleError);
+        console.log('Schedule Count:', scheduleData?.length || 0);
+
+        if (scheduleError) {
+          console.error("Error fetching audit_schedule:", scheduleError);
+          setLoadingSchedule(false);
+          return;
+        }
+
+        // Get audit_master data (for audit period, execution order calculation, status)
+        // Only get regular audits
+        const { data: auditMasterData, error: auditError } = await supabase
+          .from('audit_master')
+          .select('branch_name, audit_period_start, audit_period_end, created_at, audit_type')
+          .or('audit_type.ilike.%regular%,audit_type.ilike.%reguler%');
+
+        console.log('Audit Master Data:', auditMasterData);
+        console.log('Audit Master Error:', auditError);
+        console.log('Audit Master Count:', auditMasterData?.length || 0);
+
+        if (auditError) {
+          console.error("Error fetching audit_master:", auditError);
+        }
+
+        // Create map of audited branches (VLOOKUP by branch_name)
+        const auditedBranchMap: Record<string, {
+          audit_period_start: string | null;
+          audit_period_end: string | null;
+          created_at: string;
+        }> = {};
+
+        auditMasterData?.forEach(audit => {
+          // Store the earliest audit for each branch (in case multiple audits exist)
+          if (!auditedBranchMap[audit.branch_name] || 
+              new Date(audit.created_at) < new Date(auditedBranchMap[audit.branch_name].created_at)) {
+            auditedBranchMap[audit.branch_name] = {
+              audit_period_start: audit.audit_period_start,
+              audit_period_end: audit.audit_period_end,
+              created_at: audit.created_at
+            };
+          }
+        });
+
+        console.log('Audited Branch Map:', auditedBranchMap);
+
+        // Group audits by region for execution order calculation
+        const auditsByRegion: Record<string, Array<{
+          branch_name: string;
+          created_at: string;
+        }>> = {};
+
+        auditMasterData?.forEach(audit => {
+          // Find region from scheduleData
+          const scheduleItem = scheduleData?.find(s => s.branch_name === audit.branch_name);
+          const region = scheduleItem?.region;
+          
+          if (region && !auditsByRegion[region]?.find(a => a.branch_name === audit.branch_name)) {
+            if (!auditsByRegion[region]) {
+              auditsByRegion[region] = [];
+            }
+            auditsByRegion[region].push({
+              branch_name: audit.branch_name,
+              created_at: auditedBranchMap[audit.branch_name].created_at
+            });
+          }
+        });
+
+        console.log('Audits by Region:', auditsByRegion);
+
+        // Calculate execution order per region (sorted by created_at, earliest = 1)
+        const executionOrderMap: Record<string, number> = {};
+        Object.keys(auditsByRegion).forEach(region => {
+          const sortedAudits = auditsByRegion[region].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          
+          sortedAudits.forEach((audit, index) => {
+            executionOrderMap[audit.branch_name] = index + 1;
+          });
+        });
+
+        console.log('Execution Order Map:', executionOrderMap);
+
+        // Combine schedule with audit data (VLOOKUP result)
+        const formattedSchedule = scheduleData?.map((item: any) => {
+          const auditData = auditedBranchMap[item.branch_name];
+          const isAudited = !!auditData;
+          
+          return {
+            no: parseInt(item.no) || 0,
+            branch_name: item.branch_name,
+            region: item.region,
+            priority: parseInt(item.no) || 0,
+            status: isAudited ? 'Audited' : 'Unaudited',
+            isAudited: isAudited,
+            audit_period_start: auditData?.audit_period_start || null,
+            audit_period_end: auditData?.audit_period_end || null,
+            execution_order: executionOrderMap[item.branch_name] || undefined
+          };
+        }) || [];
+        
+        console.log('Formatted Schedule:', formattedSchedule);
+        console.log('Region A data:', formattedSchedule.filter(s => s.region === 'A'));
+        console.log('=== END DEBUG ===');
+        
+        setAuditScheduleData(formattedSchedule);
+      } catch (error) {
+        console.error('Error fetching audit schedule data:', error);
+      } finally {
+        setLoadingSchedule(false);
+      }
+    };
+    
+    
+    const fetchAdminIssues = async (profileData: any) => {
+      if (!profileData?.full_name) return;
+      
+      setLoadingAdminIssues(true);
+      
+      try {
+        // Get audit_master data where user is involved
+        const { data: auditMaster, error: auditError } = await supabase
+          .from('audit_master')
+          .select('*');
+        
+        if (auditError) {
+          console.error('Error fetching audit_master for admin issues:', auditError);
+          setLoadingAdminIssues(false);
+          return;
+        }
+
+        // Helper to check if user is in audit team or is leader
+        const isUserInAudit = (record: any, fullName: string) => {
+          if (record.leader?.toLowerCase().includes(fullName.toLowerCase())) return true;
+          
+          let teamMembers: string[] = [];
+          try {
+            if (record.team) {
+              if (record.team.startsWith('[') || record.team.startsWith('{')) {
+                const parsed = JSON.parse(record.team);
+                teamMembers = Array.isArray(parsed) ? parsed : [record.team];
+              } else {
+                teamMembers = record.team.split(',').map((t: string) => t.trim());
+              }
+            }
+          } catch {
+            if (record.team) teamMembers = [record.team];
+          }
+          
+          return teamMembers.some((member: string) => 
+            member.toLowerCase().includes(fullName.toLowerCase()) || 
+            fullName.toLowerCase().includes(member.toLowerCase())
+          );
+        };
+
+        // Filter by user
+        const userAudits = auditMaster?.filter(record => isUserInAudit(record, profileData.full_name)) || [];
+        
+        const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
+        const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
+        
+        // Helper function to get failed checks with aliases for regular audits
+        const getFailedChecksWithAliases = (audit: any) => {
+          const regularAuditAliases: Record<string, string> = {
+            dapa_reg: "DAPA",
+            // revised_dapa_reg tidak termasuk karena hanya dibutuhkan jika ada temuan fraud saat audit reguler
+            dapa_supporting_data_reg: "Data Dukung DAPA",
+            assignment_letter_reg: "Surat Tugas",
+            entrance_agenda_reg: "Entrance Agenda",
+            entrance_attendance_reg: "Absensi Entrance",
+            audit_wp_reg: "KK Pemeriksaan",
+            exit_meeting_minutes_reg: "BA Exit Meeting",
+            exit_attendance_list_reg: "Absensi Exit",
+            audit_result_letter_reg: "LHA",
+            rta_reg: "RTA"
+          };
+
+          return Object.entries(audit)
+            .filter(([key, value]) =>
+              typeof value === 'boolean' &&
+              !value &&
+              regularAuditAliases[key]
+            )
+            .map(([key]) => regularAuditAliases[key])
+            .join(', ');
+        };
+
+        // Helper function for fraud audit failed checks
+        const getFraudFailedChecksWithAliases = (audit: any) => {
+          const fraudAuditAliases: Record<string, string> = {
+            data_prep: "Data Persiapan",
+            assignment_letter_fr: "Surat Tugas",
+            audit_wp_fr: "KK Pemeriksaan",
+            audit_report_fr: "SHA",
+            detailed_findings_fr: "RTA"
+          };
+
+          return Object.entries(audit)
+            .filter(([key, value]) =>
+              typeof value === 'boolean' &&
+              !value &&
+              fraudAuditAliases[key]
+            )
+            .map(([key]) => fraudAuditAliases[key])
+            .join(', ');
+        };
+        
+        // Process regular audits - filter by missing documents OR monitoring issue
+        // Note: revised_dapa_reg is excluded from counting as it's optional (only needed if fraud found during regular audit)
+        const regularDocumentFields = [
+          'dapa_reg', 'dapa_supporting_data_reg', 'assignment_letter_reg',
+          'entrance_agenda_reg', 'entrance_attendance_reg', 'audit_wp_reg',
+          'exit_meeting_minutes_reg', 'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg'
+        ];
+        
+        const regularIssues = userAudits
+          .filter(audit => isRegular(audit.audit_type))
+          .filter(audit => {
+            // Count false values only for relevant document fields (excluding revised_dapa_reg)
+            const falseCount = regularDocumentFields.filter(field => audit[field] === false).length;
+            
+            // Check monitoring - both 'adequate' and 'memadai' are valid
+            const monitoringValue = (audit.monitoring_reg || '').toLowerCase().trim();
+            const isMonitoringOK = monitoringValue === 'adequate' || monitoringValue === 'memadai';
+            const hasMonitoringIssue = !isMonitoringOK;
+            
+            // Show in issues if: has 2+ missing documents OR has monitoring issue
+            return falseCount >= 2 || hasMonitoringIssue;
+          })
+          .map(audit => {
+            let monitoringStatus = audit.monitoring_reg || 'not yet completed';
+            if (!audit.monitoring_reg || audit.monitoring_reg === null || audit.monitoring_reg === '') {
+              monitoringStatus = 'not yet completed';
+            }
+            
+            return {
+              branch_name: audit.branch_name,
+              audit_type: 'regular',
+              missing_documents: getFailedChecksWithAliases(audit),
+              monitoring: monitoringStatus
+            };
+          });
+        
+        // Process fraud audits
+        const fraudIssues = userAudits
+          .filter(audit => isFraud(audit.audit_type))
+          .filter(audit => {
+            const falseCount = Object.values(audit).filter(v => v === false).length;
+            return falseCount >= 1;
+          })
+          .map(audit => {
+            return {
+              branch_name: audit.branch_name,
+              audit_type: 'fraud',
+              missing_documents: getFraudFailedChecksWithAliases(audit)
+            };
+          });
+        
+        // Combine both types of issues - sort by branch name
+        const combinedIssues: AdminIssue[] = [...regularIssues, ...fraudIssues]
+          .sort((a, b) => a.branch_name.localeCompare(b.branch_name));
+        
+        setAdminIssues(combinedIssues);
+      } catch (error) {
+        console.error('Error processing admin issues:', error);
+      } finally {
+        setLoadingAdminIssues(false);
+      }
+    };
+    
     const fetchData = async () => {
       if (!user?.id) return;
       
@@ -77,6 +362,7 @@ const AccountSettingsPage = () => {
         setLoadingAdminIssues(false);
         setLoadingBranches(false);
         setLoadingStats(false);
+        setLoadingSchedule(false);
         return;
       }
       
@@ -93,83 +379,92 @@ const AccountSettingsPage = () => {
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
+        setLoadingSchedule(false);
         return;
       }
 
-      // Get work papers where user's full_name is in the auditor column (comma-delimited)
-      const { data: workPapers, error: workPapersError } = await supabase
-        .from('work_papers')
-        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, fraud_amount, rating, auditor')
-        .ilike('auditor', `%${profileData.full_name}%`); // Search for full_name in comma-delimited auditor column
+      // Get audit_master records
+      const { data: auditMaster, error: auditError } = await supabase
+        .from('audit_master')
+        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, rating, team, leader');
         
-      if (workPapersError) {
-        console.error('Error fetching work papers:', workPapersError);
+      if (auditError) {
+        console.error('Error fetching audit_master:', auditError);
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
+        setLoadingSchedule(false);
         return;
       }
 
       console.log('Profile full_name:', profileData.full_name);
-      console.log('Found work papers:', workPapers?.length || 0);
-      console.log('Sample auditor columns:', workPapers?.slice(0, 3).map(wp => wp.auditor));
+      console.log('Found audit_master records:', auditMaster?.length || 0);
 
-      if (!workPapers || workPapers.length === 0) {
-        // No audit data found, set default values
+      // Helper to check if user is in audit team or is leader
+      const isUserInAudit = (record: any, fullName: string) => {
+        if (record.leader?.toLowerCase().includes(fullName.toLowerCase())) return true;
+        
+        let teamMembers: string[] = [];
+        try {
+          if (record.team) {
+            if (record.team.startsWith('[') || record.team.startsWith('{')) {
+              const parsed = JSON.parse(record.team);
+              teamMembers = Array.isArray(parsed) ? parsed : [record.team];
+            } else {
+              teamMembers = record.team.split(',').map((t: string) => t.trim());
+            }
+          }
+        } catch {
+          if (record.team) teamMembers = [record.team];
+        }
+        
+        return teamMembers.some((member: string) => 
+          member.toLowerCase().includes(fullName.toLowerCase()) || 
+          fullName.toLowerCase().includes(member.toLowerCase())
+        );
+      };
+
+      if (!auditMaster || auditMaster.length === 0) {
         setTotalRegular(0);
         setTotalFraud(0);
         setTotalAudits(0);
-        setSisaTarget(24); // Full annual target
-        setTargetColor('#dc2626'); // Red since no progress
+        setSisaTarget(24);
+        setTargetColor('#dc2626');
         setMotivationMessage("Mari semangat memulai audit pertama tahun ini!");
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
+        setLoadingSchedule(false);
         return;
       }
       
-      // Filter work papers to ensure user's full_name is actually in the auditor column
-      const filteredWorkPapers = workPapers.filter(wp => {
-        if (!wp.auditor) return false;
-        
-        const auditorList = wp.auditor.split(',').map((name: string) => name.trim()) || [];
-        
-        // Try exact match first
-        if (auditorList.includes(profileData.full_name)) {
-          return true;
-        }
-        
-        // Try partial matches (in case of slight name variations)
-        const userNameParts = profileData.full_name.toLowerCase().split(' ');
-        return auditorList.some((auditor: string) => {
-          const auditorLower = auditor.toLowerCase();
-          // Check if at least 2 name parts match (for cases like "Dede Yudha N" vs "Dede Yudha Nersanto")
-          const matchingParts = userNameParts.filter(part => auditorLower.includes(part));
-          return matchingParts.length >= 2;
-        });
-      });
+      // Filter audits where user is involved
+      const filteredAudits = auditMaster.filter(record => isUserInAudit(record, profileData.full_name));
       
-      console.log('Filtered work papers:', filteredWorkPapers.length);
-      console.log('Sample filtered auditor columns:', filteredWorkPapers?.slice(0, 3).map(wp => wp.auditor));
+      console.log('Filtered audits:', filteredAudits.length);
       
-      // 4. Unique by branch_name + audit_type + audit_start_date + audit_end_date
+      // Unique by branch_name + audit_type + audit_start_date + audit_end_date
       const uniqueMap = new Map();
-      filteredWorkPapers.forEach(wp => {
-        const key = `${wp.branch_name}|${wp.audit_type}|${wp.audit_start_date}|${wp.audit_end_date}`;
+      filteredAudits.forEach(a => {
+        const key = `${a.branch_name}|${a.audit_type}|${a.audit_start_date}|${a.audit_end_date}`;
         if (!uniqueMap.has(key)) {
-          uniqueMap.set(key, wp);
+          uniqueMap.set(key, a);
         }
       });
-      const uniquePapers = Array.from(uniqueMap.values());
+      const uniqueAudits = Array.from(uniqueMap.values());
+      
+      // Helper functions for audit type check
+      const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
+      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
       
       // Set audited branches
-      setAuditedBranches(uniquePapers);
+      setAuditedBranches(uniqueAudits);
       setLoadingBranches(false);
       
       // Calculate total statistics
-      const regular = uniquePapers.filter(wp => wp.audit_type === 'regular').length;
-      const fraud = uniquePapers.filter(wp => wp.audit_type === 'fraud').length;
-      const total = uniquePapers.length;
+      const regular = uniqueAudits.filter(a => isRegular(a.audit_type)).length;
+      const fraud = uniqueAudits.filter(a => isFraud(a.audit_type)).length;
+      const total = uniqueAudits.length;
       
       setTotalRegular(regular);
       setTotalFraud(fraud);
@@ -207,264 +502,6 @@ const AccountSettingsPage = () => {
       
       // Fetch administration issues
       await fetchAdminIssues(profileData);
-      
-      // Fetch audit schedule data
-      await fetchAuditScheduleData();
-    };
-    
-    // Function to fetch audit schedule data
-    const fetchAuditScheduleData = async () => {
-      try {
-        setLoadingSchedule(true);
-        
-        // Get audit_schedule data (contains no, branch_name, region)
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from('audit_schedule')
-          .select('no, branch_name, region') as { 
-            data: Array<{ no: number; branch_name: string; region: string }> | null; 
-            error: any;
-          };
-
-        if (scheduleError) {
-          console.error("Error fetching audit_schedule:", scheduleError);
-          setLoadingSchedule(false);
-          return;
-        }
-
-        // Get audit_regular data with created_at to determine execution order
-        let auditedBranches: Array<{
-          branch_name: string;
-          audit_period_start: string | null;
-          audit_period_end: string | null;
-          created_at: string;
-        }> = [];
-        
-        try {
-          // Explicitly specify fields to avoid any unexpected fields like 'status'
-          const { data, error } = await supabase
-            .from('audit_regular')
-            .select('branch_name, audit_period_start, audit_period_end, created_at');
-            
-          if (error) {
-            console.error("Error fetching audit_regular:", error);
-          } else {
-            auditedBranches = data || [];
-          }
-        } catch (error) {
-          console.error("Exception fetching audit_regular:", error);
-        }
-
-        // Get branch data to get region information
-        const { data: branchData, error: branchError } = await supabase
-          .from('branches')
-          .select('name, region');
-
-        if (branchError) throw branchError;
-
-        // Create branch to region map
-        const branchRegionMap: Record<string, string> = {};
-        branchData?.forEach(branch => {
-          branchRegionMap[branch.name] = branch.region;
-        });
-
-        // Group audits by region
-        const auditsByRegion: Record<string, Array<{
-          branch_name: string;
-          audit_period_start: string | null;
-          audit_period_end: string | null;
-          created_at: string;
-          region: string;
-        }>> = {};
-        
-        auditedBranches?.forEach(item => {
-          const region = branchRegionMap[item.branch_name] || 'Unknown';
-          if (!auditsByRegion[region]) {
-            auditsByRegion[region] = [];
-          }
-          auditsByRegion[region].push({
-            ...item,
-            region
-          });
-        });
-
-        // For each region, sort by created_at and assign execution_order
-        const auditedBranchMap: Record<string, {
-          isAudited: boolean;
-          audit_period_start: string | null;
-          audit_period_end: string | null;
-          execution_order: number;
-          region: string;
-          status: string;
-        }> = {};
-        Object.keys(auditsByRegion).forEach(region => {
-          // Sort by oldest created_at (ascending)
-          const sortedAudits = auditsByRegion[region].sort((a: any, b: any) => 
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          
-          // Assign execution_order for each audit in the region
-          sortedAudits.forEach((audit: any, index: number) => {
-            auditedBranchMap[audit.branch_name] = {
-              isAudited: true,
-              audit_period_start: audit.audit_period_start,
-              audit_period_end: audit.audit_period_end,
-              execution_order: index + 1,
-              region: audit.region,
-              status: 'Completed'
-            };
-          });
-        });
-
-        // Combine all data with schedule
-        const scheduleWithStatus = scheduleData?.map((item: any) => {          
-          return {
-            ...item,
-            isAudited: !!auditedBranchMap[item.branch_name],
-            audit_period_start: auditedBranchMap[item.branch_name]?.audit_period_start || null,
-            audit_period_end: auditedBranchMap[item.branch_name]?.audit_period_end || null,
-            execution_order: auditedBranchMap[item.branch_name]?.execution_order || null,
-            priority: item.no, // Use raw no value without conversion
-            status: auditedBranchMap[item.branch_name]?.status || 'Scheduled'
-          };
-        }) || [];
-        
-        setAuditScheduleData(scheduleWithStatus);
-      } catch (error) {
-        console.error('Error fetching audit schedule data:', error);
-      } finally {
-        setLoadingSchedule(false);
-      }
-    };
-    
-    const fetchAdminIssues = async (profileData: any) => {
-      if (!profileData?.full_name) return;
-      
-      setLoadingAdminIssues(true);
-      
-      try {
-        // Search for regular audits where user is the PIC
-        const { data: regularData, error: regularError } = await supabase
-          .from('audit_regular')
-          .select('*')
-          .ilike('pic', `%${profileData.full_name}%`);
-        
-        if (regularError) {
-          console.error('Error fetching regular audit issues:', regularError);
-        }
-        
-        // Get issues for fraud audits based on full_name from audit_fraud table
-        const { data: fraudData, error: fraudError } = await supabase
-          .from('audit_fraud')
-          .select('*')
-          .ilike('pic', `%${profileData.full_name}%`);
-        
-        if (fraudError) {
-          console.error('Error fetching fraud audit issues:', fraudError);
-        }
-        
-        // Helper function to get failed checks with aliases for regular audits
-        const getFailedChecksWithAliases = (audit: any) => {
-          const regularAuditAliases = {
-            dapa: "DAPA",
-            revised_dapa: "DAPA Perubahan",
-            dapa_supporting_data: "Data Dukung DAPA",
-            assignment_letter: "Surat Tugas",
-            entrance_agenda: "Entrance Agenda",
-            entrance_attendance: "Absensi Entrance",
-            audit_working_papers: "KK Pemeriksaan",
-            exit_meeting_minutes: "BA Exit Meeting",
-            exit_attendance_list: "Absensi Exit",
-            audit_result_letter: "LHA",
-            rta: "RTA"
-          };
-
-          return Object.entries(audit)
-            .filter(([key, value]) =>
-              typeof value === 'boolean' &&
-              !value &&
-              regularAuditAliases[key as keyof typeof regularAuditAliases] &&
-              key !== 'revised_dapa'
-            )
-            .map(([key]) => regularAuditAliases[key as keyof typeof regularAuditAliases])
-            .join(', ');
-        };
-
-        // Helper function for fraud audit failed checks
-        const getFraudFailedChecksWithAliases = (audit: any) => {
-          const fraudAuditAliases = {
-            data_preparation: "Data Persiapan",
-            assignment_letter: "Surat Tugas",
-            audit_working_papers: "KK Pemeriksaan",
-            audit_report: "SHA",
-            detailed_findings: "RTA"
-          };
-
-          return Object.entries(audit)
-            .filter(([key, value]) =>
-              typeof value === 'boolean' &&
-              !value &&
-              fraudAuditAliases[key as keyof typeof fraudAuditAliases]
-            )
-            .map(([key]) => fraudAuditAliases[key as keyof typeof fraudAuditAliases])
-            .join(', ');
-        };
-        
-        // Combine regular audit data (no need for multiple queries now)
-        const uniqueRegularData = regularData || [];
-        
-        // Process regular audits - filter by false count >= 2 OR monitoring issue
-        const regularIssues = uniqueRegularData
-          ?.filter(audit => {
-            // Count false values for each audit
-            const falseCount = Object.values(audit).filter(v => v === false).length;
-            // Check if monitoring is not 'adequate' (including null, empty, or any other value)
-            const hasMonitoringIssue = !audit.monitoring || audit.monitoring === null || audit.monitoring === '' || audit.monitoring.toLowerCase() !== 'adequate';
-            
-            // Include if there are 2+ false values OR if monitoring is not adequate
-            return falseCount >= 2 || hasMonitoringIssue;
-          })
-          .map(audit => {
-            // Get monitoring status
-            let monitoringStatus = audit.monitoring || 'not yet completed';
-            if (!audit.monitoring || audit.monitoring === null || audit.monitoring === '') {
-              monitoringStatus = 'not yet completed';
-            }
-            
-            return {
-              branch_name: audit.branch_name,
-              audit_type: 'regular',
-              missing_documents: getFailedChecksWithAliases(audit),
-              monitoring: monitoringStatus
-            };
-          }) || [];
-        
-        // Process fraud audits - filter by false count >= 2 only (no monitoring for fraud)
-        const fraudIssues = fraudData
-          ?.filter(audit => {
-            // Count false values for each audit
-            const falseCount = Object.values(audit).filter(v => v === false).length;
-            
-            // Include only if there are 2+ false values (no monitoring check for fraud)
-            return falseCount >= 1;
-          })
-          .map(audit => {
-            return {
-              branch_name: audit.branch_name,
-              audit_type: 'fraud',
-              missing_documents: getFraudFailedChecksWithAliases(audit)
-            };
-          }) || [];
-        
-        // Combine both types of issues - sort by branch name
-        const combinedIssues: AdminIssue[] = [...regularIssues, ...fraudIssues]
-          .sort((a, b) => a.branch_name.localeCompare(b.branch_name));
-        
-        setAdminIssues(combinedIssues);
-      } catch (error) {
-        console.error('Error processing admin issues:', error);
-      } finally {
-        setLoadingAdminIssues(false);
-      }
     };
     
     // Fetch user role
@@ -487,6 +524,7 @@ const AccountSettingsPage = () => {
     
     fetchData();
     fetchUserRole();
+    fetchAuditScheduleData(); // Call independently so it always runs
   }, [user]);
 
   if (!user) {
@@ -509,29 +547,44 @@ const AccountSettingsPage = () => {
 
   return (
     <div className="px-1 py-1 w-full">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-4">Profile and Total Recap Data Audits</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-        {/* Kiri: Profile */}
-        <div className="col-span-1 flex">
-          <AccountSettings
-            isOpen={true}
-            onClose={() => {}}
-            onAccountUpdate={() => {}}
-            isStandalone={true}
-          />
-        </div>
-        {/* Kanan: Statistik */}
-        {showAuditSections && (
-          <div className="col-span-2 flex flex-col gap-6">
-            <AuditStats />
-          </div>
-        )}
+      {/* Tab Navigation */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('performance')}
+          className={`px-6 py-3 text-sm font-semibold rounded-t-lg transition-all ${
+            activeTab === 'performance'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          User Performance
+        </button>
+        <button
+          onClick={() => setActiveTab('issues')}
+          className={`px-6 py-3 text-sm font-semibold rounded-t-lg transition-all ${
+            activeTab === 'issues'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Administration Issues
+        </button>
+        <button
+          onClick={() => setActiveTab('schedule')}
+          className={`px-6 py-3 text-sm font-semibold rounded-t-lg transition-all ${
+            activeTab === 'schedule'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Audit Schedule
+        </button>
       </div>
 
-      {/* Moved Total Statistics */}
-      {showAuditSections && (
-        <div className="mt-6 mb-6">
+      {/* User Performance Tab */}
+      {activeTab === 'performance' && showAuditSections && (
+        <>
+          {/* Total Statistics - Paling Atas */}
           <TotalStatsContainer
             totalRegular={totalRegular}
             totalFraud={totalFraud}
@@ -539,17 +592,112 @@ const AccountSettingsPage = () => {
             sisaTarget={sisaTarget}
             targetColor={targetColor}
             loading={loadingStats}
+            adminIssuesCount={adminIssues.length}
           />
-        </div>
+
+          {/* Statistik Audit */}
+          <div className="mb-6">
+            <AuditStats />
+          </div>
+        
+          {/* Tabel Audited Branches - Grid Layout */}
+          <div className="mt-10">
+            <h2 className="text-xl font-semibold mb-2">List of Audited Branches</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Regular Audits - Kiri */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-md font-medium mb-3 text-blue-700">Regular Audits</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">NO</TableHead>
+                      <TableHead>BRANCH NAME</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingBranches ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center">Loading...</TableCell>
+                      </TableRow>
+                    ) : auditedBranches.filter(branch => branch.audit_type === 'regular').length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center">No regular audits</TableCell>
+                      </TableRow>
+                    ) : (
+                      auditedBranches
+                        .filter(branch => branch.audit_type?.toLowerCase().includes('regular') || branch.audit_type?.toLowerCase().includes('reguler'))
+                        .sort((a, b) => {
+                          const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
+                          const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
+                          return dateA - dateB;
+                        })
+                        .map((row, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{idx + 1}</TableCell>
+                            <TableCell>{row.branch_name}</TableCell>
+                          </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Fraud Audits - Kanan */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-md font-medium mb-3 text-red-700">Fraud Audits</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">NO</TableHead>
+                      <TableHead>BRANCH NAME</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingBranches ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center">Loading...</TableCell>
+                      </TableRow>
+                    ) : auditedBranches.filter(branch => 
+                        branch.audit_type?.toLowerCase().includes('fraud') || 
+                        branch.audit_type?.toLowerCase().includes('investigasi') ||
+                        branch.audit_type?.toLowerCase().includes('khusus')
+                      ).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center">No fraud audits</TableCell>
+                      </TableRow>
+                    ) : (
+                      auditedBranches
+                        .filter(branch => 
+                          branch.audit_type?.toLowerCase().includes('fraud') || 
+                          branch.audit_type?.toLowerCase().includes('investigasi') ||
+                          branch.audit_type?.toLowerCase().includes('khusus')
+                        )
+                        .sort((a, b) => {
+                          const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
+                          const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
+                          return dateA - dateB;
+                        })
+                        .map((row, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{idx + 1}</TableCell>
+                            <TableCell>{row.branch_name}</TableCell>
+                          </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* NEW: Administration Issues Table */}
-      {showAuditSections && (
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold mb-2">Administration Issues</h2>
-            <h3 className="text-sm text-gray-600 mb-4">
-              For any data mismatch, contact <span className="font-bold">QA.</span>
-            </h3>
+      {/* Administration Issues Tab */}
+      {activeTab === 'issues' && showAuditSections && (
+        <div>
+          <h3 className="text-sm text-gray-600 mb-4">
+            For any data mismatch, contact <span className="font-bold">QA.</span>
+          </h3>
           <div className="bg-white rounded-lg shadow p-4">
             <Table>
               <TableHeader>
@@ -576,8 +724,20 @@ const AccountSettingsPage = () => {
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell>{issue.branch_name}</TableCell>
                       <TableCell className="capitalize">{issue.audit_type}</TableCell>
-                      <TableCell className="whitespace-pre-wrap break-words max-w-xs">{issue.missing_documents}</TableCell>
-                      <TableCell>{issue.audit_type === 'regular' ? issue.monitoring : '-'}</TableCell>
+                      <TableCell className="whitespace-pre-wrap break-words max-w-xs">
+                        {issue.missing_documents ? (
+                          issue.missing_documents
+                        ) : (
+                          <span className="text-gray-400 italic">All documents are complete</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {issue.audit_type === 'regular' ? (
+                          issue.monitoring
+                        ) : (
+                          <span className="text-red-500 italic">(No Need Monitoring)</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -586,96 +746,10 @@ const AccountSettingsPage = () => {
           </div>
         </div>
       )}
-      
-      {/* Tabel Audited Branches - Grid Layout */}
-      {showAuditSections && (
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold mb-2">List of Audited Branches</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Regular Audits - Kiri */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-md font-medium mb-3 text-blue-700">Regular Audits</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">NO</TableHead>
-                    <TableHead>BRANCH NAME</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingBranches ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center">Loading...</TableCell>
-                    </TableRow>
-                  ) : auditedBranches.filter(branch => branch.audit_type === 'regular').length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center">No regular audits</TableCell>
-                    </TableRow>
-                  ) : (
-                    auditedBranches
-  .filter(branch => branch.audit_type === 'regular')
-  .sort((a, b) => {
-    const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
-    const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
-    return dateA - dateB;
-  })
-  .map((row, idx) => (
-    <TableRow key={idx}>
-      <TableCell>{idx + 1}</TableCell>
-      <TableCell>{row.branch_name}</TableCell>
-    </TableRow>
-  ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
 
-            {/* Fraud Audits - Kanan */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-md font-medium mb-3 text-red-700">Fraud Audits</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">NO</TableHead>
-                    <TableHead>BRANCH NAME</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingBranches ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center">Loading...</TableCell>
-                    </TableRow>
-                  ) : auditedBranches.filter(branch => branch.audit_type === 'fraud').length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center">No fraud audits</TableCell>
-                    </TableRow>
-                  ) : (
-                    auditedBranches
-  .filter(branch => branch.audit_type === 'fraud')
-  .sort((a, b) => {
-    const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
-    const dateB = b.audit_start_date ? new Date(b.audit_start_date).getTime() : 0;
-    return dateA - dateB;
-  })
-  .map((row, idx) => (
-    <TableRow key={idx}>
-      <TableCell>{idx + 1}</TableCell>
-      <TableCell>{row.branch_name}</TableCell>
-    </TableRow>
-  ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Audit Schedule Section - New */}
-      {showAuditSections && (
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold mb-4">Audit Schedule</h2>
-          
+      {/* Audit Schedule Tab */}
+      {activeTab === 'schedule' && showAuditSections && (
+        <div>
           {/* Region Tabs */}
           <div className="mb-4">
             <div className="flex flex-wrap gap-2 border-b border-gray-200">
@@ -720,35 +794,25 @@ const AccountSettingsPage = () => {
                 ) : (
                   auditScheduleData
                     .filter(schedule => schedule.region === selectedRegion)
+                    .sort((a, b) => (a.no || 0) - (b.no || 0)) // Sort by priority ascending
                     .map((schedule, idx) => {
-                      // Determine row color based on execution_order and priority comparison
                       let rowColorClass = '';
                       
                       if (schedule.execution_order !== null && schedule.execution_order !== undefined) {
-                        // Convert both values to numbers for proper comparison
                         const executionOrder = Number(schedule.execution_order);
                         const priority = Number(schedule.no);
                         
-                        // If execution_order exists, compare with priority (no)
                         if (executionOrder === priority) {
-                          rowColorClass = 'bg-green-100'; // Green background if they match
+                          rowColorClass = 'bg-green-100';
                         } else {
-                          rowColorClass = 'bg-red-100'; // Red background if they don't match
+                          rowColorClass = 'bg-red-100';
                         }
-                        
-                        // Debug logging to see actual values
-                        console.log(`Branch: ${schedule.branch_name}, Execution Order: ${executionOrder}, Priority: ${priority}, Match: ${executionOrder === priority}`);
                       }
                       
                       return (
                         <TableRow key={idx} className={rowColorClass}>
-                          <TableCell>
-                            {/* Display raw priority value */}
-                            {schedule.no || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {schedule.execution_order || '-'}
-                          </TableCell>
+                          <TableCell>{schedule.no || '-'}</TableCell>
+                          <TableCell>{schedule.execution_order || '-'}</TableCell>
                           <TableCell>{schedule.branch_name}</TableCell>
                           <TableCell>
                             {schedule.audit_period_start && schedule.audit_period_end 

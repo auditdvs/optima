@@ -1,54 +1,26 @@
-import { format, parseISO } from "date-fns";
-import { ArrowUpDown, Clock, Pencil, Search } from "lucide-react";
+import { format } from "date-fns";
+import { ArrowUpDown, Search } from "lucide-react";
 import { useEffect, useState } from 'react';
-import { CartesianGrid, Dot, Line, LineChart } from 'recharts';
+import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-} from "../ui/chart";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "../ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 
-interface FraudCase {
+interface FraudStaffData {
   id: string;
-  branch_name: string;
-  region: string; // Added region field
-  fraud_amount: number;
-  fraud_staff: string;
-  fraud_payments_audits?: {
-    id: string;
-    hkp_amount: number;
-    payment_date: string;
-    notes?: string;
-    from_salary?: boolean;
-  }[];
-}
-
-interface FraudPayment {
-  id: string;
-  work_paper_id: string;
-  hkp_amount: number;
-  payment_date: string;
-  from_salary?: boolean;
-  notes?: string;
-}
-
-// Add this interface with your other interfaces
-interface FraudDetailByRegion {
+  audit_master_id: string;
   region: string;
-  totalFraudAmount: number;
-  totalRecoveryAmount: number; // Add this line
-  totalRegularAudit: number;
-  totalSpecialAudit: number;
-  totalFraudStaff: number;
+  branch_name: string;
+  fraud_staff: string;
+  fraud_amount: number;
+  payment_fraud: number;
+  notes: string | null;
 }
 
 type SortOrder = 'asc' | 'desc';
@@ -60,208 +32,72 @@ interface SortConfig {
 
 const FraudData = () => {
   // State variables
-  const [fraudCases, setFraudCases] = useState<FraudCase[]>([]);
-  const [selectedFraud, setSelectedFraud] = useState<FraudCase | null>(null);
+  const [fraudData, setFraudData] = useState<FraudStaffData[]>([]);
+  const [selectedFraud, setSelectedFraud] = useState<FraudStaffData | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
   const [fraudSearchTerm, setFraudSearchTerm] = useState('');
   const [fraudSortConfig, setFraudSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
-  const [paymentHistory, setPaymentHistory] = useState<FraudPayment[]>([]);
-  const [hkpAmountInput, setHkpAmountInput] = useState<number>(0);
-  const [fromSalaryChecked, setFromSalaryChecked] = useState<boolean>(false);
-  const [fraudDetailsByRegion, setFraudDetailsByRegion] = useState<FraudDetailByRegion[]>([]);
-  const [activeFraudTab, setActiveFraudTab] = useState<'data' | 'region'>('data');
-  const [fraudTrendData, setFraudTrendData] = useState<{ month: string; total: number }[]>([]);
+  const [paymentInput, setPaymentInput] = useState<number>(0);
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
+  const [revisedFraudAmount, setRevisedFraudAmount] = useState<number>(0);
+  const [showExceedWarning, setShowExceedWarning] = useState(false);
 
-  // Fetch functions
-  const fetchFraudTrendData = async () => {
-    // Ambil data work_papers fraud
-    const { data, error } = await supabase
-      .from('work_papers')
-      .select('audit_end_date, fraud_amount')
-      .eq('audit_type', 'fraud');
-    if (error) return;
-
-    // Inisialisasi bulan Jan-Des
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const fraudByMonth: Record<string, number> = {};
-    months.forEach(m => (fraudByMonth[m] = 0));
-
-    data?.forEach(row => {
-      if (row.audit_end_date) {
-        const d = new Date(row.audit_end_date);
-        const m = months[d.getMonth()];
-        fraudByMonth[m] += row.fraud_amount || 0;
-      }
-    });
-
-    setFraudTrendData(months.map(m => ({ month: m, total: fraudByMonth[m] })));
-  };
-
-  const fetchFraudCases = async () => {
+  // Fetch fraud data from audit_master and work_paper_persons
+  const fetchFraudData = async () => {
     try {
-      const { data: fraudData, error: fraudError } = await supabase
-        .from('work_papers')
+      // First, get all branches to map regions
+      const { data: branchesData, error: branchesError } = await supabase
+        .from('branches')
+        .select('name, region');
+      
+      if (branchesError) throw branchesError;
+      
+      // Create a lookup map for regions by branch name
+      const branchRegionMap: Record<string, string> = {};
+      branchesData?.forEach(branch => {
+        branchRegionMap[branch.name] = branch.region;
+      });
+
+      // Fetch work_paper_persons with audit_master data
+      const { data: fraudPersonsData, error: fraudError } = await supabase
+        .from('work_paper_persons')
         .select(`
           id,
-          branch_name,
-          fraud_amount,
+          audit_master_id,
           fraud_staff,
-          fraud_payments_audits (
-            id,
-            hkp_amount,
-            payment_date,
-            notes,
-            from_salary
+          fraud_amount,
+          payment_fraud,
+          notes,
+          audit_master:audit_master_id (
+            branch_name
           )
         `)
-        .eq('audit_type', 'fraud');
+        .not('fraud_staff', 'is', null);
 
       if (fraudError) throw fraudError;
 
-      // Get all branches to map regions
-      const { data: branchesData, error: branchesError } = await supabase
-        .from('branches')
-        .select('name, region');
-      
-      if (branchesError) throw branchesError;
-      
-      // Create a lookup map for regions by branch name
-      const branchRegionMap: Record<string, string> = {};
-      branchesData?.forEach(branch => {
-        branchRegionMap[branch.name] = branch.region;
-      });
+      // Filter out empty fraud_staff and transform data to include region
+      const fraudDataWithRegion: FraudStaffData[] = fraudPersonsData
+        ?.filter(person => person.fraud_staff && person.fraud_staff.trim() !== '')
+        .map(person => ({
+          id: person.id,
+          audit_master_id: person.audit_master_id,
+          branch_name: (person.audit_master as any)?.branch_name || 'Unknown',
+          region: branchRegionMap[(person.audit_master as any)?.branch_name] || 'Unknown',
+          fraud_staff: person.fraud_staff || '',
+          fraud_amount: person.fraud_amount || 0,
+          payment_fraud: person.payment_fraud || 0,
+          notes: person.notes
+        })) || [];
 
-      // Add region to each fraud case
-      const fraudCasesWithRegion = fraudData?.map(fraud => ({
-        ...fraud,
-        region: branchRegionMap[fraud.branch_name] || 'Unknown'
-      })) || [];
-
-      setFraudCases(fraudCasesWithRegion);
+      setFraudData(fraudDataWithRegion);
     } catch (error) {
-      console.error('Error fetching fraud cases:', error);
+      console.error('Error fetching fraud data:', error);
+      toast.error('Failed to fetch fraud data');
     }
   };
 
-  const fetchPaymentHistory = async (fraudId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('fraud_payments_audits')
-        .select('*')
-        .eq('work_paper_id', fraudId)
-        .order('payment_date', { ascending: false });
-      
-      if (error) throw error;
-      
-      setPaymentHistory(data || []);
-      setIsHistoryDialogOpen(true);
-    } catch (error) {
-      console.error('Error fetching payment history:', error);
-    }
-  };
-
-  // Add this function with your other fetch functions (after fetchPaymentHistory)
-  const fetchFraudDetailsByRegion = async () => {
-    try {
-      // 1. Get all branches with their regions
-      const { data: branchesData, error: branchesError } = await supabase
-        .from('branches')
-        .select('name, region');
-      
-      if (branchesError) throw branchesError;
-      
-      // Create a lookup map for regions by branch name
-      const branchRegionMap: Record<string, string> = {};
-      branchesData?.forEach(branch => {
-        branchRegionMap[branch.name] = branch.region;
-      });
-      
-      // Get unique regions
-      const regions = [...new Set(branchesData?.map(branch => branch.region))];
-      
-      // 2. Fetch work_papers data with fraud_payments_audits information
-      const { data: workPapersData, error: workPapersError } = await supabase
-        .from('work_papers')
-        .select(`
-          branch_name, 
-          fraud_amount, 
-          audit_type, 
-          fraud_staff,
-          fraud_payments_audits (
-            hkp_amount,
-            from_salary
-          )
-        `);
-      
-      if (workPapersError) throw workPapersError;
-      
-      // 3. Fetch regular audits
-      const { data: regularAuditData, error: regularAuditError } = await supabase
-        .from('audit_regular')
-        .select('branch_name');
-      
-      if (regularAuditError) throw regularAuditError;
-      
-      // Process data by region
-      const fraudDetailsByRegion = regions.map(region => {
-        // Filter work papers for this region with audit_type='fraud'
-        const regionFraudWorkPapers = workPapersData?.filter(wp => 
-          branchRegionMap[wp.branch_name] === region && 
-          wp.audit_type === 'fraud'
-        ) || [];
-        
-        // Calculate total fraud amount for this region
-        const fraudAmount = regionFraudWorkPapers
-          .reduce((sum, wp) => sum + (wp.fraud_amount || 0), 0);
-        
-        // Calculate total recovery amount for this region
-        const recoveryAmount = regionFraudWorkPapers
-          .reduce((sum, wp) => {
-            const hkpAmount = wp.fraud_payments_audits?.[0]?.hkp_amount || 0;
-            // If payment is from salary, count the full fraud amount as recovered
-            const fromSalary = wp.fraud_payments_audits?.[0]?.from_salary || false;
-            return sum + (fromSalary ? wp.fraud_amount || 0 : hkpAmount);
-          }, 0) || 0;
-        
-        // Count regular audits for this region
-        const regularAuditCount = regularAuditData
-          ?.filter(audit => branchRegionMap[audit.branch_name] === region)
-          .length || 0;
-        
-        // Count special audits for this region - Using work_papers where audit_type='fraud'
-        const specialAuditCount = regionFraudWorkPapers.length;
-        
-        // Count fraud staff cases for this region
-        const fraudStaffSet = new Set();
-        regionFraudWorkPapers
-          .filter(wp => wp.fraud_staff && wp.fraud_staff.trim() !== '')
-          .forEach(wp => {
-            // Count unique fraud staff names
-            fraudStaffSet.add(wp.fraud_staff.trim().toLowerCase());
-          });
-        
-        return {
-          region,
-          totalFraudAmount: fraudAmount,
-          totalRecoveryAmount: recoveryAmount, // Add recovery amount
-          totalRegularAudit: regularAuditCount,
-          totalSpecialAudit: specialAuditCount,
-          totalFraudStaff: fraudStaffSet.size
-        };
-      });
-      
-      // Sort by region name and filter out empty regions
-      const sortedFraudDetails = fraudDetailsByRegion
-        .filter(detail => detail.totalFraudAmount > 0 || detail.totalRegularAudit > 0 || 
-                 detail.totalSpecialAudit > 0 || detail.totalFraudStaff > 0)
-        .sort((a, b) => a.region.localeCompare(b.region));
-      
-      setFraudDetailsByRegion(sortedFraudDetails);
-    } catch (error) {
-      console.error('Error fetching fraud details by region:', error);
-    }
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -280,7 +116,7 @@ const FraudData = () => {
     setFraudSortConfig({ key, direction });
   };
 
-  const getSortedFraudData = (data: FraudCase[]) => {
+  const getSortedFraudData = (data: FraudStaffData[]) => {
     if (!fraudSortConfig.key) return data;
 
     return [...data].sort((a, b) => {
@@ -297,436 +133,412 @@ const FraudData = () => {
     });
   };
 
-  const isPaymentComplete = (fraud: FraudCase) => {
-    const payment = fraud.fraud_payments_audits?.[0];
-    if (!payment) return false;
-    return (
-      (payment.hkp_amount > 0 && payment.hkp_amount === fraud.fraud_amount) ||
-      payment.from_salary === true
-    );
-  };
-
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFraud) return;
 
     try {
-      const formElement = e.target as HTMLFormElement;
-      const formData = new FormData(formElement);
+      // Calculate new cumulative payment
+      const newPayment = selectedFraud.payment_fraud + paymentInput;
+      
+      // Warning: Check if new payment exceeds fraud amount
+      if (newPayment > selectedFraud.fraud_amount && !showExceedWarning) {
+        setShowExceedWarning(true);
+        return;
+      }
+      
+      // Create payment note with timestamp
+      const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm');
+      const paymentNote = `[${timestamp}] Payment: ${formatCurrency(paymentInput)}`;
+      const updatedNotes = selectedFraud.notes 
+        ? `${selectedFraud.notes}\n${paymentNote}${paymentNotes ? ` - ${paymentNotes}` : ''}`
+        : `${paymentNote}${paymentNotes ? ` - ${paymentNotes}` : ''}`;
 
-      const paymentDate = formData.get('payment_date') as string;
-      const fromSalary = formData.get('from_salary') === 'on';
-      const notes = formData.get('notes') as string || '';
-
-      // Gunakan nilai dari state - ini akan tetap 0 kecuali user mengubahnya secara manual
-      const hkpAmount = hkpAmountInput;
-
-      const paymentData = {
-        work_paper_id: selectedFraud.id,
-        hkp_amount: hkpAmount,
-        payment_date: paymentDate,
-        from_salary: fromSalary,
-        notes: notes
-      };
-
+      // Update work_paper_persons with cumulative payment
       const { error } = await supabase
-        .from('fraud_payments_audits')
-        .insert([paymentData]);
+        .from('work_paper_persons')
+        .update({
+          payment_fraud: newPayment,
+          notes: updatedNotes
+        })
+        .eq('id', selectedFraud.id);
 
       if (error) throw error;
 
+      toast.success('Payment updated successfully');
       setIsPaymentDialogOpen(false);
-      fetchFraudCases();
+      setPaymentInput(0);
+      setPaymentNotes('');
+      setShowExceedWarning(false);
+      fetchFraudData();
     } catch (error) {
       console.error('Error submitting payment:', error);
+      toast.error('Failed to update payment');
     }
   };
 
-  const filteredFraudCases = fraudCases.filter(fraud =>
+  const handleFraudAmountRevision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFraud) return;
+
+    try {
+      // Validation: Check if revised amount is less than current payment
+      if (revisedFraudAmount < selectedFraud.payment_fraud) {
+        toast.error(`Revised fraud amount cannot be less than current payment (${formatCurrency(selectedFraud.payment_fraud)})`);
+        return;
+      }
+
+      // Create revision note with timestamp
+      const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm');
+      const revisionNote = `[${timestamp}] Fraud amount revised from ${formatCurrency(selectedFraud.fraud_amount)} to ${formatCurrency(revisedFraudAmount)}`;
+      const updatedNotes = selectedFraud.notes 
+        ? `${selectedFraud.notes}\n${revisionNote}`
+        : revisionNote;
+
+      // Update work_paper_persons with revised fraud amount
+      const { error } = await supabase
+        .from('work_paper_persons')
+        .update({
+          fraud_amount: revisedFraudAmount,
+          notes: updatedNotes
+        })
+        .eq('id', selectedFraud.id);
+
+      if (error) throw error;
+
+      toast.success('Fraud amount revised successfully');
+      setIsRevisionDialogOpen(false);
+      setRevisedFraudAmount(0);
+      fetchFraudData();
+    } catch (error) {
+      console.error('Error revising fraud amount:', error);
+      toast.error('Failed to revise fraud amount');
+    }
+  };
+
+  const filteredFraudData = fraudData.filter(fraud =>
     fraud.branch_name.toLowerCase().includes(fraudSearchTerm.toLowerCase()) ||
     fraud.fraud_staff.toLowerCase().includes(fraudSearchTerm.toLowerCase()) ||
     fraud.region.toLowerCase().includes(fraudSearchTerm.toLowerCase())
   );
 
-  const sortedFraudCases = getSortedFraudData(filteredFraudCases);
+  const sortedFraudData = getSortedFraudData(filteredFraudData);
 
-  // Tambahkan useEffect ini untuk reset input saat dialog dibuka
   useEffect(() => {
     if (isPaymentDialogOpen) {
-      setHkpAmountInput(0);
-      setFromSalaryChecked(false);
+      setPaymentInput(0);
+      setPaymentNotes('');
+      setShowExceedWarning(false);
     }
   }, [isPaymentDialogOpen]);
 
   useEffect(() => {
-    fetchFraudTrendData();
-    fetchFraudCases();
-    fetchFraudDetailsByRegion();
+    if (isRevisionDialogOpen && selectedFraud) {
+      setRevisedFraudAmount(selectedFraud.fraud_amount);
+    }
+  }, [isRevisionDialogOpen, selectedFraud]);
+
+  useEffect(() => {
+    fetchFraudData();
   }, []);
 
+
+
   return (
-    <>
-      {/* Fraud Trend Line Chart */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Fraud Trend per Month</CardTitle>
-          <CardDescription>January - December</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              total: { label: "Total Fraud", color: "#e74c3c" }
-            }}
-            className="w-full h-[300px]" // Set explicit height here
-          >
-            <LineChart
-              data={fraudTrendData}
-              margin={{ top: 24, left: 24, right: 24, bottom: 32 }}
-              height={250} // Set chart height here (try 250 or 300)
-              width={undefined}
-            >
-              <CartesianGrid vertical={false} />
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    indicator="line"
-                    nameKey="total"
-                    hideLabel
-                  />
-                }
-              />
-              <Line
-                dataKey="total"
-                type="natural"
-                stroke="#6366F1"
-                strokeWidth={2}
-                dot={({ payload, ...props }) => (
-                  <Dot
-                    key={payload.month}
-                    r={5}
-                    cx={props.cx}
-                    cy={props.cy}
-                    fill="#6366F1"
-                    stroke="#6366F1"
-                  />
-                )}
-              />
-            </LineChart>
-          </ChartContainer>
-          {/* Bulan label di bawah chart */}
-          <div className="flex justify-between mt-2 px-2">
-            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
-              <span key={m} className="text-xs text-gray-500" style={{ minWidth: 18, textAlign: 'center' }}>{m}</span>
-            ))}
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Fraud Data</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={fraudSearchTerm}
+              onChange={(e) => setFraudSearchTerm(e.target.value)}
+              placeholder="Search branch or staff..."
+              className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
           </div>
-        </CardContent>
-        <CardFooter className="flex-col items-start gap-2 text-sm">
-          <div className="text-muted-foreground leading-none mt-5">
-            Showing total fraud amount per month (Jan–Dec)
-          </div>
-        </CardFooter>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          {/* All the existing fraud data content */}
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Fraud Data</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                value={fraudSearchTerm}
-                onChange={(e) => setFraudSearchTerm(e.target.value)}
-                placeholder="Search branch or staff..."
-                className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          
-          <div className="flex space-x-4 mb-4">
-            <button
-              onClick={() => setActiveFraudTab('data')}
-              className={`px-4 py-2 rounded-md ${
-                activeFraudTab === 'data'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Fraud Data
-            </button>
-            <button
-              onClick={() => setActiveFraudTab('region')}
-              className={`px-4 py-2 rounded-md ${
-                activeFraudTab === 'region'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Fraud by Region
-            </button>
-          </div>
-
-          {activeFraudTab === 'data' ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">No.</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => requestFraudSort('region')}
-                    >
-                      <div className="flex items-center">
-                        Region
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => requestFraudSort('branch_name')}
-                    >
-                      <div className="flex items-center">
-                        Branch Name
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => requestFraudSort('fraud_staff')}
-                    >
-                      <div className="flex items-center">
-                        Fraud Staff
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => requestFraudSort('fraud_amount')}
-                    >
-                      <div className="flex items-center">
-                        Fraud Amount
-                        <ArrowUpDown className="ml-1 h-4 w-4" />
-                      </div>
-                    </TableHead>
-                    <TableHead>HKP Amount</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedFraudCases.map((fraud, index) => (
-                    <TableRow
-                      key={fraud.id}
-                      className={isPaymentComplete(fraud) ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}
-                    >
-                      <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
-                      <TableCell className="text-xs">{fraud.region}</TableCell>
-                      <TableCell className="text-xs">{fraud.branch_name}</TableCell>
-                      <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
-                      <TableCell className="text-xs">
-                        {formatCurrency(fraud.fraud_amount)}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {fraud.fraud_payments_audits?.[0]?.hkp_amount 
-                          ? formatCurrency(fraud.fraud_payments_audits[0].hkp_amount) 
-                          : 'No HKP'}
-                        {fraud.fraud_payments_audits?.[0]?.from_salary && (
-                          <span className="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Salary</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-[250px] whitespace-normal break-words">
-                        {fraud.fraud_payments_audits?.[0]?.notes !== undefined &&
-                        fraud.fraud_payments_audits?.[0]?.notes !== null
-                          ? fraud.fraud_payments_audits[0].notes
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-3">
-                          <button
-                            onClick={() => {
-                              setSelectedFraud(fraud);
-                              setIsPaymentDialogOpen(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
-                            aria-label="Edit Payment"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => fetchPaymentHistory(fraud.id)}
-                            className="text-gray-600 hover:text-gray-800"
-                            aria-label="View Payment History"
-                          >
-                            <Clock className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">No.</TableHead>
-                    <TableHead>Region</TableHead>
-                    <TableHead>Total Fraud Amount</TableHead>
-                    <TableHead>Fraud Recovery</TableHead>
-                    <TableHead>Total Regular Audit</TableHead>
-                    <TableHead>Total Special Audit</TableHead>
-                    <TableHead>Total Fraud Staff</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fraudDetailsByRegion.map((detail, index) => (
-                    <TableRow key={detail.region}>
-                      <TableCell className="text-xs font-medium text-gray-500">{index + 1}</TableCell>
-                      <TableCell className="text-xs">{detail.region}</TableCell>
-                      <TableCell className="text-xs font-medium text-red-600">
-                        {formatCurrency(detail.totalFraudAmount)}
-                      </TableCell>
-                      <TableCell className="text-xs font-medium text-emerald-600">
-                        {formatCurrency(detail.totalRecoveryAmount)}
-                      </TableCell>
-                      <TableCell className="text-xs">{detail.totalRegularAudit}</TableCell>
-                      <TableCell className="text-xs">{detail.totalSpecialAudit}</TableCell>
-                      <TableCell className="text-xs">{detail.totalFraudStaff}</TableCell>
-                    </TableRow>
-                  ))}
-                  {fraudDetailsByRegion.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
-                        No fraud details found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">No.</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => requestFraudSort('region')}
+                >
+                  <div className="flex items-center">
+                    Region
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => requestFraudSort('branch_name')}
+                >
+                  <div className="flex items-center">
+                    Branch Name
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => requestFraudSort('fraud_staff')}
+                >
+                  <div className="flex items-center">
+                    Fraud Staff
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => requestFraudSort('fraud_amount')}
+                >
+                  <div className="flex items-center">
+                    Fraud Amount
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => requestFraudSort('payment_fraud')}
+                >
+                  <div className="flex items-center">
+                    Payment
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedFraudData.map((fraud, index) => {
+                const isOverpaid = fraud.payment_fraud > fraud.fraud_amount;
+                const isFullyPaid = fraud.payment_fraud === fraud.fraud_amount && fraud.fraud_amount > 0;
+                const paymentColorClass = isOverpaid 
+                  ? 'bg-red-100 text-red-800 font-semibold' 
+                  : isFullyPaid 
+                  ? 'bg-green-100 text-green-800 font-semibold' 
+                  : '';
+                
+                return (
+                  <TableRow key={fraud.id} className="hover:bg-gray-50">
+                    <TableCell className="text-xs font-medium text-black-500">{index + 1}</TableCell>
+                    <TableCell className="text-xs">{fraud.region}</TableCell>
+                    <TableCell className="text-xs">{fraud.branch_name}</TableCell>
+                    <TableCell className="text-xs">{fraud.fraud_staff}</TableCell>
+                    <TableCell className="text-xs">
+                      {formatCurrency(fraud.fraud_amount)}
+                    </TableCell>
+                    <TableCell className={`text-xs-bold ${paymentColorClass}`}>
+                      {fraud.payment_fraud > 0 
+                        ? formatCurrency(fraud.payment_fraud) 
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[300px] whitespace-pre-line break-words">
+                      {fraud.notes || '-'}
+                    </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedFraud(fraud);
+                          setIsPaymentDialogOpen(true);
+                        }}
+                        className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Payment
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedFraud(fraud);
+                          setIsRevisionDialogOpen(true);
+                        }}
+                        className="px-3 py-1 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 transition-colors"
+                      >
+                        Revisi
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                );
+              })}
+              {sortedFraudData.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-4 text-sm text-gray-500">
+                    No fraud data found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update HKP Amount</DialogTitle>
+            <DialogTitle>Input Payment</DialogTitle>
           </DialogHeader>
           <form onSubmit={handlePaymentSubmit} className="space-y-4">
             <div>
-              <label className="text-xs text-gray-700">HKP Amount</label>
+              <label className="text-sm font-medium text-gray-700">Payment Amount</label>
               <input
                 type="number"
-                name="amount"
                 className="w-full mt-1 text-sm border rounded-md p-2"
                 min="0"
-                value={hkpAmountInput}
-                onChange={e => setHkpAmountInput(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-700">Payment Date</label>
-              <input
-                type="date"
-                name="payment_date"
-                className="w-full mt-1 text-sm border rounded-md p-2"
-                defaultValue={format(new Date(), 'yyyy-MM-dd')}
+                value={paymentInput}
+                onChange={e => setPaymentInput(Number(e.target.value))}
                 required
               />
-            </div>
-            <div className="flex items-center mt-2">
-              <input
-                type="checkbox"
-                name="from_salary"
-                id="from_salary"
-                className="h-4 w-4 text-blue-600 rounded border-gray-300"
-                checked={fromSalaryChecked}
-                onChange={e => setFromSalaryChecked(e.target.checked)}
-              />
-              <label htmlFor="from_salary" className="ml-2 text-xs text-gray-700">
-                From Salary and Kopkada
-              </label>
+              {paymentInput > 0 && (
+                <div className="text-xs text-gray-500 mt-1">
+                  {formatCurrency(paymentInput)}
+                </div>
+              )}
+              {selectedFraud && (
+                <div className="text-xs text-gray-600 mt-2">
+                  Current Payment: {formatCurrency(selectedFraud.payment_fraud)}
+                  <br />
+                  New Total: {formatCurrency(selectedFraud.payment_fraud + paymentInput)}
+                  <br />
+                  Fraud Amount: {formatCurrency(selectedFraud.fraud_amount)}
+                  {(selectedFraud.payment_fraud + paymentInput) > selectedFraud.fraud_amount && (
+                    <div className="text-red-600 font-medium mt-1">
+                      ⚠️ Payment exceeds fraud amount!
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
-              <label className="text-xs text-gray-700">Notes</label>
+              <label className="text-sm font-medium text-gray-700">Notes (Optional)</label>
               <textarea
-                name="notes"
                 className="w-full mt-1 text-sm border rounded-md p-2"
                 rows={3}
+                value={paymentNotes}
+                onChange={e => setPaymentNotes(e.target.value)}
+                placeholder="Add notes about this payment..."
               />
             </div>
+            
+            {/* Confirmation Warning when payment exceeds fraud amount */}
+            {showExceedWarning && selectedFraud && (selectedFraud.payment_fraud + paymentInput) > selectedFraud.fraud_amount && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Peringatan: Payment Melebihi Fraud Amount
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>
+                        Total payment ({formatCurrency(selectedFraud.payment_fraud + paymentInput)}) 
+                        akan melebihi fraud amount ({formatCurrency(selectedFraud.fraud_amount)}).
+                      </p>
+                      <p className="mt-1 font-medium">
+                        Apakah Anda yakin ingin melanjutkan?
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex justify-end space-x-2">
               <button
                 type="button"
-                onClick={() => setIsPaymentDialogOpen(false)}
+                onClick={() => {
+                  setIsPaymentDialogOpen(false);
+                  setShowExceedWarning(false);
+                }}
                 className="px-4 py-2 text-sm text-gray-600 border rounded-md hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className={`px-4 py-2 text-sm text-white rounded-md ${
+                  showExceedWarning 
+                    ? 'bg-yellow-600 hover:bg-yellow-700' 
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                Save
+                {showExceedWarning ? 'Ya, Lanjutkan' : 'Save Payment'}
               </button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Payment History Dialog */}
-      <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+      {/* Fraud Amount Revision Dialog */}
+      <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Payment History</DialogTitle>
+            <DialogTitle>Revise Fraud Amount</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            {paymentHistory.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Type</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentHistory.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell className="text-xs">
-                        {payment.payment_date ? format(parseISO(payment.payment_date as string), 'dd MMM yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {formatCurrency(payment.hkp_amount)}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {payment.notes?.includes('[From Salary]') ? 'Salary Deduction' : 'Direct Payment'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-center py-4 text-sm text-gray-500">No payment history found</p>
-            )}
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => setIsHistoryDialogOpen(false)}
-              className="px-4 py-2 text-sm text-gray-600 border rounded-md hover:bg-gray-50"
-            >
-              Close
-            </button>
-          </div>
+          <form onSubmit={handleFraudAmountRevision} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Current Fraud Amount</label>
+              <div className="w-full mt-1 text-sm border rounded-md p-2 bg-gray-50">
+                {selectedFraud && formatCurrency(selectedFraud.fraud_amount)}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Revised Fraud Amount</label>
+              <input
+                type="number"
+                className="w-full mt-1 text-sm border rounded-md p-2"
+                min="0"
+                value={revisedFraudAmount}
+                onChange={e => setRevisedFraudAmount(Number(e.target.value))}
+                required
+              />
+              {revisedFraudAmount > 0 && (
+                <div className="text-xs text-gray-500 mt-1">
+                  {formatCurrency(revisedFraudAmount)}
+                </div>
+              )}
+              {selectedFraud && revisedFraudAmount < selectedFraud.payment_fraud && (
+                <div className="text-xs text-red-600 mt-1 font-medium">
+                  ⚠️ Revised amount cannot be less than current payment ({formatCurrency(selectedFraud.payment_fraud)})
+                </div>
+              )}
+              {selectedFraud && revisedFraudAmount !== selectedFraud.fraud_amount && revisedFraudAmount >= selectedFraud.payment_fraud && (
+                <div className="text-xs text-blue-600 mt-1">
+                  Change: {revisedFraudAmount > selectedFraud.fraud_amount ? '+' : ''}{formatCurrency(revisedFraudAmount - selectedFraud.fraud_amount)}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsRevisionDialogOpen(false)}
+                className="px-4 py-2 text-sm text-gray-600 border rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm text-white bg-orange-600 rounded-md hover:bg-orange-700"
+                disabled={selectedFraud ? revisedFraudAmount < selectedFraud.payment_fraud : false}
+              >
+                Save Revision
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
   );
 };
 

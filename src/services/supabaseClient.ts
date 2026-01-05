@@ -1,9 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+// Use the single shared supabase client
+import { supabase } from '../lib/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Re-export for backward compatibility
+export { supabase };
 
 // Grammar correction specific functions
 export const grammarService = {

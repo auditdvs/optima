@@ -16,16 +16,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 menit dalam milidetik
-const WARNING_BEFORE_TIMEOUT = 1 * 60 * 1000; // Peringatan 1 menit sebelum timeout
+const WARNING_BEFORE_TIMEOUT = 5 * 60 * 1000; // Peringatan 5 menit sebelum timeout
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [userRole, setUserRole] = useState<string>(() => {
-    return localStorage.getItem('userRole') || 'user';
-  });
+  // Initialize as null - session check will set the proper values
+  const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('user');
   const [auditor, setAuditor] = useState<{ id: string; name: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpiresIn, setSessionExpiresIn] = useState<number | null>(null);
@@ -42,9 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fungsi untuk reset timer inaktivitas
   const resetInactivityTimer = useCallback(() => {
-    // Only update state if at least 5 seconds have passed since last update
+    // Only update state if at least 1 second has passed since last update (reduced from 5s)
     const now = Date.now();
-    if (now - lastActivityUpdateRef.current > 5000) {
+    if (now - lastActivityUpdateRef.current > 1000) {
       lastActivityUpdateRef.current = now;
       setLastActivity(now);
       setInactivityWarningShown(false);
@@ -62,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT - WARNING_BEFORE_TIMEOUT
       // dan peringatan belum ditampilkan
       if (inactiveTime >= INACTIVITY_TIMEOUT - WARNING_BEFORE_TIMEOUT && !inactivityWarningShown) {
-        toast.warning('Weh, kalo gaada aktivitas log-out aja. Yang ada ngeberatin server, ini gue logout otomatis ya semenit lagi.', {
+        toast.warning('It looks like there has been no recent activity. To help maintain system performance, you will be automatically logged out in five minutes.', {
           toastId: 'inactivity-warning',
         });
         setInactivityWarningShown(true);
@@ -70,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Jika sudah tidak aktif lebih dari INACTIVITY_TIMEOUT, lakukan logout
       if (inactiveTime >= INACTIVITY_TIMEOUT) {
-        toast.info('Dahlah, bye!', {
+        toast.info('AFK detected. Session ended.', {
           toastId: 'inactivity-logout',
         });
         signOut();
@@ -82,9 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setInactivityTimerId(timerId);
 
     // Setup event listener untuk mendeteksi aktivitas pengguna
+    // Termasuk event untuk form input (input, change, focus) agar tidak terdeteksi AFK saat mengisi form
     const activityEvents = [
       'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click',
-      'keydown', 'keyup', 'touchmove', 'touchend'
+      'keydown', 'keyup', 'touchmove', 'touchend',
+      // Form-specific events
+      'input', 'change', 'focus', 'focusin', 'select', 'paste', 'cut', 'copy'
     ];
 
     // Use passive: true for better performance with touch events
@@ -112,10 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) {
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('userRole', userRole || 'user');
     } else {
       localStorage.removeItem('user');
+      localStorage.removeItem('userRole');
     }
-    localStorage.setItem('userRole', userRole || 'user');
   }, [user, userRole]);
 
   useEffect(() => {

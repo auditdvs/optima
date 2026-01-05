@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Play, X } from 'lucide-react';
 import { useState } from 'react';
-import { ThemeSelector } from '../components/ThemeSelector';
-import { TutorialCard } from '../components/TutorialCard';
+import { ThemeSelector } from '../components/tutorials/ThemeSelector';
+import { TutorialCard } from '../components/tutorials/TutorialCard';
 import { ThemeProvider } from '../contexts/ThemeContext';
 
 const guidelines = [

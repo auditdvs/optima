@@ -1,29 +1,29 @@
-import { ResponsivePie } from '@nivo/pie';
 import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Line, LineChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
-import CountUp from '../components/CountUp';
+import { Bar, BarChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
+import CountUp from '../components/common/CountUp';
 import { BranchRow } from "../components/dashboard/BranchLocationTable";
 import DashboardStats from '../components/dashboard/DashboardStats';
 import { FraudRow } from "../components/dashboard/TopFraudTable";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle
 } from '../components/ui/card';
 
 import html2canvas from 'html2canvas';
+import LazyEChart from '../components/common/LazyEChart';
 import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
+    ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
 } from "../components/ui/chart";
-import PasswordModal from '../components/ui/PasswordModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { supabase } from '../lib/supabaseClient';
+import { useDashboardCache } from '../contexts/DashboardCacheContext';
+import { useMapCache } from '../contexts/MapCacheContext';
 
 // sesuaikan path jika berbeda
 const auditorMapping = [
@@ -145,228 +145,54 @@ const auditorChartConfig = {
 } satisfies ChartConfig;
 
 const Dashboard = () => {
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [workPapers, setWorkPapers] = useState<WorkPaper[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [monthlyData, setMonthlyData] = useState<Array<{
-    month: string;
-    fraudAudits: number;
-    annualAudits: number;
-  }>>([]);
-  const [fraudAuditCount, setFraudAuditCount] = useState(0);
-  const [isFraudAmountCensored, setIsFraudAmountCensored] = useState(true);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [passwordError, setPasswordError] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  // Use cached map data from context
+  const { auditedBranchesGeo: cachedAuditedBranchesGeo } = useMapCache();
   
+  // Use cached dashboard data from context
+  const { 
+    branches: cachedBranches, 
+    workPapers: cachedWorkPapers, 
+    monthlyData: cachedMonthlyData,
+    dashboardStats: cachedStats,
+    isLoaded: dashboardDataLoaded 
+  } = useDashboardCache();
+  
+  // Use cached data if available, otherwise use local state
+  const branches = cachedBranches;
+  const workPapers = cachedWorkPapers;
+  const monthlyData = cachedMonthlyData;
+  const totalFraudAmount = cachedStats.totalFraudAmount;
+  const totalFraudStaffCount = cachedStats.totalFraudStaffCount;
 
-  const [auditorCounts, setAuditorCounts] = useState<Array<{
-  auditor_id: string; // Tambahkan auditor_id yang akan digunakan untuk key
-  auditor_name: string;
-  regular: number;
-  fraud: number;
-  total: number;
-}>>([]);
-
-  // Add this new state for the administration section
+  // Only keep state that is not cached
+  const [searchTerm] = useState('');
   const [activeSection] = useState<'main'>('main');
+  const [dashboardTab, setDashboardTab] = useState<'performance' | 'mapping'>('performance');
+
+  // Use cached audited branches geo data - transform to match local interface
+  const auditedBranchesGeo = cachedAuditedBranchesGeo.map(branch => ({
+    ...branch,
+    auditHistory: branch.auditHistory.map(h => ({
+      date: h.date,
+      type: h.type as 'regular' | 'fraud'
+    }))
+  }));
   
   const [months] = useState(['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
 
-  const fetchData = async () => {
-    try {
-      const { data: branchesData, error: branchesError } = await supabase
-        .from('branches')
-        .select('*');
-
-      if (branchesError) throw branchesError;
-      if (branchesData) {
-        setBranches(branchesData);
-      }
-
-      const currentYear = new Date().getFullYear();
-      const startOfYear = new Date(currentYear - 1, 11, 1).toISOString();
-      const endOfYear = new Date(currentYear, 11, 31).toISOString();
-
-      const { data: workPapersData, error: workPapersError } = await supabase
-        .from('work_papers')
-        .select('*, work_paper_auditors(auditor_name)')
-        .gte('audit_start_date', startOfYear)
-        .lte('audit_start_date', endOfYear);
-
-      const { count: auditFraudCount, error: auditFraudError } = await supabase
-        .from('audit_fraud')
-        .select('branch_name', { count: 'exact', head: true });
-
-      if (auditFraudError) throw auditFraudError;
-      setFraudAuditCount(auditFraudCount || 0);
-
-      if (workPapersError) throw workPapersError;
-      if (workPapersData) {
-        setWorkPapers(workPapersData);
-        const processedMonthlyData = getMonthlyAuditData(workPapersData);
-        setMonthlyData(processedMonthlyData);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
-
-  // Ganti fungsi fetchAuditorCounts dengan fungsi baru ini:
-
-  const fetchAuditorCounts = async () => {
-    try {
-      // Ambil semua data audit_counts
-      const { data: auditCounts, error } = await supabase
-        .from('audit_counts')
-        .select('auditor_name, branch_name, audit_end_date, audit_type');
-        
-      if (error) throw error;
-      
-      // Buat kamus untuk memetakan nama auditor ke format standar
-      const auditorNameMap = {};
-      const auditorIdMap = {};
-      
-      // Inisialisasi pemetaan
-      auditorMapping.forEach(auditor => {
-        // Nama lengkap sebagai key
-        auditorNameMap[auditor.label.toLowerCase()] = auditor.label;
-        auditorIdMap[auditor.label.toLowerCase()] = auditor.value;
-        
-        // Value/id sebagai key
-        auditorNameMap[auditor.value.toLowerCase()] = auditor.label;
-        auditorIdMap[auditor.value.toLowerCase()] = auditor.value;
-        
-        // First name sebagai key (untuk nama seperti "yogi")
-        const firstName = auditor.label.split(' ')[0].toLowerCase();
-        if (!auditorNameMap[firstName]) {
-          auditorNameMap[firstName] = auditor.label;
-          auditorIdMap[firstName] = auditor.value;
-        }
-      });
-      
-      // Struktur untuk menghitung jumlah audit unik per auditor
-      const uniqueAudits = new Map(); // Map(auditorId -> { name, regularSet, fraudSet })
-      
-      // Proses data audit_counts
-      auditCounts?.forEach(record => {
-        const auditorName = record.auditor_name?.toLowerCase();
-        if (!auditorName) return;
-        
-        // Cari id dan nama standar auditor
-        const auditorId = auditorIdMap[auditorName];
-        const standardName = auditorNameMap[auditorName];
-
-        if (!auditorId || !standardName) return;
-        
-        // Buat kunci unik audit
-        const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
-        
-        // Buat atau update data auditor
-        if (!uniqueAudits.has(auditorId)) {
-          uniqueAudits.set(auditorId, {
-            auditor_id: auditorId,
-            auditor_name: standardName,
-            regular: new Set(),
-            fraud: new Set()
-          });
-        }
-        
-        const auditorData = uniqueAudits.get(auditorId);
-        
-        // Tambahkan audit ke set yang sesuai
-        if (record.audit_type === 'regular') {
-          auditorData.regular.add(uniqueKey);
-        } else if (record.audit_type === 'fraud') {
-          auditorData.fraud.add(uniqueKey);
-        }
-      });
-      
-      // Konversi ke array dan hitung total
-      const countsArray = Array.from(uniqueAudits.values())
-        .map(auditor => ({
-          auditor_id: auditor.auditor_id,
-          auditor_name: auditor.auditor_name, // Nama lengkap
-          regular: auditor.regular.size,
-          fraud: auditor.fraud.size,
-          total: auditor.regular.size + auditor.fraud.size
-        }))
-        .filter(auditor => auditor.total > 0)
-        .sort((a, b) => b.total - a.total);
-    
-      // Simpan hasil ke state
-      setAuditorCounts(countsArray);
-    
-    } catch (error) {
-      console.error('Error fetching auditor counts:', error);
-    }
-  };
-
-  // Tambahkan fungsi fetchAuditorAuditCounts
-  const fetchAuditorAuditCounts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('audit_counts')
-        .select('auditor_name, branch_name, audit_end_date, audit_type');
-
-      if (error) throw error;
-
-      // Struktur untuk melacak audit unik per auditor
-      const auditorMap = {};
-      
-      // Process all audit counts
-      data?.forEach(record => {
-        const auditor = record.auditor_name;
-        if (!auditor) return;
-        
-        // Buat kunci unik dari branch_name dan audit_end_date
-        const uniqueKey = `${record.branch_name}|${record.audit_end_date}`;
-        
-        if (!auditorMap[auditor]) {
-          auditorMap[auditor] = { 
-            auditor_name: auditor, 
-            regular: new Set(), 
-            fraud: new Set() 
-          };
-        }
-        
-        // Kategorikan berdasarkan audit_type
-        if (record.audit_type === 'regular') {
-          auditorMap[auditor].regular.add(uniqueKey);
-        } else if (record.audit_type === 'fraud') {
-          auditorMap[auditor].fraud.add(uniqueKey);
-        }
-      });
-
-      // Convert ke array dan hitung total
-      const result = Object.values(auditorMap).map(auditor => ({
-        auditor_name: auditor.auditor_name,
-        regular: auditor.regular.size,
-        fraud: auditor.fraud.size,
-        total: auditor.regular.size + auditor.fraud.size,
-      })).sort((a, b) => b.total - a.total);
-
-      setAuditorCounts(result);
-    } catch (err) {
-      console.error('Error fetching auditor counts:', err);
-    }
-  };
-
+  // NOTE: All dashboard data fetching has been moved to DashboardCacheContext
+  // Data is now automatically cached and shared across navigations
+  
   useEffect(() => {
-    fetchData();
-    fetchAuditorCounts();
-  }, []);
-
-  // Update the handleUncensorFraud function to accept the password
-  const handleUncensorFraud = (password: string) => {
-    if (password === 'optima') {
-      setIsFraudAmountCensored(false);
-      setPasswordError(false);
-      setIsPasswordModalOpen(false);
+    if (!dashboardDataLoaded) {
+      console.log('📊 Waiting for dashboard data from cache...');
     } else {
-      setPasswordError(true);
+      console.log('📊 Dashboard data loaded from cache!');
     }
-  };
+  }, [dashboardDataLoaded]);
+
+  // NOTE: All data fetching has been moved to DashboardCacheContext and MapCacheContext
+  // Data is now automatically cached and shared across navigations
 
   // Calculate statistics
   const regularAuditedBranches = new Set(
@@ -389,12 +215,8 @@ const Dashboard = () => {
     fraudAudits: uniqueFraudAudits.size,
     annualAudits: workPapers.filter(wp => wp.audit_type === 'regular').length,
     totalAudits: workPapers.length,
-    totalFraud: workPapers.reduce((sum, wp) => sum + (wp.fraud_amount || 0), 0),
-    totalFraudCases: new Set(
-      workPapers
-        .filter(wp => wp.audit_type === 'fraud' && wp.fraud_staff)
-        .map(wp => wp.fraud_staff)  // ← Ini menghitung unique staff names
-    ).size,
+    totalFraud: totalFraudAmount, // From work_paper_persons
+    totalFraudCases: totalFraudStaffCount, // From work_paper_persons (unique fraud_staff count)
     totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size
   };
 
@@ -800,33 +622,164 @@ const getRegionAuditDataByMonth = () => {
       
       {/* Only show stats cards in main section */}
       {activeSection === 'main' && (
-        <DashboardStats 
-          stats={stats} 
-          isFraudAmountCensored={isFraudAmountCensored}
-          onFraudSectionClick={() => setIsPasswordModalOpen(true)}
-        />
+        <DashboardStats stats={stats} skipAnimation={dashboardDataLoaded} />
       )}
       
-      {/* Password Modal for Fraud Section */}
-      <PasswordModal 
-        isOpen={isPasswordModalOpen}
-        onClose={() => {
-          setIsPasswordModalOpen(false);
-          setPasswordError(false);
-        }}
-        onSubmit={handleUncensorFraud}
-        passwordError={passwordError}
-        title="Verify Access"
-        description="Enter password to view fraud details"
-      />
+
 
       {/* Main Dashboard Content */}
       {activeSection === 'main' && (
         // Changed from grid to a single card with full width
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
-            <h2 className="text-xl font-semibold pt-1 mb-4">Audit Performance Summary</h2>
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setDashboardTab('performance')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  dashboardTab === 'performance'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Audit Performance Summary
+              </button>
+              <button
+                onClick={() => setDashboardTab('mapping')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  dashboardTab === 'mapping'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Audit Mapping
+              </button>
+            </div>
+
+            {/* Audit Mapping Content */}
+            {dashboardTab === 'mapping' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-2 text-sm">
+                      <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                      Regular Audit
+                    </span>
+                    <span className="flex items-center gap-2 text-sm">
+                      <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                      Fraud Audit
+                    </span>
+                  </div>
+                  <span className="text-sm text-gray-500">
+                    Total: {auditedBranchesGeo.length} audited branches
+                  </span>
+                </div>
+
+                {/* ECharts scatter map using geo coordinates */}
+                <div className="h-[600px] w-full border rounded-lg bg-gradient-to-br from-sky-50 to-indigo-50 overflow-hidden">
+                  <LazyEChart
+                    option={{
+                      backgroundColor: 'transparent',
+                      tooltip: {
+                        trigger: 'item',
+                        triggerOn: 'click',
+                        enterable: true,
+                        hideDelay: 1000,
+                        position: 'top',
+                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                        borderColor: '#e2e8f0',
+                        textStyle: { color: '#1e293b' },
+                        extraCssText: 'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); border-radius: 12px; padding: 0; max-height: 300px; overflow-y: auto;',
+                        formatter: (params: any) => {
+                          const data = params.data;
+                          if (!data) return '';
+                          
+                          // Format audit history list
+                          const historyHtml = data.auditHistory && data.auditHistory.length > 0
+                            ? data.auditHistory.map((audit: { date: string; type: string }) => {
+                                const dateStr = new Date(audit.date).toLocaleDateString('id-ID', { 
+                                  day: '2-digit', 
+                                  month: 'short', 
+                                  year: '2-digit' 
+                                });
+                                const typeLabel = audit.type === 'fraud' ? 'Fraud' : 'Regular';
+                                const typeColor = audit.type === 'fraud' ? '#ef4444' : '#10b981';
+                                return `<div style="display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; border-bottom: 1px solid #f1f5f9;">
+                                  <span style="color: #64748b;">${dateStr}</span>
+                                  <span style="color: ${typeColor}; font-weight: 600;">${typeLabel}</span>
+                                </div>`;
+                              }).join('')
+                            : '<div style="color: #94a3b8; padding: 4px 0;">No audit history</div>';
+                          
+                          return `
+                            <div style="padding: 12px; font-family: sans-serif; min-width: 200px;">
+                              <div style="margin-bottom: 4px;">
+                                <strong style="font-size: 15px; color: ${data.hasFraud ? '#ef4444' : '#10b981'};">${data.name || 'Unknown'}</strong>
+                              </div>
+                              <div style="margin-bottom: 8px; font-size: 13px; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                                Regional ${data.region || '-'}
+                              </div>
+                              <div style="font-size: 12px;">
+                                ${historyHtml}
+                              </div>
+                            </div>
+                          `;
+                        }
+                      },
+                      geo: {
+                        map: 'indonesia',
+                        roam: true,
+                        zoom: 1.2,
+                        center: [118, -2],
+                        itemStyle: {
+                          areaColor: '#e0e7ff',
+                          borderColor: '#6366f1',
+                          borderWidth: 0.5
+                        },
+                        emphasis: {
+                          itemStyle: {
+                            areaColor: '#c7d2fe'
+                          }
+                        },
+                        label: {
+                          show: false
+                        }
+                      },
+                      series: [{
+                        name: 'Audited Branches',
+                        type: 'scatter',
+                        coordinateSystem: 'geo',
+                        data: auditedBranchesGeo.map(branch => ({
+                          name: branch.name,
+                          value: [...branch.coordinates],
+                          region: branch.region,
+                          auditHistory: branch.auditHistory,
+                          hasFraud: branch.hasFraud,
+                          symbol: 'pin',
+                          symbolSize: branch.hasFraud ? 25 : 20,
+                          itemStyle: {
+                            color: branch.hasFraud ? '#ef4444' : '#10b981',
+                            shadowBlur: 2,
+                            shadowColor: 'rgba(0,0,0,0.2)'
+                          }
+                        })),
+                        label: {
+                          show: false
+                        },
+                        emphasis: {
+                          scale: 1.5
+                        }
+                      }]
+                    }}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </div>
+              </div>
+            )}
             
+            {/* Audit Performance Summary Content */}
+            {dashboardTab === 'performance' && (
+            <>
             {/* Charts and tables layout - updated to place charts at top */}
             <div className="flex flex-col gap-2 mb-2">
               {/* TOP ROW: Both charts side by side */}
@@ -913,6 +866,7 @@ const getRegionAuditDataByMonth = () => {
                             className="text-2xl font-bold"
                             duration={2}
                             separator=","
+                            skipAnimation={dashboardDataLoaded}
                           />
                           <div className="text-xs text-gray-500 mt-1">Total Audits</div>
                         </div>
@@ -924,13 +878,13 @@ const getRegionAuditDataByMonth = () => {
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-[#50C878]"></div>
                         <span className="flex items-center gap-1">
-                          Annual: <CountUp to={getFilteredRadialData()[0]?.annualAudits || 0} duration={1.5} delay={0.5} />
+                          Annual: <CountUp to={getFilteredRadialData()[0]?.annualAudits || 0} duration={1.5} delay={0.5} skipAnimation={dashboardDataLoaded} />
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-[#e74c3c]"></div>
                         <span className="flex items-center gap-1">
-                          Special: <CountUp to={getFilteredRadialData()[0]?.fraudAudits || 0} duration={1.5} delay={0.7} />
+                          Special: <CountUp to={getFilteredRadialData()[0]?.fraudAudits || 0} duration={1.5} delay={0.7} skipAnimation={dashboardDataLoaded} />
                         </span>
                       </div>
                     </div>
@@ -959,53 +913,55 @@ const getRegionAuditDataByMonth = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
-                    <ChartContainer 
-                      config={barChartConfig}
-                      className="mx-auto h-[300px] w-full"
-                    >
-                      <LineChart
-                        accessibilityLayer
-                        data={getMonthlyDataByRegion()}
-                        margin={{
-                          top: 20,
-                          left: 20,
-                          right: 20,
-                          bottom: 40,
-                        }}
-                      >
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                          dataKey="month"
-                          tickLine={false}
-                          axisLine={false}
-                          tickMargin={10}
-                          height={40}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                        <Line
-                          dataKey="annualAudits"
-                          type="monotone"
-                          stroke="var(--color-annualAudits)"
-                          strokeWidth={2}
-                          dot={true}
-                        />
-                        <Line
-                          dataKey="fraudAudits"
-                          type="monotone"
-                          stroke="var(--color-fraudAudits)"
-                          strokeWidth={2}
-                          dot={true}
-                        />
-                      </LineChart>
-                    </ChartContainer>
+                    <LazyEChart 
+                      option={{
+                        tooltip: { trigger: 'axis' },
+                        legend: { data: ['Annual Audits', 'Special Audits'], bottom: 0 },
+                        grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
+                        xAxis: { type: 'category', boundaryGap: false, data: getMonthlyDataByRegion().map(item => item.month) },
+                        yAxis: { type: 'value' },
+                        series: [
+                          {
+                            name: 'Annual Audits',
+                            type: 'line',
+                            smooth: true,
+                            itemStyle: { color: '#50C878' },
+                            areaStyle: {
+                              opacity: 0.2,
+                              color: {
+                                type: 'linear',
+                                x: 0, y: 0, x2: 0, y2: 1,
+                                colorStops: [{ offset: 0, color: '#50C878' }, { offset: 1, color: '#ffffff' }]
+                              }
+                            },
+                            data: getMonthlyDataByRegion().map(item => item.annualAudits)
+                          },
+                          {
+                            name: 'Special Audits',
+                            type: 'line',
+                            smooth: true,
+                            itemStyle: { color: '#e74c3c' },
+                             areaStyle: {
+                              opacity: 0.2,
+                              color: {
+                                type: 'linear',
+                                x: 0, y: 0, x2: 0, y2: 1,
+                                colorStops: [{ offset: 0, color: '#e74c3c' }, { offset: 1, color: '#ffffff' }]
+                              }
+                            },
+                            data: getMonthlyDataByRegion().map(item => item.fraudAudits)
+                          }
+                        ]
+                      }}
+                      style={{ height: '300px', width: '100%' }}
+                    />
                   </CardContent>
                 </Card>
               </div>
 
               {/* BOTTOM ROW: Both tables side by side */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                {/* LEFT: Audit Barometer Pie Chart */}
+                {/* LEFT: Audit Barometer Progress Bars */}
                 <Card className="flex flex-col bg-white shadow-sm border">
                   <CardHeader className="pb-2">
                     <div className="flex flex-row items-center justify-between w-full">
@@ -1027,41 +983,85 @@ const getRegionAuditDataByMonth = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
-                    <div className="h-[300px] w-full">
-                      <ResponsivePie
-                        data={getAuditBarometerData()}
-                        margin={{ top: 20, right: 40, bottom: 40, left: 40 }}
-                        innerRadius={0.5}
-                        padAngle={0.6}
-                        cornerRadius={2}
-                        activeOuterRadiusOffset={8}
-                        colors={({ data }) => data.color}
-                        arcLinkLabelsSkipAngle={10}
-                        arcLinkLabelsTextColor="#333"
-                        arcLinkLabelsThickness={2}
-                        arcLinkLabelsColor={{ from: 'color' }}
-                        arcLabelsSkipAngle={10}
-                        arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-                        legends={[
-                          {
-                            anchor: 'bottom',
-                            direction: 'row',
-                            translateY: 36,
-                            itemWidth: 120,
-                            itemHeight: 18,
-                            symbolShape: 'circle',
-                          },
-                        ]}
-                        valueFormat={v => `${v}%`}
-                      />
+                    <div className="flex flex-col gap-6 py-4">
+                      {/* Regular Audit Progress */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-[#50C878]"></div>
+                            <span className="font-medium text-gray-700">Regular Audit</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-2xl font-bold text-[#50C878]">
+                              <CountUp to={getAuditBarometerData()[0].value} duration={1.5} skipAnimation={dashboardDataLoaded} />%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative h-4 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#50C878] to-[#86efac] rounded-full transition-all duration-1000 ease-out"
+                            style={{ width: `${Math.min(getAuditBarometerData()[0].value, 100)}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>0%</span>
+                          <span className="text-gray-600">
+                            {new Set(workPapers.filter(wp => {
+                              if (selectedBarometerRegion === 'All') return wp.audit_type === 'regular';
+                              const branch = branches.find(b => b.name === wp.branch_name);
+                              return branch && branch.region === selectedBarometerRegion && wp.audit_type === 'regular';
+                            }).map(wp => wp.branch_name)).size} dari {selectedBarometerRegion === 'All' ? branches.length : branches.filter(b => b.region === selectedBarometerRegion).length} cabang
+                          </span>
+                          <span>100%</span>
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-gray-100"></div>
+
+                      {/* Special Audit Progress */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-[#e74c3c]"></div>
+                            <span className="font-medium text-gray-700">Special Audit</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-2xl font-bold text-[#e74c3c]">
+                              <CountUp to={getAuditBarometerData()[1].value} duration={1.5} skipAnimation={dashboardDataLoaded} />%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative h-4 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#e74c3c] to-[#f87171] rounded-full transition-all duration-1000 ease-out"
+                            style={{ width: `${Math.min(getAuditBarometerData()[1].value, 100)}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>0%</span>
+                          <span className="text-gray-600">
+                            {new Set(workPapers.filter(wp => {
+                              if (selectedBarometerRegion === 'All') return wp.audit_type === 'fraud';
+                              const branch = branches.find(b => b.name === wp.branch_name);
+                              return branch && branch.region === selectedBarometerRegion && wp.audit_type === 'fraud';
+                            }).map(wp => wp.branch_name)).size} dari {selectedBarometerRegion === 'All' ? Math.round(branches.length / 2) : Math.round(branches.filter(b => b.region === selectedBarometerRegion).length / 2)} target
+                          </span>
+                          <span>100%</span>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex-col gap-1 text-xs text-gray-500">
-                    <div>
-                      Regular: {getAuditBarometerData()[0].value}% dari {selectedBarometerRegion === 'All' ? branches.length : branches.filter(b => b.region === selectedBarometerRegion).length} cabang
-                    </div>
-                    <div>
-                      Special: {getAuditBarometerData()[1].value}% dari {selectedBarometerRegion === 'All' ? Math.round(branches.length / 2) : Math.round(branches.filter(b => b.region === selectedBarometerRegion).length / 2)} target
+                  <CardFooter className="flex-col gap-1 text-xs text-gray-400 border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Target Special Audit: 50% dari total cabang</span>
                     </div>
                   </CardFooter>
                 </Card>
@@ -1167,6 +1167,8 @@ const getRegionAuditDataByMonth = () => {
 </Card>
               </div>
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       )}

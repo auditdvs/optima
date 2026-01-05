@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowLeft, ClipboardList, Download, ExternalLink, File, FileSpreadsheet, Table } from 'lucide-react';
-import { Link, Route, Routes } from 'react-router-dom';
-import COA from '../components/COA';
-import ReportErrorButton from '../components/ToolsError';
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import COA from '../components/tools/COA';
+import ReportErrorButton from '../components/tools/ToolsError';
 import '../styles/download-button.css';
 
 // Component untuk card yang bisa diklik dengan external link
@@ -205,60 +205,64 @@ function Tools() {
       iconColor: "text-green-600",
       title: "Tools Updates",
       description: "Update tools dan template terbaru"
+    },
+    {
+      to: "/tools/coa",
+      icon: Table,
+      iconBg: "bg-lime-100",
+      iconColor: "text-lime-600",
+      title: "Chart of Accounts",
+      description: "Daftar kode akun perusahaan"
     }
   ];
   
+  const location = useLocation();
+
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Tools & Utilities</h1>
-          <p className="text-gray-600">Kumpulan tools untuk membantu proses audit dan pemeriksaan</p>
-        </div>
-        <div className="flex gap-3">
-          <ReportErrorButton />
-          <Link 
-            to="/tools/coa"
-            className="bg-lime-500 hover:bg-lime-600 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2"
-          >
-            <Table size={20} />
-            Chart of Accounts
-          </Link>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {mainTools.map((tool, index) => {
-          const IconComponent = tool.icon;
-          return (
-            <Link 
-              key={index}
-              to={tool.to}
-              className="bg-white rounded-lg shadow hover:shadow-lg transition-all duration-300 p-6 group"
-            >
-              <div className="flex items-start">
-                <div className={`p-3 rounded-lg ${tool.iconBg} ${tool.iconColor} group-hover:scale-110 transition-transform`}>
-                  <IconComponent size={24} />
-                </div>
-                <div className="ml-4 flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{tool.title}</h3>
-                  <p className="text-sm text-gray-600">{tool.description}</p>
-                </div>
-              </div>
-            </Link>
-          );
-        })}
+    <div className="w-full h-full flex flex-col space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-1">Tools & Utilities</h1>
+        <p className="text-gray-600">Kumpulan tools untuk membantu proses audit dan pemeriksaan</p>
       </div>
 
-      <Routes>
-        <Route path="thc-processing" element={<THCProcessing />} />
-        <Route path="thc-processing/thc-links" element={<THCLinks />} />
-        <Route path="anomaly-processing" element={<AnomalyProcessing />} />
-        <Route path="work-paper" element={<WorkPaper />} />
-        <Route path="work-paper/work-paper-links" element={<WorkPaperLinks />} />
-        <Route path="tools-update" element={<UpdateTools />} />
-        <Route path="coa" element={<COA />} />
-      </Routes>
+      {/* Tab Navigation - Robust Responsive Grid */}
+      {/* Tab Navigation - Simple Flex Layout */}
+      <div className="bg-white rounded-lg shadow-md w-full border border-gray-200">
+        <div className="flex flex-wrap w-full">
+          {mainTools.map((tool, index) => {
+            const isActive = location.pathname.startsWith(tool.to);
+            const IconComponent = tool.icon;
+            return (
+              <Link
+                key={index}
+                to={tool.to}
+                className={`flex-1 min-w-[160px] py-3 px-4 font-medium text-sm text-center flex items-center justify-center gap-2 transition-all border-b sm:border-b-0 sm:border-r border-gray-200 last:border-r-0
+                  ${isActive
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                <IconComponent size={18} className={`flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <span className="text-center">{tool.title}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sub-page Content */}
+      <div className="animate-in fade-in zoom-in-95 duration-300">
+        <Routes>
+          <Route path="/" element={<THCProcessing />} />
+          <Route path="thc-processing" element={<THCProcessing />} />
+          <Route path="thc-processing/thc-links" element={<THCLinks />} />
+          <Route path="anomaly-processing" element={<AnomalyProcessing />} />
+          <Route path="work-paper" element={<WorkPaper />} />
+          <Route path="work-paper/work-paper-links" element={<WorkPaperLinks />} />
+          <Route path="tools-update" element={<UpdateTools />} />
+          <Route path="coa" element={<COA />} />
+        </Routes>
+      </div>
     </div>
   );
 }
@@ -318,9 +322,12 @@ function THCProcessing() {
 
   return (
     <div className="mt-6 bg-white rounded-lg shadow p-6">      
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Data Processing Workflow</h2>
-        <p className="text-gray-600">Ikuti langkah-langkah berikut untuk memproses data THC secara berurutan</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">Data Processing Workflow</h2>
+          <p className="text-gray-600">Ikuti langkah-langkah berikut untuk memproses data THC secara berurutan</p>
+        </div>
+        <ReportErrorButton />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

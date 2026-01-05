@@ -78,7 +78,6 @@ const AuditSummary = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
   const [selectedRegionReport, setSelectedRegionReport] = useState<string>('ALL');
   const [reportUndoneOnly, setReportUndoneOnly] = useState(false);
-  const [workPapersRegular, setWorkPapersRegular] = useState<any[]>([]);
 
   // State Audit Rating Count
   const [auditRatingSummary, setAuditRatingSummary] = useState<{ high: number; medium: number; low: number }>({ high: 0, medium: 0, low: 0 });
@@ -103,16 +102,22 @@ const AuditSummary = () => {
   // Pengambilan data audit rating
   const fetchAuditRatingSummary = async () => {
     try {
-      const { data: workPapers } = await supabase
-        .from('work_papers')
-        .select('region, rating')
-        .eq('audit_type', 'regular');
+      const { data: auditMaster } = await supabase
+        .from('audit_master')
+        .select('region, rating, audit_type'); // Removed filter here to do it in js or add .ilike if needed
+
+      // Filter regular only in JS to be safe with types
+      const regularAudits = auditMaster?.filter(a => 
+         a.audit_type === 'Regular' || 
+         a.audit_type === 'regular' || 
+         a.audit_type?.toLowerCase().includes('reguler')
+      );
 
       // Rekap total
       const total = { high: 0, medium: 0, low: 0 };
       const regionMap: Record<string, { high: number; medium: number; low: number }> = {};
 
-      workPapers?.forEach(wp => {
+      regularAudits?.forEach(wp => {
         const rating = wp.rating?.toLowerCase();
         if (rating === 'high' || rating === 'medium' || rating === 'low') {
           total[rating as 'high' | 'medium' | 'low']++;
@@ -146,34 +151,62 @@ const AuditSummary = () => {
 
   const fetchAuditRecapData = async () => {
     try {
-      // Fetch regular audits
-      const { data: regularData, error: regularError } = await supabase
-        .from('audit_regular')
-        .select('*, pic'); // Include the 'pic' field
+      const { data: auditMaster, error } = await supabase
+        .from('audit_master')
+        .select('*');
 
-      if (regularError) throw regularError;
+      if (error) throw error;
 
-      // Fetch fraud audits
-      const { data: fraudData, error: fraudError } = await supabase
-        .from('audit_fraud')
-        .select('*, pic'); // Include the 'pic' field
+      // Filter and Map Regular Audits
+      const regularData: RegularAudit[] = auditMaster
+        ?.filter(a => 
+             a.audit_type === 'Regular' || 
+             a.audit_type === 'regular' || 
+             a.audit_type?.toLowerCase().includes('reguler')
+        )
+        .map(a => ({
+             branch_name: a.branch_name,
+             region: a.region,
+             monitoring: a.monitoring_reg,
+             dapa: a.dapa_reg,
+             revised_dapa: a.revised_dapa_reg,
+             dapa_supporting_data: a.dapa_supporting_data_reg,
+             assignment_letter: a.assignment_letter_reg,
+             entrance_agenda: a.entrance_agenda_reg,
+             entrance_attendance: false, // Not in provided schema
+             audit_working_papers: a.audit_wp_reg,
+             exit_meeting_minutes: a.exit_meeting_minutes_reg,
+             exit_attendance_list: a.exit_attendance_list_reg,
+             audit_result_letter: a.audit_result_letter_reg,
+             rta: a.rta_reg,
+             pic: a.leader
+        })) || [];
 
-      if (fraudError) throw fraudError;
+      // Filter and Map Fraud Audits
+      const fraudData: FraudAudit[] = auditMaster
+        ?.filter(a => 
+             a.audit_type?.toLowerCase().includes('fraud') || 
+             a.audit_type?.toLowerCase().includes('investigasi') ||
+             a.audit_type?.toLowerCase().includes('khusus') || // Special audit treated as potential fraud or just separate? Assume fraud tab handles special too
+             a.audit_type?.toLowerCase().includes('special')
+        )
+        .map(a => ({
+             branch_name: a.branch_name,
+             region: a.region,
+             data_preparation: a.data_prep,
+             assignment_letter: a.assignment_letter_fr,
+             audit_working_papers: a.audit_wp_fr,
+             audit_report: a.audit_report_fr,
+             detailed_findings: a.detailed_findings_fr,
+             review: a.comment_fr,
+             pic: a.leader
+        })) || [];
 
-      // Tampilkan semua regular audit di Report
-      setRegularAudits(regularData || []);
-      setFraudAudit(fraudData || []);
+      setRegularAudits(regularData);
+      setFraudAudit(fraudData);
     } catch (error) {
       console.error('Error fetching audit recap data:', error);
     }
-  };
-
-  const fetchWorkPapersRegular = async () => {
-    const { data, error } = await supabase
-      .from('work_papers')
-      .select('branch_name')
-      .eq('audit_type', 'regular');
-    if (!error) setWorkPapersRegular(data || []);
   };
 
   // Handle sorting
@@ -217,12 +250,12 @@ const AuditSummary = () => {
   // Apply filtering and sorting
   const filteredAudits = activeTab === 'regular' 
     ? regularAudits.filter(audit => 
-        audit.branch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        audit.region.toLowerCase().includes(searchTerm.toLowerCase())
+        audit.branch_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        audit.region?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     : fraudAudits.filter(audit =>
-        audit.branch_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        audit.region.toLowerCase().includes(searchTerm.toLowerCase())
+        audit.branch_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        audit.region?.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
   const sortedAudits = getSortedData(filteredAudits);
@@ -230,7 +263,6 @@ const AuditSummary = () => {
   useEffect(() => {
     fetchAuditRatingSummary();
     fetchAuditRecapData();
-    fetchWorkPapersRegular();
   }, []);
 
   return (
@@ -627,16 +659,14 @@ const AuditSummary = () => {
                   .filter(audit => {
                     const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
-                    const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     if (!reportUndoneOnly) return true;
                     return rtaStatus === 'Undone' || reportStatus === 'Undone';
                   })
                   .map((audit, idx) => {
                     const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
-                    const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     return (
                       <tr key={branchName + idx}>
                         <td className="px-3 py-2 text-xs text-gray-900">{idx + 1}</td>
@@ -651,8 +681,7 @@ const AuditSummary = () => {
                   .filter(audit => {
                     const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const foundInWorkPapers = workPapersRegular.some(wp => wp.branch_name === branchName);
-                    const reportStatus = foundInWorkPapers ? 'Done' : 'Undone';
+                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     if (!reportUndoneOnly) return true;
                     return rtaStatus === 'Undone' || reportStatus === 'Undone';
                   }).length === 0 && (

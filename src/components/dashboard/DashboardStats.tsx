@@ -1,5 +1,5 @@
 import { AlertTriangle, Building2, Users } from 'lucide-react';
-import CountUp from '../CountUp';
+import CountUp from '../common/CountUp';
 import { Card, CardContent } from '../ui/card';
 
 interface DashboardStatsProps {
@@ -14,15 +14,10 @@ interface DashboardStatsProps {
     totalFraudCases: number;
     totalFraudulentBranches: number;
   };
-  isFraudAmountCensored: boolean;
-  onFraudSectionClick: () => void;
+  skipAnimation?: boolean; // Skip CountUp animation when data is from cache
 }
 
-const DashboardStats = ({ 
-  stats, 
-  isFraudAmountCensored,
-  onFraudSectionClick
-}: DashboardStatsProps) => {
+const DashboardStats = ({ stats, skipAnimation = false }: DashboardStatsProps) => {
   const formatCurrency = (amount: number) => {
     return `Rp ${amount.toLocaleString('id-ID')}`;
   };
@@ -44,6 +39,7 @@ const DashboardStats = ({
                   className="text-2xl font-semibold"
                   duration={1.5}
                   separator=","
+                  skipAnimation={skipAnimation}
                 />
                 <div className="flex flex-col leading-tight">
                   <span className="text-[11px] text-sky-600 flex items-center gap-1">
@@ -51,6 +47,7 @@ const DashboardStats = ({
                       to={stats.auditedBranches} 
                       duration={1.5}
                       delay={0.3}
+                      skipAnimation={skipAnimation}
                     />
                     <span>audited</span>
                   </span>
@@ -59,6 +56,7 @@ const DashboardStats = ({
                       to={stats.unauditedBranches} 
                       duration={1.5}
                       delay={0.6}
+                      skipAnimation={skipAnimation}
                     />
                     <span>unaudited</span>
                   </span>
@@ -71,11 +69,8 @@ const DashboardStats = ({
 
 
 
-      {/* Total Fraud Card with Censoring */}
-      <Card 
-        className={`bg-white ${isFraudAmountCensored ? 'cursor-pointer hover:bg-gray-50' : ''}`}
-        onClick={isFraudAmountCensored ? onFraudSectionClick : undefined}
-      >
+      {/* Total Fraud Card - No Password Protection */}
+      <Card className="bg-white">
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-rose-50 rounded-lg mt-2">
@@ -84,15 +79,9 @@ const DashboardStats = ({
             <div className="flex-1">
               <p className="text-xm text-gray-600 mt-2">Total Fraud</p>
               <div className="flex flex-col leading-tight">
-                {isFraudAmountCensored ? (
-                  <>
-                    <span className="text-xl font-semibold">Click to reveal</span>
-                  </>
-                ) : (
-                  <span className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(stats.totalFraud)}
-                  </span>
-                )}
+                <span className="text-lg font-semibold text-gray-900">
+                  {formatCurrency(stats.totalFraud)}
+                </span>
               </div>
             </div>
           </div>
@@ -114,12 +103,14 @@ const DashboardStats = ({
                   className="text-xl font-semibold"
                   duration={1.5}
                   delay={0.5}
+                  skipAnimation={skipAnimation}
                 />
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <CountUp 
                     to={stats.totalFraudulentBranches} 
                     duration={1.5}
                     delay={0.8}
+                    skipAnimation={skipAnimation}
                   />
                   <span>branches involved</span>
                 </span>
@@ -133,3 +124,4 @@ const DashboardStats = ({
 };
 
 export default DashboardStats;
+
