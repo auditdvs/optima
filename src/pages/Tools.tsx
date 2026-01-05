@@ -5,7 +5,14 @@ import ReportErrorButton from '../components/tools/ToolsError';
 import '../styles/download-button.css';
 
 // Component untuk card yang bisa diklik dengan external link
-function ExternalLinkCard({ url, title, description, className = "" }) {
+interface ExternalLinkCardProps {
+  url: string;
+  title: string;
+  description: string;
+  className?: string;
+}
+
+function ExternalLinkCard({ url, title, description, className = "" }: ExternalLinkCardProps) {
   return (
     <a
       href={url}
@@ -25,7 +32,14 @@ function ExternalLinkCard({ url, title, description, className = "" }) {
 }
 
 // Component untuk download card
-function DownloadCard({ url, title, description, disabled = false }) {
+interface DownloadCardProps {
+  url: string;
+  title: string;
+  description: string;
+  disabled?: boolean;
+}
+
+function DownloadCard({ url, title, description, disabled = false }: DownloadCardProps) {
   return (
     <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 h-full ${disabled ? "opacity-60 pointer-events-none" : ""}`}>
       <div className="p-6 flex flex-col justify-between h-full">
@@ -50,7 +64,12 @@ function DownloadCard({ url, title, description, disabled = false }) {
 }
 
 // Component untuk back button
-function BackButton({ to, text = "Kembali" }) {
+interface BackButtonProps {
+  to: string;
+  text?: string;
+}
+
+function BackButton({ to, text = "Kembali" }: BackButtonProps) {
   return (
     <div className="flex items-center mb-6">
       <Link to={to} className="flex items-center text-blue-600 hover:text-blue-800 transition-colors">
@@ -64,39 +83,99 @@ function BackButton({ to, text = "Kembali" }) {
 function THCLinks() {
   const thcLinks = [
     {
-      url: "https://olah-data-thc.streamlit.app/",
-      title: "THC Regional A, B, C",
-      description: "Pengolahan data THC untuk regional A, B, dan C"
+      url: "https://thc001.streamlit.app/",
+      title: "Pengolahan THC Regional A",
+      description: "Pengolahan data THC untuk Regional A"
     },
     {
-      url: "https://thc-alter-2.streamlit.app/",
-      title: "THC Regional D, E, F",
-      description: "Pengolahan data THC untuk regional D, E, dan F"
+      url: "https://thc002.streamlit.app/",
+      title: "Pengolahan THC Regional B",
+      description: "Pengolahan data THC untuk Regional B"
     },
     {
-      url: "https://thc-alter-0103.streamlit.app/",
-      title: "THC Regional G, H, I",
-      description: "Pengolahan data THC untuk regional G, H, dan I"
+      url: "https://thc003.streamlit.app/",
+      title: "Pengolahan THC Regional C",
+      description: "Pengolahan data THC untuk Regional C"
     },
     {
-      url: "https://thc-0104.streamlit.app/",
-      title: "THC Regional J, K, L",
-      description: "Pengolahan data THC untuk regional J, K, dan L"
+      url: "https://thc004.streamlit.app/",
+      title: "Pengolahan THC Regional D",
+      description: "Pengolahan data THC untuk Regional D"
     },
     {
-      url: "https://thc-0105.streamlit.app/",
-      title: "THC Regional M, N, O",
-      description: "Pengolahan data THC untuk regional M, N, dan O"
+      url: "https://thc005.streamlit.app/",
+      title: "Pengolahan THC Regional E",
+      description: "Pengolahan data THC untuk Regional E"
     },
     {
-      url: "https://thc-0106.streamlit.app/",
-      title: "THC Regional P, Q, R, S",
-      description: "Pengolahan data THC untuk regional P, Q, R, dan S"
+      url: "https://thc006.streamlit.app/",
+      title: "Pengolahan THC Regional F",
+      description: "Pengolahan data THC untuk Regional F"
     },
     {
-      url: "https://thc-link-adm.streamlit.app/",
-      title: "THC Admin Panel",
-      description: "Panel administrasi khusus untuk admin"
+      url: "https://thc007.streamlit.app/",
+      title: "Pengolahan THC Regional G",
+      description: "Pengolahan data THC untuk Regional G"
+    },
+    {
+      url: "https://thc008.streamlit.app/",
+      title: "Pengolahan THC Regional H",
+      description: "Pengolahan data THC untuk Regional H"
+    },
+    {
+      url: "https://thc009.streamlit.app/",
+      title: "Pengolahan THC Regional I",
+      description: "Pengolahan data THC untuk Regional I"
+    },
+    {
+      url: "https://thc010.streamlit.app/",
+      title: "Pengolahan THC Regional J",
+      description: "Pengolahan data THC untuk Regional J"
+    },
+    {
+      url: "https://thc011.streamlit.app/",
+      title: "Pengolahan THC Regional K",
+      description: "Pengolahan data THC untuk Regional K"
+    },
+    {
+      url: "https://thc012.streamlit.app/",
+      title: "Pengolahan THC Regional L",  
+      description: "Pengolahan data THC untuk Regional L"
+    },
+    {
+      url: "https://thc013.streamlit.app/",
+      title: "Pengolahan THC Regional M",
+      description: "Pengolahan data THC untuk Regional M"
+    },
+    {
+      url: "https://thc014.streamlit.app/",
+      title: "Pengolahan THC Regional N",
+      description: "Pengolahan data THC untuk Regional N"
+    },
+    {
+      url: "https://thc015.streamlit.app/",
+      title: "Pengolahan THC Regional O",  
+      description: "Pengolahan data THC untuk Regional O"
+    },
+    {
+      url: "https://thc016.streamlit.app/",
+      title: "Pengolahan THC Regional P",
+      description: "Pengolahan data THC untuk Regional P"
+    },
+    {
+      url: "https://thc017.streamlit.app/",
+      title: "Pengolahan THC Regional Q",
+      description: "Pengolahan data THC untuk Regional Q"
+    },
+    {
+      url: "https://thc018.streamlit.app/",
+      title: "Pengolahan THC Regional R",
+      description: "Pengolahan data THC untuk Regional R"
+    },
+    {
+      url: "https://thc019.streamlit.app/",
+      title: "Pengolahan THC Regional S",
+      description: "Pengolahan data THC untuk Regional S"
     }
   ];
 
@@ -125,52 +204,7 @@ function THCLinks() {
   );
 }
 
-function WorkPaperLinks() {
-  const workPaperLinks = [
-    {
-      url: "https://kk-anggota-keluar.streamlit.app/",
-      title: "Anggota Keluar",
-      description: "Kertas kerja untuk sampel anggota keluar"
-    },
-    {
-      url: "https://kk-anggota-par.streamlit.app/",
-      title: "Anggota PAR",
-      description: "Kertas kerja untuk sampel anggota PAR"
-    },
-    {
-      url: "https://kk-simpanan-pinjaman.streamlit.app/",
-      title: "Simpanan & Pinjaman",
-      description: "Analisa simpanan dan pinjaman berdasarkan center sampel dari THC"
-    },
-    {
-      url: "https://kk-santunan-meninggal.streamlit.app/",
-      title: "Santunan Meninggal",
-      description: "kertas kerja santunan anggota dan suami meninggal"
-    }
-  ];
 
-  return (
-    <div className="mt-6 bg-white rounded-lg shadow p-6">
-      <BackButton to="/tools/work-paper" />
-      
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Kertas Kerja Digital</h2>
-        <p className="text-gray-600">Tools untuk generate dan menganalisa kertas kerja pemeriksaan audit</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {workPaperLinks.map((link, index) => (
-          <ExternalLinkCard
-            key={index}
-            url={link.url}
-            title={link.title}
-            description={link.description}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function Tools() {
   const mainTools = [
@@ -258,7 +292,7 @@ function Tools() {
           <Route path="thc-processing/thc-links" element={<THCLinks />} />
           <Route path="anomaly-processing" element={<AnomalyProcessing />} />
           <Route path="work-paper" element={<WorkPaper />} />
-          <Route path="work-paper/work-paper-links" element={<WorkPaperLinks />} />
+
           <Route path="tools-update" element={<UpdateTools />} />
           <Route path="coa" element={<COA />} />
         </Routes>
@@ -280,42 +314,42 @@ function THCProcessing() {
       step: "02", 
       title: "TAK Processing",
       description: "Pengolahan data menggunakan bahan TAK dan Database Simpanan",
-      link: "https://tr-anggota-keluar.streamlit.app/",
+      link: "https://tak001.streamlit.app/",
       isInternal: false
     },
     {
       step: "03",
       title: "TLP & KDP Processing", 
       description: "Pengolahan data menggunakan bahan TLP, KDP dan Database Pinjaman",
-      link: "https://tlp-kdp.streamlit.app/",
+      link: "https://tlp-kdp001.streamlit.app/",
       isInternal: false
     },
     {
       step: "04",
       title: "VLOOKUP & N/A Handler",
       description: "Pengolahan data N/A yang sudah dicari secara manual dengan VLOOKUP",
-      link: "https://merge-app.streamlit.app/",
+      link: "https://vlookupna.streamlit.app/",
       isInternal: false
     },
     {
       step: "05",
       title: "Merge Simpanan & Pinjaman",
       description: "Penggabungan data pivot simpanan dan pinjaman yang sudah diproses",
-      link: "https://merge-dbcr.streamlit.app/",
+      link: "https://mergeall.streamlit.app/",
       isInternal: false
     },
     {
       step: "06",
       title: "Format Data THC Gabungan",
       description: "Format final data THC gabungan dari semua sumber data",
-      link: "https://format-data-thc-gabungan.streamlit.app/",
+      link: "https://thcgabungan.streamlit.app/",
       isInternal: false
     },
     {
       step: "07",
       title: "Format Data THC Gabungan Final",
       description: "Melakukan pengolahan sesuai dengan file excel yang tadinya bernama Format Data THC Gabungan",
-      link: "https://formatdatathc-gabungan.streamlit.app/",
+      link: "https://thcgabunganfinal.streamlit.app/",
       isInternal: false
     }
   ];
@@ -384,25 +418,7 @@ function WorkPaper() {
 
   return (
     <div className="mt-6 space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Digital Work Paper Tools */}
-        <Link to="/tools/work-paper/work-paper-links" className="no-underline">
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 h-full border-2 border-purple-200">
-            <div className="p-6 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center mb-4">
-                  <ClipboardList className="text-purple-600 mr-3" size={24} />
-                  <h3 className="text-xl font-semibold text-gray-900">Kertas Kerja Digital</h3>
-                </div>
-                <p className="text-gray-700">Tools online untuk generate kertas kerja pemeriksaan audit secara otomatis agar lebih rapi dan efisien</p>
-              </div>
-              <div className="mt-4 text-purple-600 font-medium">
-                Akses Tools →
-              </div>
-            </div>
-          </div>
-        </Link>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Download Templates */}
         {downloadTemplates.map((template, index) => (
           <DownloadCard
@@ -421,19 +437,19 @@ function WorkPaper() {
 function AnomalyProcessing() {
   const anomalyTools = [
     {
-      url: "https://thc-simpanan.streamlit.app/",
+      url: "https://thcsimpanan.streamlit.app/",
       title: "THC Simpanan",
       description: "Analisis berdasarkan nilai rata-rata, nilai yang sering muncul dan nilai yang berbeda jauh dari kebiasaan anggota",
       category: "THC Analysis"
     },
     {
-      url: "https://pinjaman-ke.streamlit.app/",
+      url: "https://thcpinjaman.streamlit.app/",
       title: "THC Pinjaman",
       description: "Analisis berdasarkan ketentuan plafon pembiayaan per pinjaman, jangka waktu, jenis pinjaman",
       category: "THC Analysis"
     },
     {
-      url: "https://anomali-keseluruhan.streamlit.app/",
+      url: "https://allanomaly.streamlit.app/",
       title: "Analisa Anomali Keseluruhan",
       description: "Analisa total anomali pinjaman dan simpanan berdasarkan Petugas Lapang dan Center Meeting",
       category: "THC Analysis"
@@ -451,31 +467,25 @@ function AnomalyProcessing() {
       category: "Disbursement"
     },
     {
-      url: "https://trialbalance.streamlit.app/",
-      title: "Analisa Trial Balance",
-      description: "Mengetahui fokus pemeriksaan kantor cabang antara pinjaman dan simpanan",
-      category: "Financial Analysis"
-    },
-    {
-      url: "https://analysis-trx-bbm.streamlit.app/",
+      url: "https://bbm001.streamlit.app/",
       title: "Analisa BBM",
       description: "Ketentuan maksimal jumlah BBM dalam 1 bulan sesuai jabatan",
       category: "Financial Analysis"
     },
     {
-      url: "https://analysis-trx-fc.streamlit.app/",
+      url: "https://atk001.streamlit.app/",
       title: "Analisa Fotocopy",
       description: "Analisa jumlah form fotocopy berdasarkan kewajaran harga per lembar",
       category: "Financial Analysis"
     },
     {
-      url: "https://kk-konsumsi.streamlit.app/",
+      url: "https://konsumsi.streamlit.app/",
       title: "Analisa Konsumsi",
       description: "Pengecekkan biaya pengeluaran konsumsi berdasarkan kriteria kuantitas beras, galon, gula, dll",
       category: "Financial Analysis"
     },
     {
-      url: "https://top-up.streamlit.app/",
+      url: "https://topupanomaly.streamlit.app/",
       title: "Analisa Top Up",
       description: "Analisa anomali top up pinjaman",
       category: "Disbursement"
@@ -483,7 +493,7 @@ function AnomalyProcessing() {
   ];
 
   // Group tools by category
-  const groupedTools = anomalyTools.reduce((acc, tool) => {
+  const groupedTools = anomalyTools.reduce<Record<string, typeof anomalyTools>>((acc, tool) => {
     if (!acc[tool.category]) {
       acc[tool.category] = [];
     }
@@ -491,7 +501,7 @@ function AnomalyProcessing() {
     return acc;
   }, {});
 
-  const categoryColors = {
+  const categoryColors: Record<string, string> = {
     "THC Analysis": "border-blue-200 bg-blue-50",
     "General Analysis": "border-purple-200 bg-purple-50", 
     "Risk Analysis": "border-red-200 bg-red-50",
