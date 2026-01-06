@@ -1,4 +1,4 @@
-import { Edit, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { Edit, Plus, RefreshCcw, Search, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Ganti ke react-toastify
 import EChartComponent from '../components/common/EChartComponent';
@@ -85,8 +85,19 @@ const BranchDirectory: React.FC = () => {
   // Use cached branchesGeo from context
   const branchesGeo = cachedBranchesGeo;
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Search state specifically for map view
+  const [mapSearchTerm, setMapSearchTerm] = useState('');
 
-  // Fetch branch data from database (for table display)
+  // Filter map points based on search
+  const filteredMapBranches = React.useMemo(() => {
+    if (!mapSearchTerm) return branchesGeo;
+    const term = mapSearchTerm.toLowerCase();
+    return branchesGeo.filter(b => 
+      b.name?.toLowerCase().includes(term) || 
+      b.region?.toLowerCase().includes(term)
+    );
+  }, [branchesGeo, mapSearchTerm]); // Fetch branch data from database (for table display)
   useEffect(() => {
     const fetchBranchData = async () => {
       const { data } = await supabase.from('branches_info').select('*');
@@ -389,11 +400,34 @@ const BranchDirectory: React.FC = () => {
                   </div>
                 </div>
                 <span className="text-sm font-medium px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
-                  Total: {branchesGeo.length} Locations Mapped
+                  Total: {filteredMapBranches.length} Locations Mapped
                 </span>
               </div>
               
-              <div className="h-[calc(100vh-280px)] min-h-[500px] w-full rounded-xl border border-indigo-50 bg-gradient-to-br from-slate-50 to-indigo-50/50 overflow-hidden relative">
+              <div className="h-[calc(100vh-280px)] min-h-[500px] w-full rounded-xl border border-indigo-50 bg-gradient-to-br from-slate-50 to-indigo-50/50 overflow-hidden relative group">
+                {/* Floating Search Bar */}
+                <div className="absolute top-4 left-4 z-10 w-full max-w-xs transition-opacity duration-300 opacity-90 hover:opacity-100 focus-within:opacity-100">
+                  <div className="relative shadow-lg rounded-xl">
+                    <input
+                      type="text"
+                      value={mapSearchTerm}
+                      onChange={(e) => setMapSearchTerm(e.target.value)}
+                      placeholder="Cari cabang di peta..."
+                      className="w-full pl-10 pr-4 py-3 bg-white/95 backdrop-blur-sm border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm text-sm font-medium text-gray-700 placeholder-gray-400"
+                    />
+                    <div className="absolute left-3 top-3 text-indigo-500">
+                      <Search className="w-5 h-5" />
+                    </div>
+                    {mapSearchTerm && (
+                      <button 
+                        onClick={() => setMapSearchTerm('')}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <EChartComponent
                   option={{
                     backgroundColor: 'transparent',
@@ -498,7 +532,7 @@ const BranchDirectory: React.FC = () => {
                       name: 'Branches',
                       type: 'scatter',
                       coordinateSystem: 'geo',
-                      data: branchesGeo.map(branch => {
+                      data: filteredMapBranches.map(branch => {
                         const isRegional = branch.name.startsWith('REGIONAL');
                         const isHeadOffice = branch.name.includes('KANTOR PUSAT');
                         const isKomida = branch.name.includes('KOMIDA PRINTING');
@@ -561,23 +595,22 @@ const BranchDirectory: React.FC = () => {
                           }
                         };
                       }),
-                      label: { show: false },
+                      label: {
+                        show: true,
+                        formatter: '{b}',
+                        position: 'right',
+                        fontSize: 10,
+                        color: '#1e293b',
+                        fontWeight: 600,
+                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        padding: [2, 4],
+                        borderRadius: 3,
+                        distance: 5
+                      },
                       emphasis: {
                         scale: 1.5,
                         label: {
-                          show: true,
-                          formatter: '{b}',
-                          position: 'top',
-                          fontSize: 11,
-                          fontWeight: 'bold',
-                          color: '#1e3a8a',
-                          backgroundColor: '#fff',
-                          padding: [4, 8],
-                          borderRadius: 4,
-                          borderColor: '#bfdbfe',
-                          borderWidth: 1,
-                          shadowBlur: 4,
-                          shadowColor: 'rgba(0,0,0,0.1)'
+                          show: false // Jangan munculkan label lagi saat hover
                         }
                       }
                     }]

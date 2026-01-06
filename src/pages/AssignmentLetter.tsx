@@ -1,5 +1,6 @@
-import { FileText, Plus, Upload } from 'lucide-react';
+import { FileText, Mail, Plus, Upload } from 'lucide-react';
 import { useState } from 'react';
+import RPMRegistration from '../components/assignment/RPMRegistration';
 import AddendumForm from '../components/manager-dashboard/AddendumForm';
 import AddendumList from '../components/manager-dashboard/AddendumList';
 import AssignmentLetterForm from '../components/manager-dashboard/AssignmentLetterForm';
@@ -7,7 +8,7 @@ import AssignmentLetterList from '../components/manager-dashboard/AssignmentLett
 import LpjSubmission from '../components/manager-dashboard/LpjSubmission';
 
 export default function AssignmentLetter() {
-  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj'>('letter');
+  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj' | 'rpm'>('letter');
   const [showFormModal, setShowFormModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -23,11 +24,11 @@ export default function AssignmentLetter() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Assignment</h1>
-            <p className="text-sm md:text-base text-gray-600">Buat surat tugas atau addendum serta laporan pertanggungjawaban.</p>
+            <p className="text-sm md:text-base text-gray-600">Buat surat tugas, addendum, LPJ, dan register surat RPM.</p>
           </div>
         
           {/* Download Template Button - only show for letter/addendum tabs */}
-          {activeTab !== 'lpj' && (
+          {(activeTab === 'letter' || activeTab === 'addendum') && (
             <button
               onClick={async () => {
                 try {
@@ -93,7 +94,7 @@ export default function AssignmentLetter() {
                   setActiveTab('lpj');
                   setShowFormModal(false);
                 }}
-                className={`flex-1 min-w-[200px] py-4 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
+                className={`flex-1 min-w-[180px] py-4 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'lpj'
                     ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
@@ -101,7 +102,23 @@ export default function AssignmentLetter() {
               >
                 <div className="flex items-center justify-center">
                   <Upload className="w-5 h-5 mr-2" />
-                  Laporan Pertanggungjawaban
+                  LPJ
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('rpm');
+                  setShowFormModal(false);
+                }}
+                className={`flex-1 min-w-[160px] py-4 px-4 text-center border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'rpm'
+                    ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-center">
+                  <Mail className="w-5 h-5 mr-2" />
+                  Register Surat RPM
                 </div>
               </button>
             </nav>
@@ -144,15 +161,23 @@ export default function AssignmentLetter() {
               </div>
               <AddendumList refreshTrigger={refreshTrigger} />
             </div>
-          ) : (
+          ) : activeTab === 'lpj' ? (
             <div className="p-4 md:p-6">
               <LpjSubmission />
+            </div>
+          ) : (
+            <div className="p-4 md:p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Register Surat RPM</h2>
+                <p className="text-sm text-gray-500 mt-1">Kelola dan pantau status surat RPM (Reminder, Peringatan, dan Monitoring).</p>
+              </div>
+              <RPMRegistration refreshTrigger={refreshTrigger} />
             </div>
           )}
         </div>
 
-        {/* Form Modal */}
-        {showFormModal && (
+        {/* Form Modal - Only for letter/addendum */}
+        {showFormModal && (activeTab === 'letter' || activeTab === 'addendum') && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4 sm:p-6 flex items-start justify-center">
             <div className="relative w-full max-w-4xl shadow-xl rounded-lg bg-white my-8">
               <div className="p-4 md:p-6">
@@ -192,3 +217,4 @@ export default function AssignmentLetter() {
     </div>
   );
 }
+
