@@ -241,11 +241,31 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   };
 
   const formatAuditPeriod = (letter: AssignmentLetter) => {
-    if (letter.audit_period_start && letter.audit_period_end) {
-      return `${new Date(letter.audit_period_start).toLocaleDateString('id-ID')} - ${new Date(letter.audit_period_end).toLocaleDateString('id-ID')}`;
-    }
+    const formatDateShort = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear()).slice(-2);
+      return `${day}/${month}/${year}`;
+    };
+
     if (letter.audit_start_date && letter.audit_end_date) {
-      return `${new Date(letter.audit_start_date).toLocaleDateString('id-ID')} - ${new Date(letter.audit_end_date).toLocaleDateString('id-ID')}`;
+      return `${formatDateShort(letter.audit_start_date)} s.d. ${formatDateShort(letter.audit_end_date)}`;
+    }
+    return '-';
+  };
+
+  const formatAddendumPeriod = (addendum: any) => {
+    const formatDateShort = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear()).slice(-2);
+      return `${day}/${month}/${year}`;
+    };
+
+    if (addendum.start_date && addendum.end_date) {
+      return `${formatDateShort(addendum.start_date)} s.d. ${formatDateShort(addendum.end_date)}`;
     }
     return '-';
   };
@@ -1028,7 +1048,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dibuat oleh</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode Audit</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -1082,7 +1102,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                       {getCreatorName(letter.created_by)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {letter.tanggal_input ? new Date(letter.tanggal_input).toLocaleDateString('id-ID') : '-'}
+                      {formatAuditPeriod(letter)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
@@ -1126,6 +1146,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link File</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode Audit</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -1200,6 +1221,9 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getStatusBadge(addendum.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatAddendumPeriod(addendum)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
