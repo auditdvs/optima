@@ -10,6 +10,7 @@ import { MapCacheProvider } from './contexts/MapCacheContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import AssignmentLetter from './pages/AssignmentLetter';
+import AuditorWorkpapers from './pages/AuditorWorkpapers';
 import BranchDirectory from './pages/BranchDirectory';
 import Broadcast from './pages/Broadcast';
 import CompanyRegulations from './pages/CompanyRegulations';
@@ -122,6 +123,11 @@ function App() {
               <Route path="qa-management" element={
                 <PrivateRoute requiredRoles={['superadmin', 'qa', 'manager']}>
                   <QAManagement />
+                </PrivateRoute>
+              } />
+              <Route path="auditor-workpapers" element={
+                <PrivateRoute requiredRoles={['superadmin', 'qa', 'manager', 'dvs', 'user', 'risk']}>
+                  <AuditorWorkpapers />
                 </PrivateRoute>
               } />
               <Route path="add-user" element={

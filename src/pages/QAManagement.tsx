@@ -1,10 +1,10 @@
-import { Check, Download, Plus, Save, Search, Trash2, Upload, X } from 'lucide-react';
+import { Check, Download, Eye, Save, Search, Trash2, Upload, X } from 'lucide-react';
+// @ts-ignore
 import Papa from 'papaparse';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { MatriksData, MatriksTable } from '../components/qa-management/MatriksSection';
-import { RPMLetter, RPMLetterTable } from '../components/qa-management/RPMLetterTable';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { supabase } from '../lib/supabaseClient';
@@ -15,7 +15,7 @@ interface AuditMaster {
   id: string;
   branch_name: string;
   region: string;
-  audit_type: 'regular' | 'fraud';
+  audit_type: 'regular' | 'fraud' | 'special';
   audit_start_date: string;
   audit_end_date: string;
   audit_period_start?: string; // MM,YYYY format
@@ -48,6 +48,18 @@ interface AuditMaster {
   comment_fr?: string;
 }
 
+interface ApprovedDocument {
+  id: string;
+  type: 'Surat Tugas' | 'Addendum';
+  letter_number: string;
+  branch_name: string;
+  region: string;
+  date: string;
+  status: string;
+  raw_data: any;
+  created_by_name?: string;
+}
+
 interface Auditor {
   id: string;
   name: string;
@@ -73,29 +85,6 @@ const CheckboxCell = ({
       {checked ? <Check size={18} /> : <X size={18} />}
     </div>
   );
-};
-
-const getRomanNumeral = (month: number): string => {
-  const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-  return romanNumerals[month];
-};
-
-const generateLetterNumber = (letters: RPMLetter[]): string => {
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const month = getRomanNumeral(currentDate.getMonth());
-  
-  // Count only letters from the current year by extracting year from letter_number
-  // Format: 001/KMD-AUDIT/QA/I/2026 - year is the last part
-  const lettersThisYear = letters.filter(letter => {
-    if (!letter.letter_number) return false;
-    const parts = letter.letter_number.split('/');
-    const letterYear = parseInt(parts[parts.length - 1], 10);
-    return letterYear === currentYear;
-  });
-  
-  const number = String(lettersThisYear.length + 1).padStart(3, '0');
-  return `${number}/KMD-AUDIT/QA/${month}/${currentYear}`;
 };
 
 const getInitialsFromName = (name: string, auditors: Auditor[]): string => {
@@ -150,7 +139,7 @@ const QAManagement: React.FC = () => {
   // --- State ---
   const [audits, setAudits] = useState<AuditMaster[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'rating' | 'rpm_letter' | 'matriks'>('regular');
+  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'rating' | 'approved_docs' | 'matriks'>('rating');
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -175,19 +164,11 @@ const QAManagement: React.FC = () => {
   const [matriksDeleting, setMatriksDeleting] = useState(false);
   const [showConfirmDeleteMatriks, setShowConfirmDeleteMatriks] = useState(false);
 
-  // RPM Letter State
-  const [rpmLetters, setRpmLetters] = useState<RPMLetter[]>([]);
-  const [rpmLoading, setRpmLoading] = useState(false);
-  const [showAddLetterModal, setShowAddLetterModal] = useState(false);
-  const [showEditLetterModal, setShowEditLetterModal] = useState(false);
-  const [editingLetter, setEditingLetter] = useState<RPMLetter | null>(null);
-  const [newLetter, setNewLetter] = useState<Partial<RPMLetter>>({
-    region: '',
-    branch_or_region_ho: '',
-    subject: '',
-    status: 'Inadequate',
-    letter_date: new Date().toISOString().split('T')[0]
-  });
+  // Approved Docs State
+  const [approvedDocs, setApprovedDocs] = useState<ApprovedDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<ApprovedDocument | null>(null);
+  const [showDocDetailModal, setShowDocDetailModal] = useState(false);
 
   // --- Effects ---
 
@@ -199,8 +180,8 @@ const QAManagement: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'matriks') {
       fetchMatriksData();
-    } else if (activeTab === 'rpm_letter') {
-      fetchRpmLetters();
+    } else if (activeTab === 'approved_docs') {
+      fetchApprovedDocs();
     }
   }, [activeTab]);
 
@@ -285,21 +266,77 @@ const QAManagement: React.FC = () => {
     }
   };
 
-  const fetchRpmLetters = async () => {
+  const fetchApprovedDocs = async () => {
     try {
-      setRpmLoading(true);
-      const { data, error } = await supabase
-        .from('rpm_letters')
+      setDocsLoading(true);
+      
+      // Fetch Letters
+      const { data: letters, error: letterError } = await supabase
+        .from('letter')
         .select('*')
-        .order('created_at', { ascending: false });
+        .in('status', ['approved', 'pending'])
+        .order('id', { ascending: false });
+        
+      if (letterError) throw letterError;
 
-      if (error) throw error;
-      setRpmLetters(data || []);
+      // Fetch Addendums
+      const { data: addendums, error: addendumError } = await supabase
+        .from('addendum')
+        .select('*')
+        .in('status', ['approved', 'pending'])
+        .order('id', { ascending: false });
+
+      if (addendumError) throw addendumError;
+
+      // Fetch creator names
+      const userIds = new Set<string>();
+      letters?.forEach(l => l.created_by && userIds.add(l.created_by));
+      addendums?.forEach(a => a.created_by && userIds.add(a.created_by));
+      
+      const profileMap = new Map<string, string>();
+      if (userIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', Array.from(userIds));
+          
+        profiles?.forEach(p => profileMap.set(p.id, p.full_name));
+      }
+
+      const merged: ApprovedDocument[] = [
+        ...(letters || []).map(l => ({
+          id: l.id,
+          type: 'Surat Tugas' as const,
+          letter_number: l.assigment_letter,
+          branch_name: l.branch_name,
+          region: l.region,
+          date: l.tanggal_input || l.created_at || new Date().toISOString(),
+          status: l.status,
+          raw_data: l,
+          created_by_name: l.created_by ? profileMap.get(l.created_by) || '-' : '-'
+        })),
+        ...(addendums || []).map(a => ({
+          id: a.id,
+          type: 'Addendum' as const,
+          letter_number: a.assigment_letter,
+          branch_name: a.branch_name,
+          region: a.region,
+          date: a.tanggal_input || a.created_at || new Date().toISOString(),
+          status: a.status,
+          raw_data: a,
+          created_by_name: a.created_by ? profileMap.get(a.created_by) || '-' : '-'
+        }))
+      ];
+      
+      // Sort by date desc (newest first)
+      merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setApprovedDocs(merged);
     } catch (error) {
-      console.error('Error fetching letters:', error);
-      toast.error('Failed to fetch letters');
+      console.error('Error fetching docs:', error);
+      toast.error('Failed to fetch documents');
     } finally {
-      setRpmLoading(false);
+      setDocsLoading(false);
     }
   };
 
@@ -349,8 +386,9 @@ const QAManagement: React.FC = () => {
   };
 
   const handleExport = () => {
-    if (activeTab === 'rpm_letter') {
-      handleExportRpm();
+    if (activeTab === 'approved_docs') {
+      // Handle approved docs export if needed, or simple disabled for now
+      toast.success('Export available via view detail');
       return;
     }
 
@@ -529,143 +567,7 @@ const QAManagement: React.FC = () => {
     }
   };
 
-  // --- RPM Letter Handlers ---
 
-  const handleAddLetter = async () => {
-    try {
-      const letterNumber = generateLetterNumber(rpmLetters);
-      const dueDate = getDueDate(newLetter.status as RPMLetter['status']);
-
-      const { error } = await supabase
-        .from('rpm_letters')
-        .insert([{
-          ...newLetter,
-          letter_number: letterNumber,
-          due_date: dueDate
-        }]);
-
-      if (error) throw error;
-
-      toast.success('Letter added successfully');
-      setShowAddLetterModal(false);
-      fetchRpmLetters();
-    } catch (error) {
-      console.error('Error adding letter:', error);
-      toast.error('Failed to add letter');
-    }
-  };
-
-  const handleUpdateRpmStatus = async (id: string, status: RPMLetter['status']) => {
-    const dueDate = getDueDate(status);
-    try {
-      const { error } = await supabase
-        .from('rpm_letters')
-        .update({ status, due_date: dueDate })
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchRpmLetters();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handleUpdateRpmDueDate = async (id: string, dueDate: string) => {
-    try {
-      const { error } = await supabase
-        .from('rpm_letters')
-        .update({ due_date: dueDate })
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchRpmLetters();
-    } catch (error) {
-      console.error('Error updating due date:', error);
-      toast.error('Failed to update due date');
-    }
-  };
-
-  const getDueDate = (status: RPMLetter['status']): string => {
-    switch (status) {
-      case 'Reminder 1':
-      case 'Reminder 2':
-        return '';
-      case 'Adequate':
-        return 'Finished';
-      case 'Inadequate':
-        return 'Open';
-      default:
-        return '';
-    }
-  };
-
-  const handleEditLetter = (letter: RPMLetter) => {
-    setEditingLetter(letter);
-    setShowEditLetterModal(true);
-  };
-
-  const handleUpdateLetter = async () => {
-    if (!editingLetter?.id) return;
-    
-    try {
-      const { error } = await supabase
-        .from('rpm_letters')
-        .update({
-          region: editingLetter.region,
-          branch_or_region_ho: editingLetter.branch_or_region_ho,
-          subject: editingLetter.subject,
-          letter_date: editingLetter.letter_date
-        })
-        .eq('id', editingLetter.id);
-
-      if (error) throw error;
-
-      toast.success('Letter updated successfully');
-      setShowEditLetterModal(false);
-      setEditingLetter(null);
-      fetchRpmLetters();
-    } catch (error) {
-      console.error('Error updating letter:', error);
-      toast.error('Failed to update letter');
-    }
-  };
-
-  const handleExportRpm = () => {
-    try {
-      const exportData = rpmLetters.map((letter, index) => ({
-        'No': index + 1,
-        'Letter Number': letter.letter_number,
-        'Letter Date': letter.letter_date,
-        'Region': letter.region,
-        'Branch/Region/HO': letter.branch_or_region_ho,
-        'Subject': letter.subject,
-        'Status': letter.status,
-        'Due Date': letter.due_date
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'RPM Letters');
-      
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      
-      // Create download link manually to avoid file-saver dependency if preferred, 
-      // but here we use XLSX.writeFile which handles it or we can use file-saver if installed.
-      // Since we used XLSX.writeFile above, let's stick to that for consistency if possible, 
-      // but XLSX.write returns buffer. Let's use XLSX.writeFile directly.
-      
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, worksheet, 'RPM Letters');
-      XLSX.writeFile(wb, 'rpm_letters_report.xlsx');
-      
-      toast.success('Report downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      toast.error('Failed to download report');
-    }
-  };
 
   // --- Filtering ---
 
@@ -709,26 +611,6 @@ const QAManagement: React.FC = () => {
         <div className="flex flex-col gap-3 w-full md:w-auto">
           {/* Unified Tabs - Scrollable on mobile */}
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto scrollbar-hide w-full md:w-auto">
-            <button
-              onClick={() => setActiveTab('regular')}
-              className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === 'regular' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Regular
-            </button>
-            <button
-              onClick={() => setActiveTab('special')}
-              className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === 'special' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Special
-            </button>
              <button
               onClick={() => setActiveTab('rating')}
               className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
@@ -740,14 +622,14 @@ const QAManagement: React.FC = () => {
               Rating
             </button>
             <button
-              onClick={() => setActiveTab('rpm_letter')}
+              onClick={() => setActiveTab('approved_docs')}
               className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === 'rpm_letter' 
+                activeTab === 'approved_docs' 
                   ? 'bg-white text-indigo-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              RPM Letter
+              Surat Tugas & Addendum
             </button>
             <button
               onClick={() => setActiveTab('matriks')}
@@ -789,23 +671,8 @@ const QAManagement: React.FC = () => {
                   />
                 </label>
               </>
-            ) : activeTab === 'rpm_letter' ? (
-              <>
-                <button
-                  onClick={handleExport}
-                  className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"
-                >
-                  <Download size={18} className="mr-2" />
-                  <span>Report</span>
-                </button>
-                <button
-                  onClick={() => setShowAddLetterModal(true)}
-                  className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors text-sm font-medium"
-                >
-                  <Plus size={18} className="mr-2" />
-                  <span>Add Letter</span>
-                </button>
-              </>
+            ) : activeTab === 'approved_docs' ? (
+              <></>
             ) : (
               <>
                 <button
@@ -835,14 +702,86 @@ const QAManagement: React.FC = () => {
       </div>
 
       {/* Content Area */}
-      {activeTab === 'rpm_letter' ? (
-        <div className="bg-white p-4 md:p-6 rounded-lg shadow overflow-x-auto">
-          <RPMLetterTable 
-            data={rpmLetters} 
-            onUpdateStatus={handleUpdateRpmStatus} 
-            onUpdateDueDate={handleUpdateRpmDueDate}
-            onEdit={handleEditLetter}
-          />
+      {activeTab === 'approved_docs' ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          {docsLoading ? (
+            <div className="flex justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+             <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Surat</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch/Region</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {approvedDocs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                         No approved documents found.
+                        </td>
+                      </tr>
+                    ) : (
+                      approvedDocs.map((doc, idx) => (
+                        <tr key={`${doc.type}-${doc.id}`} className="hover:bg-gray-50 transition-colors">
+                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
+                           <td className="px-6 py-4 whitespace-nowrap text-sm">
+                             <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                               doc.type === 'Surat Tugas' 
+                                 ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                 : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                             }`}>
+                               {doc.type}
+                             </span>
+                           </td>
+                           <td className="px-6 py-4 text-sm font-medium text-gray-900">{doc.letter_number}</td>
+                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                             {doc.branch_name} <span className="text-gray-400 mx-1">•</span> {doc.region}
+                           </td>
+                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                             {new Date(doc.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                           </td>
+                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                               {doc.created_by_name}
+                             </td>
+                             <td className="px-6 py-4 whitespace-nowrap">
+                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                               doc.status === 'approved' ? 'bg-green-100 text-green-800' :
+                               doc.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                               doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                               'bg-gray-100 text-gray-800'
+                             }`}>
+                               {doc.status}
+                             </span>
+                           </td>
+                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => {
+                                  setSelectedDoc(doc);
+                                  setShowDocDetailModal(true);
+                                }}
+                                className="text-indigo-600 hover:text-indigo-900 flex items-center justify-center bg-indigo-50 p-2 rounded-md hover:bg-indigo-100 transition-colors"
+                                title="View Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                           </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+             </div>
+          )}
         </div>
       ) : activeTab === 'matriks' ? (
         <div className="bg-white p-4 md:p-6 rounded-lg shadow overflow-hidden">
@@ -1201,163 +1140,93 @@ const QAManagement: React.FC = () => {
         </>
       )}
 
-      {/* Modals */}
-      {showAddLetterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Add New Letter</h2>
-            <div className="space-y-4">
-              {/* Letter Number Preview */}
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                <label className="block text-xs font-medium text-indigo-600 mb-1">Letter Number (Auto-generated)</label>
-                <div className="text-sm font-mono font-semibold text-indigo-800">
-                  {generateLetterNumber(rpmLetters)}
-                </div>
+      {/* Doc Detail Modal */}
+      {showDocDetailModal && selectedDoc && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                 <h3 className="text-xl font-bold text-gray-900">
+                    Detail {selectedDoc.type}
+                 </h3>
+                 <button 
+                  onClick={() => setShowDocDetailModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
+                 >
+                   <X className="w-5 h-5" />
+                 </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Region</label>
-                <input
-                  type="text"
-                  value={newLetter.region}
-                  onChange={(e) => setNewLetter({ ...newLetter, region: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Branch/Region/HO</label>
-                <input
-                  type="text"
-                  value={newLetter.branch_or_region_ho}
-                  onChange={(e) => setNewLetter({ ...newLetter, branch_or_region_ho: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Subject</label>
-                <textarea
-                  value={newLetter.subject}
-                  onChange={(e) => setNewLetter({ ...newLetter, subject: e.target.value })}
-                  maxLength={500}
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select
-                  value={newLetter.status}
-                  onChange={(e) => setNewLetter({ ...newLetter, status: e.target.value as RPMLetter['status'] })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  <option value="Adequate">Adequate</option>
-                  <option value="Inadequate">Inadequate</option>
-                  <option value="Reminder 1">Reminder 1</option>
-                  <option value="Reminder 2">Reminder 2</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setShowAddLetterModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddLetter}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
-              >
-                Add Letter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              
+              <div className="p-6 space-y-6">
+                 {/* Header Info */}
+                 <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4 border border-gray-100">
+                    <div>
+                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nomor Surat</label>
+                       <p className="mt-1 text-base font-medium text-gray-900">{selectedDoc.letter_number}</p>
+                    </div>
+                     <div>
+                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tanggal</label>
+                       <p className="mt-1 text-base font-medium text-gray-900">
+                         {new Date(selectedDoc.date).toLocaleDateString('id-ID', { dateStyle: 'full' })}
+                       </p>
+                    </div>
+                    <div>
+                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Branch</label>
+                       <p className="mt-1 text-sm font-medium text-gray-900">{selectedDoc.branch_name}</p>
+                    </div>
+                    <div>
+                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Region</label>
+                       <p className="mt-1 text-sm font-medium text-gray-900">{selectedDoc.region}</p>
+                    </div>
+                 </div>
 
-      {/* Edit Letter Modal */}
-      {showEditLetterModal && editingLetter && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Letter</h3>
-              <button
-                onClick={() => {
-                  setShowEditLetterModal(false);
-                  setEditingLetter(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Letter Number</label>
-                <input
-                  type="text"
-                  value={editingLetter.letter_number}
-                  disabled
-                  className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm cursor-not-allowed"
-                />
+                 {/* Specific Fields based on Type */}
+                 <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-900 border-b pb-2">Informasi Detail</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                       {selectedDoc.type === 'Surat Tugas' ? (
+                          <>
+                             <div>
+                                <label className="block text-sm text-gray-500">Tipe Audit</label>
+                                <span className="text-gray-900 font-medium">{selectedDoc.raw_data.audit_type || '-'}</span>
+                             </div>
+                             <div>
+                                <label className="block text-sm text-gray-500">Tim Audit</label>
+                                <span className="text-gray-900 font-medium whitespace-pre-wrap">{selectedDoc.raw_data.team ? selectedDoc.raw_data.team.replace(/[[\]"]/g, '') : '-'}</span>
+                             </div>
+                             <div className="col-span-2">
+                                <label className="block text-sm text-gray-500">Periode Audit</label>
+                                <span className="text-gray-900 font-medium">
+                                   {selectedDoc.raw_data.audit_start_date && new Date(selectedDoc.raw_data.audit_start_date).toLocaleDateString('id-ID')} s.d. {selectedDoc.raw_data.audit_end_date && new Date(selectedDoc.raw_data.audit_end_date).toLocaleDateString('id-ID')}
+                                </span>
+                             </div>
+                          </>
+                       ) : (
+                          <>
+                              <div>
+                                <label className="block text-sm text-gray-500">Tipe Addendum</label>
+                                <span className="text-gray-900 font-medium">{selectedDoc.raw_data.addendum_type || '-'}</span>
+                             </div>
+                             <div>
+                                <label className="block text-sm text-gray-500">Nomor Surat Asal</label>
+                                <span className="text-gray-900 font-medium">{selectedDoc.raw_data.assignment_letter_before || '-'}</span>
+                             </div>
+                             <div className="col-span-2">
+                                <label className="block text-sm text-gray-500">Keterangan</label>
+                                <p className="text-gray-900 font-medium bg-gray-50 p-2 rounded mt-1 border border-gray-100">
+                                  {selectedDoc.raw_data.keterangan || selectedDoc.raw_data.description || '-'}
+                                </p>
+                             </div>
+                          </>
+                       )}
+                    </div>
+                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Letter Date</label>
-                <input
-                  type="date"
-                  value={editingLetter.letter_date}
-                  onChange={(e) => setEditingLetter({ ...editingLetter, letter_date: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
+              
+              <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end">
+                 <Button onClick={() => setShowDocDetailModal(false)}>Close</Button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Region</label>
-                <input
-                  type="text"
-                  value={editingLetter.region}
-                  onChange={(e) => setEditingLetter({ ...editingLetter, region: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Branch/Region/HO</label>
-                <input
-                  type="text"
-                  value={editingLetter.branch_or_region_ho}
-                  onChange={(e) => setEditingLetter({ ...editingLetter, branch_or_region_ho: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Subject</label>
-                <textarea
-                  value={editingLetter.subject}
-                  onChange={(e) => setEditingLetter({ ...editingLetter, subject: e.target.value })}
-                  maxLength={500}
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-            
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowEditLetterModal(false);
-                  setEditingLetter(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateLetter}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+           </div>
         </div>
       )}
 

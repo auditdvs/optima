@@ -152,7 +152,13 @@ function Layout({ children }: LayoutProps) {
 
         // Only show popup if there are pending items
         if (totalLetters > 0 || totalAddendums > 0) {
-          setShowManagerAlert(true);
+          const today = new Date().toDateString();
+          const lastShown = localStorage.getItem('manager_approval_popup_last_shown');
+          
+          if (lastShown !== today) {
+            setShowManagerAlert(true);
+            localStorage.setItem('manager_approval_popup_last_shown', today);
+          }
         } else {
            setShowManagerAlert(false);
         }
@@ -538,15 +544,24 @@ function Layout({ children }: LayoutProps) {
               </div>
 
               {/* Action Button */}
-              <button
-                onClick={handleOkClick}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-all shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 flex items-center justify-center gap-2 group"
-              >
-                <span>Tinjau Dokumen</span>
-                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleOkClick}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-all shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 flex items-center justify-center gap-2 group"
+                >
+                  <span>Tinjau Dokumen</span>
+                  <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowManagerAlert(false)}
+                  className="flex-1 py-2.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition-all hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200"
+                >
+                  Nanti Saja
+                </button>
+              </div>
             </div>
 
           </div>

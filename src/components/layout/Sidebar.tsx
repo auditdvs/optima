@@ -1,23 +1,24 @@
 import {
-  ChartPie,
-  ChevronsUpDown,
-  FilePenLine,
-  FileText,
-  FileVideo,
-  GitPullRequest,
-  History,
-  KeyRound,
-  LayoutDashboard,
-  Library,
-  LogOut,
-  Megaphone,
-  ScanFace,
-  Table2,
-  Ticket,
-  UserRoundPen,
-  Users,
-  Wrench,
-  X
+    ChartPie,
+    ChevronsUpDown,
+    FileCheck,
+    FilePenLine,
+    FileText,
+    FileVideo,
+    GitPullRequest,
+    History,
+    KeyRound,
+    LayoutDashboard,
+    Library,
+    LogOut,
+    Megaphone,
+    ScanFace,
+    Table2,
+    Ticket,
+    UserRoundPen,
+    Users,
+    Wrench,
+    X
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -169,6 +170,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
     const auditItems = [];
     if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole)) auditItems.push({ path: '/qa-section', icon: FilePenLine, label: 'Update Audits' });
     if (['superadmin', 'qa', 'manager'].includes(userRole)) auditItems.push({ path: '/qa-management', icon: Users, label: 'QA Workpapers' });
+    if (['superadmin', 'qa', 'manager', 'dvs', 'user', 'risk'].includes(userRole)) auditItems.push({ path: '/auditor-workpapers', icon: FileCheck, label: 'Auditor Workpapers' });
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole)) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
     auditItems.push({ path: '/tools', icon: Wrench, label: 'Tools' });
 
