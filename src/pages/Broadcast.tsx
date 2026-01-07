@@ -10,12 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
 } from "../components/ui/table";
 import { Textarea } from "../components/ui/textarea";
 
@@ -48,6 +48,7 @@ function Broadcast() {
   const [notifications, setNotifications] = useState<NotificationWithReaders[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showAsPopup, setShowAsPopup] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -152,6 +153,7 @@ function Broadcast() {
           sender_id: user.id,
           attachment_url: attachmentUrl,
           attachment_name: attachmentDetails?.name,
+          show_as_popup: showAsPopup,
           created_at: new Date().toISOString()
         })
         .select();
@@ -164,6 +166,7 @@ function Broadcast() {
       setTitle('');
       setMessage('');
       setFile(null);
+      setShowAsPopup(false);
       setDialogOpen(false);
       fetchNotifications();
     } catch (error) {
@@ -282,7 +285,8 @@ function Broadcast() {
                     id="message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    rows={4}
+                    rows={8}
+                    className="min-h-[180px] resize-y"
                     required
                   />
                 </div>
@@ -323,6 +327,25 @@ function Broadcast() {
                   <p className="text-sm text-gray-500">
                     PDF, JPG, PNG or GIF up to 5MB
                   </p>
+                </div>
+
+                {/* Popup Option */}
+                <div className="flex items-center space-x-3 py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="showAsPopup"
+                    checked={showAsPopup}
+                    onChange={(e) => setShowAsPopup(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <Label htmlFor="showAsPopup" className="text-sm font-medium cursor-pointer">
+                      Tampilkan sebagai Pop-up
+                    </Label>
+                    <span className="text-xs text-gray-500">
+                      Pesan akan muncul sebagai pop-up saat user login (hanya sekali)
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

@@ -28,6 +28,15 @@ function Layout({ children }: LayoutProps) {
     branch_name: string;
     rejection_reason: string;
   } | null>(null);
+
+  // Popup broadcast notification state
+  const [popupNotification, setPopupNotification] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    attachment_url?: string;
+    attachment_name?: string;
+  } | null>(null);
   
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
@@ -395,6 +404,66 @@ function Layout({ children }: LayoutProps) {
     setShowProcrastinateConfirm(false); // Close confirm
   };
 
+  // Check for popup notifications on login
+  useEffect(() => {
+    const checkPopupNotifications = async () => {
+      if (!user) return;
+
+      try {
+        // Get unread popup notifications
+        const { data: unreadPopups, error } = await supabase
+          .from('notifications')
+          .select('id, title, message, attachment_url, attachment_name')
+          .eq('show_as_popup', true)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error('Error fetching popup notifications:', error);
+          return;
+        }
+
+        if (!unreadPopups || unreadPopups.length === 0) return;
+
+        const popup = unreadPopups[0];
+
+        // Check if user already read this popup
+        const { data: readData } = await supabase
+          .from('notification_reads')
+          .select('id')
+          .eq('notification_id', popup.id)
+          .eq('user_id', user.id)
+          .single();
+
+        // If not read, show popup
+        if (!readData) {
+          setPopupNotification(popup);
+        }
+      } catch (err) {
+        console.error('Error checking popup notifications:', err);
+      }
+    };
+
+    checkPopupNotifications();
+  }, [user]);
+
+  const handleDismissPopup = async () => {
+    if (!popupNotification || !user) return;
+
+    try {
+      // Mark as read
+      await supabase.from('notification_reads').insert({
+        notification_id: popupNotification.id,
+        user_id: user.id,
+        read_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Error marking popup as read:', err);
+    }
+
+    setPopupNotification(null);
+  };
+
   const theme = getPriorityTheme(highestPriority);
   
   return (
@@ -659,6 +728,61 @@ function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Popup Broadcast Notification Modal (iOS Style) */}
+      {popupNotification && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+          {/* Backdrop with blur */}
+          <div 
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300" 
+            onClick={() => {}} // Prevent click outside to close if desired, or handleDismissPopup to close
+          />
+          
+          <div className="relative w-full max-w-2xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden ring-1 ring-black/5">
+            <div className="flex flex-col max-h-[85vh]">
+              
+              {/* iOS Header Style */}
+              <div className="pt-8 px-8 pb-4 text-center">
+                <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
+                  {popupNotification.title}
+                </h3>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="px-8 pb-6 overflow-y-auto">
+                <div className="text-base text-gray-700 leading-relaxed text-center whitespace-pre-wrap">
+                  {popupNotification.message}
+                </div>
+
+                {/* Attachment - cleaner look */}
+                {popupNotification.attachment_url && (
+                  <div 
+                    onClick={() => window.open(popupNotification.attachment_url, '_blank')}
+                    className="mt-6 flex items-center justify-center gap-2 py-3 px-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer border border-gray-100 group"
+                  >
+                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span className="text-sm font-medium text-blue-600 group-hover:text-blue-700 truncate max-w-[200px]">
+                      {popupNotification.attachment_name || 'Lihat Lampiran'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Button - Full width divider style common in iOS */}
+              <div className="border-t border-gray-100 bg-gray-50/50">
+                <button
+                  onClick={handleDismissPopup}
+                  className="w-full py-4 text-blue-600 font-semibold text-lg hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none"
+                >
+                  Mengerti
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
