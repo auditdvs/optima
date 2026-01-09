@@ -289,24 +289,35 @@ const AuditSummary = () => {
             return (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <Card className="bg-red-100">
-                    <CardContent className="flex flex-col items-center py-6">
-                      <span className="text-3xl font-bold text-rose-600">{filteredSummary.high}</span>
-                      <span className="text-lg font-semibold text-rose-500 mt-2">Total High</span>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-yellow-100">
-                    <CardContent className="flex flex-col items-center py-6">
-                      <span className="text-3xl font-bold text-amber-600">{filteredSummary.medium}</span>
-                      <span className="text-lg font-semibold text-amber-500 mt-2">Total Medium</span>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-green-100">
-                    <CardContent className="flex flex-col items-center py-6">
-                      <span className="text-3xl font-bold text-emerald-600">{filteredSummary.low}</span>
-                      <span className="text-lg font-semibold text-emerald-500 mt-2">Total Low</span>
-                    </CardContent>
-                  </Card>
+                  <div className="bg-white rounded-xl border border-rose-100 shadow-sm p-4 flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                       <ArrowUpDown size={24} className="transform rotate-180" /> {/* Mimic high icon or use simple circle */}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">High Risk</p>
+                      <p className="text-2xl font-bold text-gray-900">{filteredSummary.high}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-xl border border-amber-100 shadow-sm p-4 flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                       <div className="w-6 h-1 bg-current rounded-full" /> {/* Medium dash */}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Medium Risk</p>
+                      <p className="text-2xl font-bold text-gray-900">{filteredSummary.medium}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-emerald-100 shadow-sm p-4 flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                       <ArrowUpDown size={24} /> {/* Mimic low icon */}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Low Risk</p>
+                      <p className="text-2xl font-bold text-gray-900">{filteredSummary.low}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Bar Chart Style shadcn */}
@@ -386,24 +397,24 @@ const AuditSummary = () => {
 
                 {/* Tambahkan Tabel Recap Rating Per Region */}
                 <div className="mt-8">
-                  <h4 className="text-md font-semibold mb-2">Audit Rating Recap Per Region</h4>
-                  <div className="overflow-x-auto rounded-md border">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-4">Regional Breakdown</h4>
+                  <div className="overflow-hidden rounded-xl border border-gray-200">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-rose-500 uppercase tracking-wider">High</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-amber-500 uppercase tracking-wider">Medium</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-emerald-500 uppercase tracking-wider">Low</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Region</th>
+                          <th className="px-6 py-3 text-center text-xs font-semibold text-rose-600 uppercase tracking-wider bg-rose-50/50">High</th>
+                          <th className="px-6 py-3 text-center text-xs font-semibold text-amber-600 uppercase tracking-wider bg-amber-50/50">Medium</th>
+                          <th className="px-6 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wider bg-emerald-50/50">Low</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {auditRatingByRegion.map(region => (
-                          <tr key={region.region}>
-                            <td className="px-3 py-2 text-xs text-gray-900">{region.region}</td>
-                            <td className="px-3 py-2 text-center text-xs font-bold text-rose-600">{region.high}</td>
-                            <td className="px-3 py-2 text-center text-xs font-bold text-amber-600">{region.medium}</td>
-                            <td className="px-3 py-2 text-center text-xs font-bold text-emerald-600">{region.low}</td>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {auditRatingByRegion.map((region, idx) => (
+                          <tr key={region.region} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                            <td className="px-6 py-3 text-sm font-medium text-gray-900">{region.region}</td>
+                            <td className="px-6 py-3 text-center text-sm font-semibold text-rose-600 bg-rose-50/30">{region.high || '-'}</td>
+                            <td className="px-6 py-3 text-center text-sm font-semibold text-amber-600 bg-amber-50/30">{region.medium || '-'}</td>
+                            <td className="px-6 py-3 text-center text-sm font-semibold text-emerald-600 bg-emerald-50/30">{region.low || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -610,76 +621,87 @@ const AuditSummary = () => {
 
       {/* Container Baru: Report */}
       <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="text-lg">Report</CardTitle>
-          <div className="mt-2 flex gap-2 items-center flex-wrap">
-            {/* Region Filter as Label + Button */}
-            <button
-              className={`px-3 py-1 rounded-md text-xs font-medium border ${selectedRegionReport === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
-              onClick={() => setSelectedRegionReport('ALL')}
-              type="button"
-            >
-              All Region
-            </button>
-            {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
-              <button
-                key={region}
-                className={`px-3 py-1 rounded-md text-xs font-medium border ${selectedRegionReport === region ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
-                onClick={() => setSelectedRegionReport(region)}
-                type="button"
-              >
-                Regional {region}
-              </button>
-            ))}
-            <label className="flex items-center text-xs font-medium ml-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <CardTitle className="text-lg font-bold text-gray-900">Report Status</CardTitle>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer group">
               <input
                 type="checkbox"
                 checked={reportUndoneOnly}
                 onChange={e => setReportUndoneOnly(e.target.checked)}
-                className="mr-2 h-4 w-4" // Tambahkan h-5 w-5 untuk memperbesar checkbox
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
-              Show only Undone
+              <span className="text-sm text-gray-600 group-hover:text-gray-900 select-none">Show Undone Only</span>
             </label>
+            
+            <div className="relative min-w-[180px]">
+              <select
+                value={selectedRegionReport}
+                onChange={(e) => setSelectedRegionReport(e.target.value)}
+                className="w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 text-sm"
+              >
+                <option value="ALL">All Regions</option>
+                {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
+                  <option key={region} value={region}>Regional {region}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-hidden rounded-xl border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch Name</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RTA</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">No.</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Branch Name</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">RTA</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Report</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {regularAudits
                   .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
                   .filter(audit => {
-                    const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
                     const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     if (!reportUndoneOnly) return true;
                     return rtaStatus === 'Undone' || reportStatus === 'Undone';
                   })
                   .map((audit, idx) => {
-                    const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
                     const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     return (
-                      <tr key={branchName + idx}>
-                        <td className="px-3 py-2 text-xs text-gray-900">{idx + 1}</td>
-                        <td className="px-3 py-2 text-xs text-gray-900">{branchName}</td>
-                        <td className={`px-3 py-2 text-xs font-semibold ${audit.rta ? 'text-green-600' : 'text-red-600'}`}>{rtaStatus}</td>
-                        <td className={`px-3 py-2 text-xs font-semibold ${reportStatus === 'Done' ? 'text-green-600' : 'text-red-600'}`}>{reportStatus}</td>
+                      <tr key={audit.branch_name + idx} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-3 text-sm text-gray-900">{idx + 1}</td>
+                        <td className="px-6 py-3 text-sm font-medium text-gray-900">{audit.branch_name}</td>
+                        <td className="px-6 py-3 text-center">
+                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                             audit.rta 
+                               ? 'bg-emerald-100 text-emerald-800' 
+                               : 'bg-rose-100 text-rose-800'
+                           }`}>
+                             {rtaStatus}
+                           </span>
+                        </td>
+                        <td className="px-6 py-3 text-center">
+                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                             reportStatus === 'Done' 
+                               ? 'bg-emerald-100 text-emerald-800' 
+                               : 'bg-rose-100 text-rose-800'
+                           }`}>
+                             {reportStatus}
+                           </span>
+                        </td>
                       </tr>
                     );
                   })}
                 {regularAudits
                   .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
                   .filter(audit => {
-                    const branchName = audit.branch_name;
                     const rtaStatus = audit.rta ? 'Done' : 'Undone';
                     const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
                     if (!reportUndoneOnly) return true;

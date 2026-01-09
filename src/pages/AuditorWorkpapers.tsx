@@ -1,4 +1,4 @@
-import { Check, Save, Search, X } from 'lucide-react';
+import { Check, Save, Search, User, Users, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import RPMRegistrationComponent from '../components/assignment/RPMRegistration';
@@ -59,12 +59,14 @@ const CheckboxCell = ({
 }) => {
   return (
     <div 
-      className={`flex items-center justify-center w-8 h-8 rounded cursor-pointer transition-colors ${
-        checked ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-md cursor-pointer transition-all duration-200 border ${
+        checked 
+          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
+          : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
       }`}
       onClick={() => onChange(!checked)}
     >
-      {checked ? <Check size={18} /> : <X size={18} />}
+      {checked ? <Check size={16} strokeWidth={2.5} /> : <X size={16} strokeWidth={2.5} />}
     </div>
   );
 };
@@ -84,18 +86,36 @@ const getInitialsFromName = (name: string, auditors: Auditor[]): string => {
   return nameParts.map(part => part[0]).join('').toUpperCase();
 };
 
+const getTeamInitials = (teamStr: string | undefined, auditors: Auditor[]): string => {
+  if (!teamStr) return '';
+  let names: string[] = [];
+  try {
+    const parsed = JSON.parse(teamStr);
+    if (Array.isArray(parsed)) {
+      names = parsed;
+    } else {
+      names = [teamStr];
+    }
+  } catch {
+     names = teamStr.split(',').map(s => s.trim());
+  }
+  
+  if (names.length === 0) return '';
+  return names.map(name => getInitialsFromName(name, auditors)).join(', ');
+};
+
 const formatAuditPeriod = (audit: AuditMaster): string => {
   const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'
   ];
-  
+
   if (audit.audit_period_start && audit.audit_period_end) {
     const formatMonthYear = (dateStr: string) => {
       const date = new Date(dateStr);
       const month = monthNames[date.getMonth()];
       const year = date.getFullYear();
-      return `${month}, ${year}`;
+      return `${month} ${year}`;
     };
     return `${formatMonthYear(audit.audit_period_start)} s.d. ${formatMonthYear(audit.audit_period_end)}`;
   }
@@ -105,7 +125,7 @@ const formatAuditPeriod = (audit: AuditMaster): string => {
       const date = new Date(dateStr);
       const month = monthNames[date.getMonth()];
       const year = date.getFullYear();
-      return `${month}, ${year}`;
+      return `${month} ${year}`;
     };
     return `${formatMonthYear(audit.audit_start_date)} s.d. ${formatMonthYear(audit.audit_end_date)}`;
   }
@@ -256,22 +276,22 @@ const AuditorWorkpapers: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 min-h-screen">
+    <div className="space-y-6 h-full">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Kertas Kerja Auditor</h1>
-            <p className="text-sm text-gray-500 mt-1">Kelola kertas kerja audit reguler dan khusus. Setelah checklist jangan lupa klik tombol simpan, untuk menyimpan data yang sudah di checklist.</p>
-          </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Kertas Kerja Auditor</h1>
+          <p className="text-sm text-gray-500 mt-1">Kelola kertas kerja audit reguler dan khusus. Setelah checklist jangan lupa klik tombol simpan, untuk menyimpan data yang sudah di checklist.</p>
+        </div>
 
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           {/* Tabs */}
           <div className="inline-flex items-center bg-gray-100 p-1 rounded-lg w-full md:w-auto overflow-x-auto">
             <button
@@ -305,15 +325,13 @@ const AuditorWorkpapers: React.FC = () => {
               Register RPM
             </button>
           </div>
-        </div>
 
-        {/* Action Buttons - only show for audit tabs */}
-        {activeTab !== 'rpm' && (
-          <div className="flex gap-2 flex-wrap md:justify-end">
+          {/* Action Buttons - only show for audit tabs */}
+          {activeTab !== 'rpm' && (
             <button
               onClick={handleSaveChanges}
               disabled={Object.keys(modifiedRows).length === 0}
-              className={`flex-1 md:flex-none flex items-center justify-center px-4 py-2 text-white rounded transition-colors text-sm font-medium ${
+              className={`flex-1 md:flex-none flex items-center justify-center px-4 py-2 text-white rounded-md transition-colors text-sm font-medium shadow-sm ${
                 Object.keys(modifiedRows).length > 0 
                   ? 'bg-indigo-600 hover:bg-indigo-700' 
                   : 'bg-gray-400 cursor-not-allowed'
@@ -322,8 +340,8 @@ const AuditorWorkpapers: React.FC = () => {
               <Save size={18} className="mr-2" />
               <span>Simpan</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* RPM Registration Tab Content */}
@@ -381,8 +399,9 @@ const AuditorWorkpapers: React.FC = () => {
             <div key={audit.id} className="bg-white p-4 rounded-lg shadow border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-gray-900">{audit.branch_name}</h3>
-                  <div className="text-xs text-gray-500 mt-0.5">{audit.region}</div>
+                  <h3 className="font-bold text-gray-900">
+                    {audit.branch_name} <span className="font-normal text-gray-500 ml-1">| {audit.region}</span>
+                  </h3>
                 </div>
               </div>
 
@@ -394,7 +413,18 @@ const AuditorWorkpapers: React.FC = () => {
                     </div>
                     <div>
                        <span className="block text-gray-400 font-medium">Tim</span>
-                       <span className="truncate block" title={audit.team}>{audit.leader ? getInitialsFromName(audit.leader, auditors) : '-'}</span>
+                       <div className="flex flex-col gap-1 mt-1">
+                         <div className="flex items-center gap-1.5">
+                           <User size={10} className="text-indigo-400"/>
+                           <span className="truncate text-indigo-700 font-medium" title={audit.leader}>{audit.leader ? getInitialsFromName(audit.leader, auditors) : '-'}</span>
+                         </div>
+                         {audit.team && (
+                           <div className="flex items-center gap-1.5 text-gray-500">
+                             <Users size={10} className="text-gray-400"/>
+                             <span className="truncate" title={audit.team}>{getTeamInitials(audit.team, auditors)}</span>
+                           </div>
+                         )}
+                       </div>
                     </div>
                  </div>
 
@@ -438,8 +468,8 @@ const AuditorWorkpapers: React.FC = () => {
                            value={audit.monitoring_reg || ''}
                            onChange={(e) => handleTextChange(audit.id, 'monitoring_reg', e.target.value)}
                            className={`w-full text-sm border rounded-lg p-2.5 transition-colors ${
-                             audit.monitoring_reg === 'Memadai' ? 'text-green-700 border-green-200 bg-green-50' :
-                             audit.monitoring_reg === 'Tidak Memadai' ? 'text-red-700 border-red-200 bg-red-50' : 
+                             audit.monitoring_reg === 'Memadai' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
+                             audit.monitoring_reg === 'Tidak Memadai' ? 'text-rose-700 border-rose-200 bg-rose-50' : 
                              'border-gray-200 bg-white'
                            }`}
                          >
@@ -477,28 +507,28 @@ const AuditorWorkpapers: React.FC = () => {
                 <th className="px-4 py-3 sticky left-0 bg-gray-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Informasi Cabang</th>
                 {activeTab === 'regular' && (
                   <>
-                    <th className="px-2 py-3 text-center min-w-[80px]">DAPA</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">DAPA Perubahan</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Data Pendukung</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Surat Tugas</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Ent. Agenda</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">KK Audit</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Exit Agenda</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Exit Attendance</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">SHA</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">RTA</th>
-                    <th className="px-2 py-3 text-center min-w-[120px]">Monitoring</th>
-                    <th className="px-2 py-3 min-w-[200px]">Komentar</th>
+                    <th className="px-2 py-3 text-center min-w-[70px] font-semibold text-gray-600 align-bottom">DAPA</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">DAPA Perubahan</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">Data Pendukung DAPA</th>
+                    <th className="px-2 py-3 text-center min-w-[70px] font-semibold text-gray-600 align-bottom">Surat Tugas</th>
+                    <th className="px-2 py-3 text-center min-w-[80px] font-semibold text-gray-600 align-bottom">Ent. Agenda</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">KK Pemeriksaan</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">BA Exit Meeting</th>
+                    <th className="px-2 py-3 text-center min-w-[80px] font-semibold text-gray-600 align-bottom">Absensi Exit</th>
+                    <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">LHA</th>
+                    <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">RTA</th>
+                    <th className="px-2 py-3 text-center min-w-[120px] font-semibold text-gray-600 align-bottom">Monitoring</th>
+                    <th className="px-2 py-3 min-w-[200px] font-semibold text-gray-600 align-bottom">Komentar</th>
                   </>
                 )}
                 {activeTab === 'special' && (
                   <>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Data Persiapan</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">Surat Tugas</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">KK Audit</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">LHA</th>
-                    <th className="px-2 py-3 text-center min-w-[80px]">SHA</th>
-                    <th className="px-2 py-3 min-w-[200px]">Komentar</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">Data Persiapan</th>
+                    <th className="px-2 py-3 text-center min-w-[80px] font-semibold text-gray-600 align-bottom">Surat Tugas</th>
+                    <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">KK Pemeriksaan</th>
+                    <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">SHA</th>
+                    <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">RTA</th>
+                    <th className="px-2 py-3 min-w-[200px] font-semibold text-gray-600 align-bottom">Komentar</th>
                   </>
                 )}
               </tr>
@@ -515,13 +545,23 @@ const AuditorWorkpapers: React.FC = () => {
                   <tr key={audit.id} className={`hover:bg-gray-50 transition-colors ${modifiedRows[audit.id] ? 'bg-yellow-50' : ''}`}>
                     <td className="px-4 py-3 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                       <div className="min-w-[200px]">
-                        <div className="font-semibold text-gray-900">{audit.branch_name}</div>
-                        <div className="text-xs text-gray-500">{audit.region}</div>
+                        <div className="font-semibold text-gray-900">
+                          {audit.branch_name} <span className="font-normal text-gray-500 ml-1">| {audit.region}</span>
+                        </div>
                         <div className="text-xs text-gray-400 mt-1">
                           {activeTab === 'regular' ? formatAuditPeriod(audit) : `${new Date(audit.audit_start_date).toLocaleDateString()} - ${new Date(audit.audit_end_date).toLocaleDateString()}`}
                         </div>
-                        <div className="text-xs text-indigo-600 font-medium mt-0.5">
-                          {audit.leader ? getInitialsFromName(audit.leader, auditors) : '-'}
+                        <div className="flex flex-col gap-1 mt-2">
+                          <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-medium" title={`Ketua Tim: ${audit.leader}`}>
+                            <User size={12} className="text-indigo-400" />
+                            {audit.leader ? getInitialsFromName(audit.leader, auditors) : '-'}
+                          </div>
+                          {audit.team && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500" title={`Anggota Tim: ${audit.team}`}>
+                              <Users size={12} className="text-gray-400" />
+                              {getTeamInitials(audit.team, auditors)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -543,8 +583,8 @@ const AuditorWorkpapers: React.FC = () => {
                             value={audit.monitoring_reg || ''}
                             onChange={(e) => handleTextChange(audit.id, 'monitoring_reg', e.target.value)}
                             className={`w-full text-xs border rounded p-1.5 ${
-                              audit.monitoring_reg === 'Memadai' ? 'text-green-700 border-green-200 bg-green-50' :
-                              audit.monitoring_reg === 'Tidak Memadai' ? 'text-red-700 border-red-200 bg-red-50' : ''
+                              audit.monitoring_reg === 'Memadai' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
+                              audit.monitoring_reg === 'Tidak Memadai' ? 'text-rose-700 border-rose-200 bg-rose-50' : ''
                             }`}
                           >
                             <option value="">-</option>

@@ -51,7 +51,7 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
   const fetchBranches = async () => {
     try {
       const { data, error } = await supabase
-        .from('branches')
+        .from('branches_info')
         .select('id, name, region')
         .order('name');
 

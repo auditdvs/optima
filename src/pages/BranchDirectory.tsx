@@ -244,7 +244,7 @@ const BranchDirectory: React.FC = () => {
     setDeleteError('');
     if (!selectedBranch) return;
 
-    const requiredPassword = '17727721dhe';
+    const requiredPassword = 'auditoptima';
     if (deletePassword !== requiredPassword) {
       setDeleteError('Password salah!');
       toast.error("Password salah!");
