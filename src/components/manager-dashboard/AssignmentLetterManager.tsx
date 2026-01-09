@@ -39,7 +39,7 @@ interface Account {
 
 interface AssignmentLetterManagerProps {
   refreshTrigger?: number;
-  initialTab?: 'letter' | 'addendum' | 'lpj';
+  initialTab?: 'letter' | 'addendum' | 'lpj' | 'mutasi';
 }
 
 interface LpjSubmission {
@@ -67,7 +67,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj'>(initialTab || 'letter');
+  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj' | 'mutasi'>(initialTab || 'letter');
   const [lpjSubmissions, setLpjSubmissions] = useState<LpjSubmission[]>([]);
   const [lpjFilter, setLpjFilter] = useState<'all' | 'submitted' | 'pending'>('all');
   const [showAddendumDetailModal, setShowAddendumDetailModal] = useState(false);
@@ -75,12 +75,21 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   const [addendumRejectionReason, setAddendumRejectionReason] = useState('');
   const [isEditingKeterangan, setIsEditingKeterangan] = useState(false);
   const [editedKeterangan, setEditedKeterangan] = useState('');
+  
+  // Audit Mutasi states
+  const [mutasiList, setMutasiList] = useState<any[]>([]);
+  const [selectedMutasi, setSelectedMutasi] = useState<any>(null);
+  const [showMutasiDetailModal, setShowMutasiDetailModal] = useState(false);
+  const [showMutasiRejectModal, setShowMutasiRejectModal] = useState(false);
+  const [showMutasiApproveConfirm, setShowMutasiApproveConfirm] = useState(false);
+  const [mutasiRejectionReason, setMutasiRejectionReason] = useState('');
 
   useEffect(() => {
     fetchLetters();
     fetchAddendums();
     fetchAccounts();
     fetchLpjSubmissions();
+    fetchMutasiList();
   }, [refreshTrigger]);
 
   const fetchLetters = async () => {
@@ -170,6 +179,84 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
     return user;
   };
 
+  const fetchMutasiList = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_mutasi')
+        .select('*')
+        .order('departure_date', { ascending: false });
+
+      if (error) throw error;
+      setMutasiList(data || []);
+    } catch (error) {
+      console.error('Error fetching mutasi:', error);
+    }
+  };
+
+  const handleApproveMutasi = async (id: number) => {
+    setProcessingId(String(id));
+    try {
+      const { error } = await supabase
+        .from('audit_mutasi')
+        .update({ status: 'approved' })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Audit Mutasi disetujui');
+      setShowMutasiDetailModal(false);
+      fetchMutasiList();
+    } catch (error) {
+      console.error('Error approving mutasi:', error);
+      toast.error('Gagal menyetujui');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectMutasi = async (id: number, reason: string) => {
+    if (!reason.trim()) {
+      toast.error('Alasan penolakan harus diisi');
+      return;
+    }
+    setProcessingId(String(id));
+    try {
+      const { error } = await supabase
+        .from('audit_mutasi')
+        .update({ status: 'rejected', reject_reason: reason })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Audit Mutasi ditolak');
+      setShowMutasiRejectModal(false);
+      setShowMutasiDetailModal(false);
+      setMutasiRejectionReason('');
+      fetchMutasiList();
+    } catch (error) {
+      console.error('Error rejecting mutasi:', error);
+      toast.error('Gagal menolak');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const formatMutasiDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const formatMutasiCurrency = (value: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(value || 0);
+  };
+
   const handleApprove = async (letterId: string) => {
     setProcessingId(letterId);
     try {
@@ -197,7 +284,11 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
         await approveLetterFallback(letterId, user.id);
         toast.success('Assignment Letter berhasil disetujui (fallback)', { id: 'approve-letter' });
       }
-
+      
+      // Close the modal after successful approval
+      setShowDetailModal(false);
+      setSelectedLetter(null);
+      
       fetchLetters();
     } catch (error) {
       console.error('Error approving letter:', error);
@@ -761,143 +852,162 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   return (
     <div className="space-y-4">
       
-      {/* Sub Tab Navigation dengan Statistics */}
-      <div className="bg-white rounded-lg shadow-sm mb-4">
-        <div className="border-b border-gray-200">
-          <div className="flex items-center justify-between px-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('letter')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'letter'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center">
-                  Surat Tugas
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab('addendum')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'addendum'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center">
-                  Addendum
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab('lpj')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'lpj'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center">
-                  Laporan Pertanggungjawaban
-                </div>
-              </button>
+      {/* Summary Stats Table */}
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <table className="min-w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Surat Tugas</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Addendum</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">LPJ</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Audit Mutasi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {/* Total Row */}
+            <tr className="hover:bg-gray-50">
+              <td className="px-4 py-2 text-sm font-medium text-gray-700">Total</td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                  {letters.length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                  {addendums.length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                  {letters.filter(l => l.status === 'approved').length + addendums.filter(a => a.status === 'approved').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                  {mutasiList.length}
+                </span>
+              </td>
+            </tr>
+            {/* Pending Row */}
+            <tr className="hover:bg-gray-50">
+              <td className="px-4 py-2 text-sm font-medium text-yellow-700">Pending</td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                  {letters.filter(l => l.status === 'pending').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                  {addendums.filter(a => a.status === 'pending').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                  {(letters.filter(l => l.status === 'approved').length + addendums.filter(a => a.status === 'approved').length) - lpjSubmissions.length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                  {mutasiList.filter(m => m.status === 'pending').length}
+                </span>
+              </td>
+            </tr>
+            {/* Approved Row */}
+            <tr className="hover:bg-gray-50">
+              <td className="px-4 py-2 text-sm font-medium text-green-700">Approved</td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  {letters.filter(l => l.status === 'approved').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  {addendums.filter(a => a.status === 'approved').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  {lpjSubmissions.length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  {mutasiList.filter(m => m.status === 'approved').length}
+                </span>
+              </td>
+            </tr>
+            {/* Rejected Row */}
+            <tr className="hover:bg-gray-50">
+              <td className="px-4 py-2 text-sm font-medium text-red-700">Rejected</td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                  {letters.filter(l => l.status === 'rejected').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                  {addendums.filter(a => a.status === 'rejected').length}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="text-gray-400 text-xs">-</span>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                  {mutasiList.filter(m => m.status === 'rejected').length}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-            </nav>
-            
-            {/* Statistics */}
-            <div className="flex items-center space-x-2 py-4">
-              {activeTab === 'lpj' ? (
-                <>
-                  {/* LPJ Stats: Total Approved, Sudah Input, Belum Input */}
-                  <div className="flex items-center bg-gray-100 px-2 py-1 rounded-md">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-gray-700">Total Approved:</span>
-                      <span className="text-xs font-bold text-gray-900">
-                        {letters.filter(l => l.status === 'approved').length + addendums.filter(a => a.status === 'approved').length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center bg-green-50 px-2 py-1 rounded-md border border-green-200">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-green-700">Sudah Input LPJ:</span>
-                      <span className="text-xs font-bold text-green-800">
-                        {lpjSubmissions.length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-amber-700">Belum Input LPJ:</span>
-                      <span className="text-xs font-bold text-amber-800">
-                        {(letters.filter(l => l.status === 'approved').length + addendums.filter(a => a.status === 'approved').length) - lpjSubmissions.length}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Standard Stats for Letter/Addendum/Timeline */}
-                  <div className="flex items-center bg-gray-100 px-2 py-1 rounded-md">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-gray-700">Total:</span>
-                      <span className="text-xs font-bold text-gray-900">
-                        {activeTab === 'letter' ? letters.length : activeTab === 'addendum' ? addendums.length : letters.length + addendums.length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center bg-yellow-50 px-2 py-1 rounded-md border border-yellow-200">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-yellow-700">Pending:</span>
-                      <span className="text-xs font-bold text-yellow-800">
-                        {activeTab === 'letter' 
-                          ? letters.filter(l => l.status === 'pending').length 
-                          : activeTab === 'addendum' 
-                            ? addendums.filter(a => a.status === 'pending').length
-                            : letters.filter(l => l.status === 'pending').length + addendums.filter(a => a.status === 'pending').length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center bg-green-50 px-2 py-1 rounded-md border border-green-200">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-green-700">Approved:</span>
-                      <span className="text-xs font-bold text-green-800">
-                        {activeTab === 'letter' 
-                          ? letters.filter(l => l.status === 'approved').length 
-                          : activeTab === 'addendum'
-                            ? addendums.filter(a => a.status === 'approved').length
-                            : letters.filter(l => l.status === 'approved').length + addendums.filter(a => a.status === 'approved').length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center bg-red-50 px-2 py-1 rounded-md border border-red-200">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-red-700">Rejected:</span>
-                      <span className="text-xs font-bold text-red-800">
-                        {activeTab === 'letter' 
-                          ? letters.filter(l => l.status === 'rejected').length 
-                          : activeTab === 'addendum'
-                            ? addendums.filter(a => a.status === 'rejected').length
-                            : letters.filter(l => l.status === 'rejected').length + addendums.filter(a => a.status === 'rejected').length}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-lg shadow-sm">
+        <div className="border-b border-gray-200">
+          <nav className="px-6 -mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('letter')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'letter'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Surat Tugas
+            </button>
+            <button
+              onClick={() => setActiveTab('addendum')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'addendum'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Addendum
+            </button>
+            <button
+              onClick={() => setActiveTab('lpj')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'lpj'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Laporan Pertanggungjawaban
+            </button>
+            <button
+              onClick={() => setActiveTab('mutasi')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'mutasi'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Audit Mutasi
+            </button>
+          </nav>
         </div>
       </div>
 
@@ -1048,7 +1158,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dibuat oleh</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode Audit</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pelaksanaan Audit</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -1132,7 +1242,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : activeTab === 'addendum' ? (
         /* Addendum Table */
         <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1252,6 +1362,273 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
               )}
             </tbody>
           </table>
+        </div>
+      ) : activeTab === 'mutasi' ? (
+        /* Audit Mutasi Table */
+        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Berangkat</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dari</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ke</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {mutasiList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    Belum ada data audit mutasi
+                  </td>
+                </tr>
+              ) : (
+                mutasiList.map((mutasi, index) => (
+                  <tr key={mutasi.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{mutasi.auditor_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatMutasiDate(mutasi.departure_date)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{mutasi.from_branch}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{mutasi.to_branch}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {mutasi.status === 'approved' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>
+                      ) : mutasi.status === 'rejected' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => {
+                          setSelectedMutasi(mutasi);
+                          setShowMutasiDetailModal(true);
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View Full
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {/* Mutasi Detail Modal */}
+      {showMutasiDetailModal && selectedMutasi && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Detail Audit Mutasi</h3>
+              <button
+                onClick={() => {
+                  setShowMutasiDetailModal(false);
+                  setSelectedMutasi(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Auditor</label>
+                  <p className="text-sm font-semibold text-gray-900">{selectedMutasi.auditor_name}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Tanggal Berangkat</label>
+                  <p className="text-sm text-gray-900">{formatMutasiDate(selectedMutasi.departure_date)}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Dari Cabang/Regional</label>
+                  <p className="text-sm text-gray-900">{selectedMutasi.from_branch}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Ke Cabang/Regional</label>
+                  <p className="text-sm text-gray-900">{selectedMutasi.to_branch}</p>
+                </div>
+              </div>
+
+              {/* Cost Breakdown */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Rincian Biaya</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Transportasi</span>
+                    <span className="font-medium text-gray-900">{formatMutasiCurrency(selectedMutasi.transport)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Konsumsi</span>
+                    <span className="font-medium text-gray-900">{formatMutasiCurrency(selectedMutasi.konsumsi)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Lainnya</span>
+                    <span className="font-medium text-gray-900">{formatMutasiCurrency(selectedMutasi.lainnya)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                    <span className="font-semibold text-gray-900">Total</span>
+                    <span className="font-bold text-indigo-600">{formatMutasiCurrency(selectedMutasi.total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {selectedMutasi.notes && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Catatan</label>
+                  <p className="text-sm text-gray-700 mt-1">{selectedMutasi.notes}</p>
+                </div>
+              )}
+
+              {/* Attachment */}
+              {selectedMutasi.file_url && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">Lampiran</label>
+                  <a
+                    href={selectedMutasi.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Download {selectedMutasi.file_name || 'File'}
+                  </a>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowMutasiRejectModal(true)}
+                  disabled={processingId === String(selectedMutasi.id)}
+                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </button>
+                <button
+                  onClick={() => setShowMutasiApproveConfirm(true)}
+                  disabled={processingId === String(selectedMutasi.id)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  {processingId === String(selectedMutasi.id) ? 'Processing...' : 'Accept'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mutasi Reject Modal */}
+      {showMutasiRejectModal && selectedMutasi && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Tolak Audit Mutasi</h3>
+              <button
+                onClick={() => {
+                  setShowMutasiRejectModal(false);
+                  setMutasiRejectionReason('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Auditor: <strong>{selectedMutasi.auditor_name}</strong>
+              </p>
+              <p className="text-sm text-gray-600">
+                {selectedMutasi.from_branch} → {selectedMutasi.to_branch}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Alasan Penolakan <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={mutasiRejectionReason}
+                onChange={(e) => setMutasiRejectionReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                rows={3}
+                placeholder="Masukkan alasan penolakan..."
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowMutasiRejectModal(false);
+                  setMutasiRejectionReason('');
+                }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handleRejectMutasi(selectedMutasi.id, mutasiRejectionReason)}
+                disabled={!mutasiRejectionReason.trim() || processingId === String(selectedMutasi.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processingId === String(selectedMutasi.id) ? 'Processing...' : 'Tolak'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mutasi Approve Confirmation Modal */}
+      {showMutasiApproveConfirm && selectedMutasi && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-xl bg-white">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Persetujuan</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Apakah Anda yakin ingin menyetujui audit mutasi untuk <strong>{selectedMutasi.auditor_name}</strong>?
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                {selectedMutasi.from_branch} → {selectedMutasi.to_branch}
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setShowMutasiApproveConfirm(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMutasiApproveConfirm(false);
+                    handleApproveMutasi(selectedMutasi.id);
+                  }}
+                  disabled={processingId === String(selectedMutasi.id)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Ya, Setujui
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
