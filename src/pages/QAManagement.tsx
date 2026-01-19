@@ -1,4 +1,4 @@
-import { Check, Download, Eye, Save, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, Eye, Save, Search, Trash2, Upload, X } from 'lucide-react';
 // @ts-ignore
 import Papa from 'papaparse';
 import React, { useEffect, useState } from 'react';
@@ -169,6 +169,11 @@ const QAManagement: React.FC = () => {
   const [docsLoading, setDocsLoading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<ApprovedDocument | null>(null);
   const [showDocDetailModal, setShowDocDetailModal] = useState(false);
+  
+  // Approved Docs Filters & Sort
+  const [docTypeFilter, setDocTypeFilter] = useState<string>('All');
+  const [docCreatedByFilter, setDocCreatedByFilter] = useState<string>('All');
+  const [docSortOrder, setDocSortOrder] = useState<'asc' | 'desc' | null>(null); // For Letter Number
 
   // --- Effects ---
 
@@ -472,7 +477,7 @@ const QAManagement: React.FC = () => {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: async (results) => {
+        complete: async (results: any) => {
           const csvData = results.data as any[];
           const mappedData = csvData.map((row) => ({
             kc_kr_kp: row.kc_kr_kp || row['kc_kr_kp'] || '',
@@ -531,7 +536,7 @@ const QAManagement: React.FC = () => {
           toast.success(`Successfully uploaded ${filteredData.length} new records`, { id: 'upload-toast' });
           await fetchMatriksData();
         },
-        error: (error) => {
+        error: (error: any) => {
           toast.error(`Failed to parse CSV: ${error.message}`, { id: 'upload-toast' });
         },
       });
@@ -593,6 +598,29 @@ const QAManagement: React.FC = () => {
 
     return matchesSearch && matchesRegion && matchesYear;
   });
+
+  // --- Filtering (Docs) ---
+  
+  const uniqueCreators = Array.from(new Set(approvedDocs.map(d => d.created_by_name).filter(Boolean))).sort();
+
+  const filteredDocs = approvedDocs.filter(doc => {
+    const matchType = docTypeFilter === 'All' || doc.type === docTypeFilter;
+    const matchCreator = docCreatedByFilter === 'All' || doc.created_by_name === docCreatedByFilter;
+    return matchType && matchCreator;
+  }).sort((a, b) => {
+    if (docSortOrder === 'asc') {
+      return a.letter_number.localeCompare(b.letter_number);
+    } else if (docSortOrder === 'desc') {
+      return b.letter_number.localeCompare(a.letter_number);
+    }
+    return 0;
+  });
+
+  const toggleSort = () => {
+    if (docSortOrder === null) setDocSortOrder('asc');
+    else if (docSortOrder === 'asc') setDocSortOrder('desc');
+    else setDocSortOrder(null);
+  };
 
   // --- Render ---
 
@@ -703,19 +731,67 @@ const QAManagement: React.FC = () => {
 
       {/* Content Area */}
       {activeTab === 'approved_docs' ? (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
+          {/* Filters Toolbar */}
+          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-4 items-center">
+              {/* Type Filter */}
+              <div className="flex items-center gap-2">
+                 <label className="text-sm font-medium text-gray-600">Type:</label>
+                 <select 
+                    value={docTypeFilter} 
+                    onChange={(e) => setDocTypeFilter(e.target.value)}
+                    className="bg-white border text-sm rounded-md px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                 >
+                    <option value="All">All Types</option>
+                    <option value="Surat Tugas">Surat Tugas</option>
+                    <option value="Addendum">Addendum</option>
+                 </select>
+              </div>
+
+               {/* Created By Filter */}
+               <div className="flex items-center gap-2">
+                 <label className="text-sm font-medium text-gray-600">Created By:</label>
+                 <select 
+                    value={docCreatedByFilter} 
+                    onChange={(e) => setDocCreatedByFilter(e.target.value)}
+                    className="bg-white border text-sm rounded-md px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                 >
+                    <option value="All">All Users</option>
+                    {uniqueCreators.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                 </select>
+              </div>
+            </div>
+            
+             <div className="text-xs text-gray-500">
+                Showing {filteredDocs.length} documents
+             </div>
+          </div>
+
           {docsLoading ? (
             <div className="flex justify-center p-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
             </div>
           ) : (
-             <div className="overflow-x-auto">
+             <div className="overflow-auto flex-1">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Surat</th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors group select-none"
+                        onClick={toggleSort}
+                      >
+                        <div className="flex items-center gap-2">
+                          Nomor Surat
+                          {docSortOrder === 'asc' ? <ArrowUp size={14} className="text-indigo-600" /> : 
+                           docSortOrder === 'desc' ? <ArrowDown size={14} className="text-indigo-600" /> : 
+                           <ArrowUpDown size={14} className="text-gray-400 group-hover:text-gray-600" />}
+                        </div>
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch/Region</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
@@ -724,14 +800,14 @@ const QAManagement: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {approvedDocs.length === 0 ? (
+                    {filteredDocs.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                         No approved documents found.
+                        <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                         No documents found matching the criteria.
                         </td>
                       </tr>
                     ) : (
-                      approvedDocs.map((doc, idx) => (
+                      filteredDocs.map((doc, idx) => (
                         <tr key={`${doc.type}-${doc.id}`} className="hover:bg-gray-50 transition-colors">
                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
                            <td className="px-6 py-4 whitespace-nowrap text-sm">
