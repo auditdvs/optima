@@ -36,6 +36,7 @@ function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'superadmin','d
   requiredRoles?: string[];
 }) {
   const { user, userRole, isLoading } = useAuth();
+  const location = useLocation();
   
   if (isLoading) {
     return (
@@ -45,7 +46,7 @@ function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'superadmin','d
     );
   }
 
-  const location = useLocation();
+
 
   if (!user) {
     // If accessing root, redirect to login cleanly

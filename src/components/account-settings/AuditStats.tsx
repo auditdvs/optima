@@ -121,8 +121,7 @@ export const AuditTotalStats = () => {
   );
 };
 
-const AuditStats = () => {
-  const { user } = useAuth();
+const AuditStats = ({ audits }: { audits: any[] }) => {
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [targetRealizationData, setTargetRealizationData] = useState<any[]>([]);
@@ -130,85 +129,29 @@ const AuditStats = () => {
   const [selectedYear, setSelectedYear] = useState<string>('');
 
   useEffect(() => {
-    const fetchStats = async () => {
-      if (!user?.id) return;
-
-      // Get user profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profileData?.full_name) {
-        setLoading(false);
-        return;
-      }
-
-      // Get audit_master records where user's full_name is in team or leader
-      const { data: auditMaster, error: auditError } = await supabase
-        .from('audit_master')
-        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, team, leader');
-
-      if (auditError || !auditMaster) {
-        setLoading(false);
-        return;
-      }
-
-      // Helper to check if user is in audit team or is leader
-      const isUserInAudit = (record: any, fullName: string) => {
-        if (record.leader?.toLowerCase().includes(fullName.toLowerCase())) return true;
-        
-        let teamMembers: string[] = [];
-        try {
-          if (record.team) {
-            if (record.team.startsWith('[') || record.team.startsWith('{')) {
-              const parsed = JSON.parse(record.team);
-              teamMembers = Array.isArray(parsed) ? parsed : [record.team];
-            } else {
-              teamMembers = record.team.split(',').map((t: string) => t.trim());
-            }
-          }
-        } catch {
-          if (record.team) teamMembers = [record.team];
-        }
-        
-        return teamMembers.some((member: string) => 
-          member.toLowerCase().includes(fullName.toLowerCase()) || 
-          fullName.toLowerCase().includes(member.toLowerCase())
-        );
-      };
-
-      // Filter audits where user is involved
-      const filteredAudits = auditMaster.filter(record => isUserInAudit(record, profileData.full_name));
-
-      // Unique by branch_name + audit_type + audit_start_date + audit_end_date
-      const uniqueMap = new Map();
-      filteredAudits.forEach(a => {
-        const key = `${a.branch_name}|${a.audit_type}|${a.audit_start_date}|${a.audit_end_date}`;
-        if (!uniqueMap.has(key)) {
-          uniqueMap.set(key, a);
-        }
-      });
-      const uniqueAudits = Array.from(uniqueMap.values());
-
-      const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
-      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
-
+    const processStats = () => {
       // Get all years from data
-      const yearSet = new Set(uniqueAudits.map(a => a.audit_start_date?.slice(0,4)).filter(Boolean));
+      const yearSet = new Set(audits.map(a => a.audit_start_date?.slice(0,4)).filter(Boolean));
       const yearsArr = Array.from(yearSet).sort((a, b) => b.localeCompare(a)); // Sort descending
       setAvailableYears(yearsArr);
       
       // Set default year to current year or latest year
       const currentYear = new Date().getFullYear().toString();
-      const defaultYear = yearsArr.includes(currentYear) ? currentYear : yearsArr[0] || currentYear;
-      setSelectedYear(defaultYear);
+      // If we have data but current year is not in it, select the latest available year
+      const defaultYear = yearsArr.includes(currentYear) ? currentYear : (yearsArr[0] || currentYear);
+      
+      // Only update selectedYear if it's not set yet or if previously selected year is not available (rare case)
+      if (!selectedYear || (yearsArr.length > 0 && !yearsArr.includes(selectedYear))) {
+         setSelectedYear(defaultYear);
+      }
+
+      const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
+      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
 
       // --- Bar Chart Data ---
       const allMonths = ['01','02','03','04','05','06','07','08','09','10','11','12'];
       const monthMap = new Map();
-      uniqueAudits.forEach(a => {
+      audits.forEach(a => {
         const month = a.audit_start_date?.slice(0, 7); // "YYYY-MM"
         if (!month) return;
         if (!monthMap.has(month)) {
@@ -222,7 +165,10 @@ const AuditStats = () => {
       const allMonthlyData: any[] = [];
       const allTargetRealizationData: any[] = [];
       
-      yearSet.forEach(year => {
+      // If no data, we still want to generate empty months for current year/selected year
+      const yearsToProcess = yearsArr.length > 0 ? yearsArr : [currentYear];
+
+      yearsToProcess.forEach(year => {
         allMonths.forEach((month, idx) => {
           const ym = `${year}-${month}`;
           const found = monthMap.get(ym);
@@ -257,8 +203,8 @@ const AuditStats = () => {
       setLoading(false);
     };
 
-    fetchStats();
-  }, [user]);
+    processStats();
+  }, [audits, selectedYear]);
 
   // Filter data by selected year
   const filteredMonthlyData = monthlyData.filter(d => d.year === selectedYear);

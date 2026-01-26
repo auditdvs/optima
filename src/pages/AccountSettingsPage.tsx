@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            import { useEffect, useState } from 'react';
 import AuditStats from '../components/account-settings/AuditStats';
 import TotalStatsContainer from '../components/account-settings/TotalStatsContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -15,8 +15,10 @@ interface AuditedBranch {
 
 // New interface for administration issues
 interface AdminIssue {
+  id?: string;
   branch_name: string;
   audit_type: string;
+  audit_start_date?: string;
   missing_documents: string;
   monitoring?: string; // Optional, only for regular audits
 }
@@ -51,50 +53,16 @@ const AccountSettingsPage = () => {
 
     
     
-    const fetchAdminIssues = async (profileData: any) => {
-      if (!profileData?.full_name) return;
+    // Unified logic to process admin issues from providing audits
+    const fetchAdminIssues = (userAudits: any[]) => {
+      if (!userAudits || userAudits.length === 0) {
+        setLoadingAdminIssues(false);
+        return;
+      }
       
       setLoadingAdminIssues(true);
       
       try {
-        // Get audit_master data where user is involved
-        const { data: auditMaster, error: auditError } = await supabase
-          .from('audit_master')
-          .select('*');
-        
-        if (auditError) {
-          console.error('Error fetching audit_master for admin issues:', auditError);
-          setLoadingAdminIssues(false);
-          return;
-        }
-
-        // Helper to check if user is in audit team or is leader
-        const isUserInAudit = (record: any, fullName: string) => {
-          if (record.leader?.toLowerCase().includes(fullName.toLowerCase())) return true;
-          
-          let teamMembers: string[] = [];
-          try {
-            if (record.team) {
-              if (record.team.startsWith('[') || record.team.startsWith('{')) {
-                const parsed = JSON.parse(record.team);
-                teamMembers = Array.isArray(parsed) ? parsed : [record.team];
-              } else {
-                teamMembers = record.team.split(',').map((t: string) => t.trim());
-              }
-            }
-          } catch {
-            if (record.team) teamMembers = [record.team];
-          }
-          
-          return teamMembers.some((member: string) => 
-            member.toLowerCase().includes(fullName.toLowerCase()) || 
-            fullName.toLowerCase().includes(member.toLowerCase())
-          );
-        };
-
-        // Filter by user
-        const userAudits = auditMaster?.filter(record => isUserInAudit(record, profileData.full_name)) || [];
-        
         const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
         const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
         
@@ -114,14 +82,17 @@ const AccountSettingsPage = () => {
             rta_reg: "RTA"
           };
 
-          return Object.entries(audit)
-            .filter(([key, value]) =>
-              typeof value === 'boolean' &&
-              !value &&
-              regularAuditAliases[key]
-            )
-            .map(([key]) => regularAuditAliases[key])
-            .join(', ');
+          const missingDocs: string[] = [];
+          
+          // Check each required field directly
+          Object.keys(regularAuditAliases).forEach(key => {
+            // If value is NOT true (could be false, null, undefined) -> Missing
+            if (audit[key] !== true) {
+              missingDocs.push(regularAuditAliases[key]);
+            }
+          });
+
+          return missingDocs.join(', ');
         };
 
         // Helper function for fraud audit failed checks
@@ -134,154 +105,222 @@ const AccountSettingsPage = () => {
             detailed_findings_fr: "RTA"
           };
 
-          return Object.entries(audit)
-            .filter(([key, value]) =>
-              typeof value === 'boolean' &&
-              !value &&
-              fraudAuditAliases[key]
-            )
-            .map(([key]) => fraudAuditAliases[key])
-            .join(', ');
+          const missingDocs: string[] = [];
+          
+          Object.keys(fraudAuditAliases).forEach(key => {
+            if (audit[key] !== true) {
+              missingDocs.push(fraudAuditAliases[key]);
+            }
+          });
+          
+          return missingDocs.join(', ');
         };
         
-        // Process regular audits - filter by missing documents OR monitoring issue
-        // Note: revised_dapa_reg is excluded from counting as it's optional (only needed if fraud found during regular audit)
-        const regularDocumentFields = [
-          'dapa_reg', 'dapa_supporting_data_reg', 'assignment_letter_reg',
-          'entrance_agenda_reg', 'entrance_attendance_reg', 'audit_wp_reg',
-          'exit_meeting_minutes_reg', 'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg'
-        ];
-        
-        const regularIssues = userAudits
-          .filter(audit => isRegular(audit.audit_type))
-          .filter(audit => {
-            // Count false values only for relevant document fields (excluding revised_dapa_reg)
-            const falseCount = regularDocumentFields.filter(field => audit[field] === false).length;
-            
-            // Check monitoring - both 'adequate' and 'memadai' are valid
-            const monitoringValue = (audit.monitoring_reg || '').toLowerCase().trim();
-            const isMonitoringOK = monitoringValue === 'adequate' || monitoringValue === 'memadai';
-            const hasMonitoringIssue = !isMonitoringOK;
-            
-            // Show in issues if: has 2+ missing documents OR has monitoring issue
-            return falseCount >= 2 || hasMonitoringIssue;
-          })
-          .map(audit => {
-            let monitoringStatus = audit.monitoring_reg || 'not yet completed';
-            if (!audit.monitoring_reg || audit.monitoring_reg === null || audit.monitoring_reg === '') {
-              monitoringStatus = 'not yet completed';
-            }
-            
-            return {
-              branch_name: audit.branch_name,
-              audit_type: 'regular',
-              missing_documents: getFailedChecksWithAliases(audit),
-              monitoring: monitoringStatus
-            };
-          });
-        
-        // Process fraud audits
-        const fraudIssues = userAudits
-          .filter(audit => isFraud(audit.audit_type))
-          .filter(audit => {
-            const falseCount = Object.values(audit).filter(v => v === false).length;
-            return falseCount >= 1;
-          })
-          .map(audit => {
-            return {
-              branch_name: audit.branch_name,
-              audit_type: 'fraud',
-              missing_documents: getFraudFailedChecksWithAliases(audit)
-            };
-          });
-        
-        // Combine both types of issues - sort by branch name
-        const combinedIssues: AdminIssue[] = [...regularIssues, ...fraudIssues]
-          .sort((a, b) => a.branch_name.localeCompare(b.branch_name));
-        
-        setAdminIssues(combinedIssues);
-      } catch (error) {
-        console.error('Error processing admin issues:', error);
-      } finally {
-        setLoadingAdminIssues(false);
-      }
-    };
-    
-    const fetchData = async () => {
-      if (!user?.id) return;
+      // Process regular audits - filter by missing documents OR monitoring issue
+      // Regular audit: 9 items checked (excluding dapa_reg/dapa perubahan as it is optional)
+      const regularDocumentFields = [
+        'dapa_supporting_data_reg', 'assignment_letter_reg',
+        'entrance_agenda_reg', 'entrance_attendance_reg', 'audit_wp_reg',
+        'exit_meeting_minutes_reg', 'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg'
+      ];
       
-      // Get user profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profileData) {
-        console.error('Error fetching profile:', profileError);
-        setLoadingAdminIssues(false);
-        setLoadingBranches(false);
-        setLoadingStats(false);
-        return;
-      }
-      
-      setUserData(profileData);
-      
-      if (!profileData.full_name) {
-        // No full_name found, set default values
-        setTotalRegular(0);
-        setTotalFraud(0);
-        setTotalAudits(0);
-        setSisaTarget(24); // Full annual target
-        setTargetColor('#dc2626'); // Red since no progress
-        setMotivationMessage("Silakan update nama lengkap di profile Anda.");
-        setLoadingBranches(false);
-        setLoadingStats(false);
-        setLoadingAdminIssues(false);
-        return;
-      }
-
-      // Get audit_master records
-      const { data: auditMaster, error: auditError } = await supabase
-        .from('audit_master')
-        .select('id, branch_name, audit_type, audit_start_date, audit_end_date, rating, team, leader');
-        
-      if (auditError) {
-        console.error('Error fetching audit_master:', auditError);
-        setLoadingBranches(false);
-        setLoadingStats(false);
-        setLoadingAdminIssues(false);
-        return;
-      }
-
-      console.log('Profile full_name:', profileData.full_name);
-      console.log('Found audit_master records:', auditMaster?.length || 0);
-
-      // Helper to check if user is in audit team or is leader
-      const isUserInAudit = (record: any, fullName: string) => {
-        if (record.leader?.toLowerCase().includes(fullName.toLowerCase())) return true;
-        
-        let teamMembers: string[] = [];
-        try {
-          if (record.team) {
-            if (record.team.startsWith('[') || record.team.startsWith('{')) {
-              const parsed = JSON.parse(record.team);
-              teamMembers = Array.isArray(parsed) ? parsed : [record.team];
-            } else {
-              teamMembers = record.team.split(',').map((t: string) => t.trim());
-            }
+      const regularIssues = userAudits
+        .filter(audit => isRegular(audit.audit_type))
+        .filter(audit => {
+           // Count missing docs (not true)
+           const missingCount = regularDocumentFields.filter(field => audit[field] !== true).length;
+           
+           // Check monitoring
+           const monitoringValue = (audit.monitoring_reg || '').toLowerCase().trim();
+           const isMonitoringOK = monitoringValue === 'adequate' || monitoringValue === 'memadai';
+           const hasMonitoringIssue = !isMonitoringOK; // Only issue if NOT adequate/memadai
+           
+           return missingCount > 0 || hasMonitoringIssue;
+        }) 
+        .map(audit => {
+          let monitoringStatus = audit.monitoring_reg || 'not yet completed';
+          if (!audit.monitoring_reg || audit.monitoring_reg === null || audit.monitoring_reg === '') {
+            monitoringStatus = 'not yet completed';
           }
-        } catch {
-          if (record.team) teamMembers = [record.team];
-        }
+          
+          let missingDocsStr = getFailedChecksWithAliases(audit);
+          if (!missingDocsStr) {
+            missingDocsStr = "Semua dokumen sudah lengkap"; // Should not be reached due to filter, but safe fallback
+          }
+          
+          return {
+            id: audit.id, // Added ID
+            branch_name: audit.branch_name,
+            audit_type: 'regular',
+            audit_start_date: audit.audit_start_date,
+            missing_documents: missingDocsStr,
+            monitoring: monitoringStatus
+          };
+        });
+      
+      // Process fraud audits (5 checklist items)
+      const fraudAuditAliasesKeys = [
+        "data_prep", "assignment_letter_fr", "audit_wp_fr", "audit_report_fr", "detailed_findings_fr"
+      ];
+      
+      const fraudIssues = userAudits
+        .filter(audit => isFraud(audit.audit_type))
+        .map(audit => {
+          let missingDocsStr = getFraudFailedChecksWithAliases(audit);
+          if (!missingDocsStr) {
+             missingDocsStr = "Semua dokumen sudah lengkap";
+          }
+          
+          return {
+            id: audit.id, // Added ID
+            branch_name: audit.branch_name,
+            audit_type: 'fraud',
+            audit_start_date: audit.audit_start_date,
+            missing_documents: missingDocsStr
+          };
+        });
+      
+      // Combine both types of issues - sort by branch name
+      const combinedIssues: AdminIssue[] = [...regularIssues, ...fraudIssues]
+        .sort((a, b) => a.branch_name.localeCompare(b.branch_name));
+      
+      setAdminIssues(combinedIssues);
+    } catch (error) {
+      console.error('Error processing admin issues:', error);
+    } finally {
+      setLoadingAdminIssues(false);
+    }
+  };
+    
+  const fetchData = async () => {
+    if (!user?.id) return;
+    
+    // Get user profile data
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profileData) {
+      console.error('Error fetching profile:', profileError);
+      setLoadingAdminIssues(false);
+      setLoadingBranches(false);
+      setLoadingStats(false);
+      return;
+    }
+    
+    setUserData(profileData);
+    
+    if (!profileData.full_name) {
+      // No full_name found, set default values
+      setTotalRegular(0);
+      setTotalFraud(0);
+      setTotalAudits(0);
+      setSisaTarget(24); // Full annual target
+      setTargetColor('#dc2626'); // Red since no progress
+      setMotivationMessage("Silakan update nama lengkap di profile Anda.");
+      setLoadingBranches(false);
+      setLoadingStats(false);
+      setLoadingAdminIssues(false);
+      return;
+    }
+
+    // Get audit_master records
+    // Get audit_master records
+    const { data: auditMaster, error: auditError } = await supabase
+      .from('audit_master')
+      .select('*');
+      
+    if (auditError) {
+      console.error('Error fetching audit_master:', auditError);
+      setLoadingBranches(false);
+      setLoadingStats(false);
+      setLoadingAdminIssues(false);
+      return;
+    }
+
+    // Get assignment letters (Surat Tugas)
+    const { data: letters, error: letterError } = await supabase
+      .from('letter')
+      .select('id, branch_name, audit_type, audit_start_date, audit_end_date, team, leader, status')
+      .eq('status', 'Approved');
+
+    if (letterError) {
+      console.error('Error fetching letters:', letterError);
+      // Continue even if letter fetch fails, rely on audit_master
+    }
+
+    console.log('Profile full_name:', profileData.full_name);
+    console.log('Found audit_master records:', auditMaster?.length || 0);
+
+    // Helper to check if user is in audit team or is leader with Fuzzy Matching
+    const isUserInAudit = (record: any, fullName: string) => {
+      if (!fullName) return false;
+      
+      const normalize = (str: string) => str.toLowerCase().replace(/[.,]/g, '').trim();
+      const userTokens = normalize(fullName).split(/\s+/);
+      const userInitials = userTokens.map(t => t[0]).join(''); 
+      
+      // Function to check if two name strings are likely the same person
+      const isMatch = (dbName: string) => {
+        if (!dbName) return false;
+        const normDbName = normalize(dbName);
         
-        return teamMembers.some((member: string) => 
-          member.toLowerCase().includes(fullName.toLowerCase()) || 
-          fullName.toLowerCase().includes(member.toLowerCase())
-        );
+        // 1. Exact match or includes
+        if (normDbName.includes(normalize(fullName)) || normalize(fullName).includes(normDbName)) return true;
+        
+        // 2. Initials User vs Initials DB Match (e.g. DFA vs DFA)
+        const dbTokens = normDbName.split(/\s+/);
+        const dbInitials = dbTokens.map(t => t[0]).join('');
+        if (userInitials === dbInitials && userInitials.length >= 2) return true;
+        
+        // 3. User Initials match DB Name (e.g. User=DFA, DB=Dara Fusvita Adityacakra) -> handled above by dbInitials check? No.
+        // If User is "Dara Fusvita A.C", Initials "DFA". DB is "Dara Fusvita Adityacakra", Initials "DFA". Matches!
+        
+        // 4. Token Intersection (Fuzzy)
+        // Check if significant number of tokens match
+        let matchCount = 0;
+        userTokens.forEach(uToken => {
+            // Check if this user token matches any db token (starts with)
+            // e.g. User "A.C" (AC) vs DB "Adityacakra" -> "adityacakra" starts with "a" (too weak), but "ac"? No.
+            // Better: Check exact matches of major words
+            if (dbTokens.some(dToken => dToken === uToken || dToken.startsWith(uToken) || uToken.startsWith(dToken))) {
+                matchCount++;
+            }
+        });
+        
+        // If 2 or more names match (e.g. Dara + Fusvita), valid.
+        if (matchCount >= 2) return true;
+        
+        // Special case: "A.C" vs "Adityacakra"
+        // If User has "Dara Fusvita", and DB has "Dara Fusvita", that's 2 matches.
+        
+        return false;
       };
 
-      if (!auditMaster || auditMaster.length === 0) {
+      // Check Leader
+      if (record.leader && isMatch(record.leader)) return true;
+      
+      // Check Team
+      let teamMembers: string[] = [];
+      try {
+        if (record.team) {
+          if (record.team.startsWith('[') || record.team.startsWith('{')) {
+            const parsed = JSON.parse(record.team);
+            teamMembers = Array.isArray(parsed) ? parsed : [record.team];
+          } else {
+            teamMembers = record.team.split(',').map((t: string) => t.trim());
+          }
+        }
+      } catch {
+        if (record.team) teamMembers = [record.team];
+      }
+      
+      return teamMembers.some((member: string) => isMatch(member));
+    };
+
+      if ((!auditMaster || auditMaster.length === 0) && (!letters || letters.length === 0)) {
         setTotalRegular(0);
         setTotalFraud(0);
         setTotalAudits(0);
@@ -295,14 +334,22 @@ const AccountSettingsPage = () => {
         return;
       }
       
-      // Filter audits where user is involved
-      const filteredAudits = auditMaster.filter(record => isUserInAudit(record, profileData.full_name));
+      // Filter audits and letters where user is involved
+      const auditMasterRecords = auditMaster || [];
+      const letterRecords = letters || [];
       
-      console.log('Filtered audits:', filteredAudits.length);
+      const filteredAudits = auditMasterRecords.filter(record => isUserInAudit(record, profileData.full_name));
+      const filteredLetters = letterRecords.filter(record => isUserInAudit(record, profileData.full_name));
+      
+      // Combine records from both sources (Checklist/AuditMaster + Surat Tugas/Letters)
+      // This ensures we count audits that are just assigned AND audits that are already in progress/done
+      const allRecords = [...filteredAudits, ...filteredLetters];
+      
+      console.log('Filtered total records:', allRecords.length);
       
       // Unique by branch_name + audit_type + audit_start_date + audit_end_date
       const uniqueMap = new Map();
-      filteredAudits.forEach(a => {
+      allRecords.forEach(a => {
         const key = `${a.branch_name}|${a.audit_type}|${a.audit_start_date}|${a.audit_end_date}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, a);
@@ -354,11 +401,54 @@ const AccountSettingsPage = () => {
       }
       
       setTargetColor(color);
-      setMotivationMessage(message || "Mari semangat mengejar target audit bulanan!");
-      setLoadingStats(false);
-      
-      // Fetch administration issues
-      await fetchAdminIssues(profileData);
+      // Deduplicate checklist audits to avoid double records (one empty, one full)
+      // PRIORITY: Choose the record that has MORE checklist items filled (true)
+      const countChecklistFilled = (audit: any) => {
+         let count = 0;
+         const allKeys = [
+            // Regular keys
+            'dapa_supporting_data_reg', 'assignment_letter_reg', 'entrance_agenda_reg', 
+            'entrance_attendance_reg', 'audit_wp_reg', 'exit_meeting_minutes_reg', 
+            'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg',
+            // Fraud keys
+            "data_prep", "assignment_letter_fr", "audit_wp_fr", "audit_report_fr", "detailed_findings_fr"
+         ];
+         allKeys.forEach(k => {
+            if (audit[k] === true) count++;
+         });
+         return count;
+      };
+
+      const dedupMap = new Map();
+      filteredAudits.forEach(a => {
+         // Deduplicate by Month (YYYY-MM) to catch duplicates with slightly different dates
+         // Assuming audit_start_date is YYYY-MM-DD
+         const monthKey = a.audit_start_date ? a.audit_start_date.substring(0, 7) : 'unknown';
+         const key = `${a.branch_name}|${a.audit_type}|${monthKey}`;
+         
+         if (dedupMap.has(key)) {
+            const existing = dedupMap.get(key);
+            const existingCount = countChecklistFilled(existing);
+            const newCount = countChecklistFilled(a);
+            
+            // If new record has more completed items, replace the existing one
+            // Also if counts are equal, prefer the one with the later ID (assuming newer) or just keep existing?
+            // Let's prefer the one with MORE items.
+            if (newCount > existingCount) {
+               dedupMap.set(key, a);
+            } else if (newCount === existingCount) {
+                // If equal completeness, pick the one with later end date or just later ID?
+                // Let's simply keep existing unless we have reason.
+                // Actually, let's compare dates just in case.
+            }
+         } else {
+            dedupMap.set(key, a);
+         }
+      });
+      const uniqueChecklistAudits = Array.from(dedupMap.values());
+
+      // Fetch administration issues (Must use audit_master records for document completeness)
+      await fetchAdminIssues(uniqueChecklistAudits);
     };
     
     // Fetch user role
@@ -382,7 +472,7 @@ const AccountSettingsPage = () => {
     fetchData();
     fetchUserRole();
 
-  }, [user]);
+  }, [user, activeTab]);
 
   if (!user) {
     return (
@@ -445,7 +535,7 @@ const AccountSettingsPage = () => {
 
           {/* Statistik Audit */}
           <div className="mb-6">
-            <AuditStats />
+            <AuditStats audits={auditedBranches} />
           </div>
         
           {/* Tabel Audited Branches - Grid Layout */}
@@ -544,7 +634,7 @@ const AccountSettingsPage = () => {
       {activeTab === 'issues' && showAuditSections && (
         <div>
           <h3 className="text-sm text-gray-600 mb-4">
-            For any data mismatch, contact <span className="font-bold">QA.</span>
+            Jika ada data yang tidak sesuai, cek dibagian <span className="font-bold">Kertas Kerja Auditor</span>.
           </h3>
           <div className="bg-white rounded-lg shadow p-4">
             <Table>
@@ -560,30 +650,43 @@ const AccountSettingsPage = () => {
               <TableBody>
                 {loadingAdminIssues ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                    <TableCell colSpan={5} className="text-center">Loading issues...</TableCell>
                   </TableRow>
                 ) : adminIssues.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">No administration issues found</TableCell>
+                    <TableCell colSpan={5} className="text-center py-8 text-green-600 font-medium bg-green-50">
+                      Great job! No administration issues found.
+                    </TableCell>
                   </TableRow>
                 ) : (
                   adminIssues.map((issue, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{idx + 1}</TableCell>
-                      <TableCell>{issue.branch_name}</TableCell>
-                      <TableCell className="capitalize">{issue.audit_type}</TableCell>
-                      <TableCell className="whitespace-pre-wrap break-words max-w-xs">
-                        {issue.missing_documents ? (
-                          issue.missing_documents
-                        ) : (
-                          <span className="text-gray-400 italic">All documents are complete</span>
-                        )}
+                      <TableCell className="font-medium">{issue.branch_name}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          issue.audit_type === 'regular' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {issue.audit_type === 'regular' ? 'Regular' : 'Fraud'}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`text-xs font-medium max-w-md ${
+                        issue.missing_documents === "Semua dokumen sudah lengkap" 
+                          ? "text-emerald-600 font-bold" 
+                          : "text-red-600"
+                      }`}>
+                        {issue.missing_documents}
                       </TableCell>
                       <TableCell>
-                        {issue.audit_type === 'regular' ? (
-                          issue.monitoring
+                        {issue.monitoring && issue.monitoring !== '(No Need Monitoring)' ? (
+                          <span className={`${
+                            issue.monitoring === 'not yet completed' ? 'text-orange-600' : 
+                            issue.monitoring === 'Tidak Memadai' ? 'text-red-600 font-bold' : 'text-green-600'
+                          }`}>
+                            {issue.monitoring}
+                          </span>
                         ) : (
-                          <span className="text-red-500 italic">(No Need Monitoring)</span>
+                          <span className="text-gray-400 italic text-xs">(No Need Monitoring)</span>
                         )}
                       </TableCell>
                     </TableRow>
