@@ -18,13 +18,12 @@ interface AuditMaster {
   audit_end_date: string;
   rating?: 'high' | 'medium' | 'low' ;
   inputted_by?: string;
-  auditors?: string[]; // Array of strings based on new schema
+  auditors?: string[]; 
   leader?: string;
   team?: string;
-  fraud_amount?: number; // For display in table if needed, though it's in work_paper_persons
-  is_real_fraud?: boolean; // Whether the fraud audit confirmed actual fraud
-  has_field_fraud?: boolean; // Whether regular audit found fraud in the field (addendum case)
-  // Regular fields
+  fraud_amount?: number; 
+  is_real_fraud?: boolean; 
+  has_field_fraud?: boolean; 
   dapa_reg?: boolean;
   revised_dapa_reg?: boolean;
   dapa_supporting_data_reg?: boolean;
@@ -44,6 +43,11 @@ interface AuditMaster {
   audit_report_fr?: boolean;
   detailed_findings_fr?: boolean;
   comment_fr?: string;
+  
+  work_paper_persons?: { // Added for displaying fraud details
+    fraud_staff: string;
+    fraud_amount: number;
+  }[];
 }
 
 interface WorkPaperPerson {
@@ -82,6 +86,8 @@ const QASection: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('');
+  const [inputStatus, setInputStatus] = useState<string>('all');
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -167,7 +173,13 @@ const QASection: React.FC = () => {
       // For now, just fetching audit_master
       const { data, error } = await supabase
         .from('audit_master')
-        .select('*')
+        .select(`
+          *,
+          work_paper_persons (
+            fraud_staff,
+            fraud_amount
+          )
+        `)
         .order('audit_start_date', { ascending: false });
       
       if (error) throw error;
@@ -367,7 +379,20 @@ const QASection: React.FC = () => {
     // Region filter
     const matchesRegion = !selectedRegion || audit.region === selectedRegion;
 
-    return matchesSearch && matchesDate && matchesRegion;
+    // Type filter
+    const matchesType = !selectedType || audit.audit_type === selectedType;
+
+    // Input Status filter (Done vs Pending)
+    let matchesStatus = true;
+    if (inputStatus !== 'all') {
+      const isDone = audit.audit_type === 'fraud' 
+        ? (!!audit.rating && audit.work_paper_persons && audit.work_paper_persons.length > 0)
+        : !!audit.rating;
+      
+      matchesStatus = inputStatus === 'done' ? isDone : !isDone;
+    }
+
+    return matchesSearch && matchesDate && matchesRegion && matchesType && matchesStatus;
   });
 
   const availableYears = Array.from(new Set(
@@ -433,6 +458,36 @@ const QASection: React.FC = () => {
               </select>
             </div>
 
+            <div className="w-28">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md text-sm ${
+                  selectedType === 'fraud' ? 'bg-red-50 text-red-700 border-red-200' :
+                  selectedType === 'regular' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''
+                }`}
+              >
+                <option value="">All Types</option>
+                <option value="regular">Regular</option>
+                <option value="fraud">Fraud</option>
+              </select>
+            </div>
+
+             <div className="w-32">
+              <select
+                value={inputStatus}
+                onChange={(e) => setInputStatus(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md text-sm ${
+                  inputStatus === 'done' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                  inputStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''
+                }`}
+              >
+                <option value="all">All Status</option>
+                <option value="done">Done Input</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+
             <div className="w-32">
               <select
                 value={selectedMonth}
@@ -484,20 +539,23 @@ const QASection: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left border-b">
+                <th className="p-3 font-medium text-gray-600">No</th>
                 <th className="p-3 font-medium text-gray-600">Branch</th>
                 <th className="p-3 font-medium text-gray-600">Region</th>
                 <th className="p-3 font-medium text-gray-600">Start Date</th>
                 <th className="p-3 font-medium text-gray-600">End Date</th>
                 <th className="p-3 font-medium text-gray-600">Type</th>
                 <th className="p-3 font-medium text-gray-600">Rating</th>
+                <th className="p-3 font-medium text-gray-600">Status LHA</th>
                 <th className="p-3 font-medium text-gray-600">Auditors</th>
                 <th className="p-3 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {filteredAudits.length > 0 ? (
-                filteredAudits.map((audit) => (
+                filteredAudits.map((audit, index) => (
                   <tr key={audit.id} className="hover:bg-gray-50 bg-white">
+                    <td className="p-3 text-gray-700">{index + 1}</td>
                     <td className="p-3 text-gray-700">{audit.branch_name}</td>
                     <td className="p-3 text-gray-700">{audit.region || '-'}</td>
                     <td className="p-3 text-gray-700">{formatDate(audit.audit_start_date)}</td>
@@ -530,6 +588,40 @@ const QASection: React.FC = () => {
                           <span className="text-orange-500 text-xs font-medium">Belum diinput</span>
                         )
                       )}
+                      
+                      {/* Display Fraud Details (Staff & Amount) for Fraud Audits */}
+                      {audit.audit_type === 'fraud' && audit.work_paper_persons && audit.work_paper_persons.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-1">
+                          {audit.work_paper_persons.map((person, idx) => (
+                            <div key={idx} className="text-xs bg-gray-50 p-1.5 rounded border border-gray-200">
+                              <div className="font-semibold text-gray-700">{person.fraud_staff}</div>
+                              <div className="text-gray-500">
+                                {new Intl.NumberFormat('id-ID', { 
+                                  style: 'currency', 
+                                  currency: 'IDR',
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0
+                                }).format(person.fraud_amount)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 text-gray-700">
+                      {audit.audit_type === 'regular' ? (
+                        audit.rating ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                            Sudah Upload
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap">
+                            Belum
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
                     </td>
                     <td className="p-3 text-gray-700">
                       {audit.leader || audit.team ? (
@@ -539,12 +631,12 @@ const QASection: React.FC = () => {
                               {audit.leader} (Leader)
                             </span>
                           )}
-                          {audit.team && audit.team.split(',')
-                            .map(m => m.trim())
-                            .filter(member => {
-                              // Filter out academic titles
-                              const academicTitles = [
-                                'S.E', 'SE', 'S.E.', 'S.Tr', 'S.Tr.', 'S.Tr.Akun', 'S.Akun',
+                          {audit.team && (() => {
+                            const rawMembers = audit.team.split(',').map(m => m.trim());
+                            const cleanMembers: string[] = [];
+                            
+                            const academicTitles = [
+                                'S.E', 'SE', 'S.E.', 'S.Tr', 'S.Tr.', 'S.Tr.Akun', 'S.Akun', 
                                 'M.M', 'MM', 'M.M.', 'M.Ak', 'M.Sc', 'M.Si',
                                 'S.H', 'SH', 'S.H.', 'S.Kom', 'S.T', 'ST',
                                 'Dr', 'Dr.', 'Drs', 'Drs.', 'Ir', 'Ir.',
@@ -553,19 +645,32 @@ const QASection: React.FC = () => {
                                 'Ak', 'Ak.', 'CA', 'CPA', 'CIA', 'CFE', 'CRMP',
                                 'S.Akt', 'S.Stat', 'S.Si', 'S.Hum',
                                 'MP', 'M.P', 'M.Eng', 'M.T',
-                                ''
-                              ];
-                              const upperMember = member.toUpperCase();
-                              return !academicTitles.some(title => 
-                                upperMember === title.toUpperCase() || 
-                                upperMember === title.toUpperCase().replace('.', '')
-                              );
-                            })
-                            .map((member, index) => (
+                                'A.Md', 'A.Md.', 'AMD',
+                                'Kom', 'S.Kom'
+                            ];
+
+                            rawMembers.forEach(part => {
+                                // Check if part seems to be an academic title
+                                // Logic: matching list OR typically short (<= 5 chars) and possibly starting with dot
+                                const upperPart = part.toUpperCase().replace(/\./g, '');
+                                const isTitle = academicTitles.some(t => 
+                                    upperPart === t.toUpperCase().replace(/\./g, '')
+                                ) || (part.length <= 5 && part.includes('.'));
+
+                                if (isTitle && cleanMembers.length > 0) {
+                                    // Append to last member
+                                    cleanMembers[cleanMembers.length - 1] += `, ${part}`;
+                                } else if (part) {
+                                    cleanMembers.push(part);
+                                }
+                            });
+
+                            return cleanMembers.map((member, index) => (
                               <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded mr-1 mb-1">
                                 {member}
                               </span>
-                            ))}
+                            ));
+                          })()}
                         </div>
                       ) : (
                         <span className="text-gray-400">-</span>
@@ -583,7 +688,7 @@ const QASection: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="p-4 text-center text-gray-500">
+                  <td colSpan={10} className="p-4 text-center text-gray-500">
                     No audit tasks found
                   </td>
                 </tr>

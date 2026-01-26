@@ -40,6 +40,10 @@ interface AuditMaster {
   audit_report_fr?: boolean;
   detailed_findings_fr?: boolean;
   comment_fr?: string;
+  
+  // Fraud specific fields
+  is_real_fraud?: boolean;
+  work_paper_persons?: { fraud_staff: string; fraud_amount: number }[];
 }
 
 interface Auditor {
@@ -169,7 +173,13 @@ const AuditorWorkpapers: React.FC = () => {
       
       const { data: auditData, error: auditError } = await supabase
         .from('audit_master')
-        .select('*')
+        .select(`
+          *,
+          work_paper_persons (
+            fraud_staff,
+            fraud_amount
+          )
+        `)
         .order('branch_name');
       
       if (auditError) throw auditError;
@@ -270,6 +280,9 @@ const AuditorWorkpapers: React.FC = () => {
       if (startYear !== selectedYear && endYear !== selectedYear) return false;
     }
     return true;
+  }).sort((a, b) => {
+    // Sort all audits by date (oldest first)
+    return new Date(a.audit_start_date).getTime() - new Date(b.audit_start_date).getTime();
   });
 
   // --- Render ---
@@ -462,21 +475,56 @@ const AuditorWorkpapers: React.FC = () => {
                  
                  <div className="space-y-3">
                     {activeTab === 'regular' && (
+                      <>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Status LHA</label>
+                          {audit.rating ? (
+                            <div className="w-full text-sm border border-emerald-200 rounded-lg p-2.5 bg-emerald-50 text-emerald-700 font-medium text-center">
+                              Sudah Upload LHA
+                            </div>
+                          ) : (
+                            <div className="w-full text-sm border border-rose-200 rounded-lg p-2.5 bg-rose-50 text-rose-700 font-medium text-center">
+                              Belum Upload LHA
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Status Monitoring</label>
+                          <select
+                            value={audit.monitoring_reg || ''}
+                            onChange={(e) => handleTextChange(audit.id, 'monitoring_reg', e.target.value)}
+                            className={`w-full text-sm border rounded-lg p-2.5 transition-colors ${
+                              audit.monitoring_reg === 'Memadai' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
+                              audit.monitoring_reg === 'Tidak Memadai' ? 'text-rose-700 border-rose-200 bg-rose-50' : 
+                              'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <option value="">- Pilih Status -</option>
+                            <option value="Memadai">Memadai</option>
+                            <option value="Tidak Memadai">Tidak Memadai</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {activeTab === 'special' && (
                       <div>
-                        <label className="text-xs font-medium text-gray-700 block mb-1">Status Monitoring</label>
-                        <select
-                           value={audit.monitoring_reg || ''}
-                           onChange={(e) => handleTextChange(audit.id, 'monitoring_reg', e.target.value)}
-                           className={`w-full text-sm border rounded-lg p-2.5 transition-colors ${
-                             audit.monitoring_reg === 'Memadai' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
-                             audit.monitoring_reg === 'Tidak Memadai' ? 'text-rose-700 border-rose-200 bg-rose-50' : 
-                             'border-gray-200 bg-white'
-                           }`}
-                         >
-                           <option value="">- Pilih Status -</option>
-                           <option value="Memadai">Memadai</option>
-                           <option value="Tidak Memadai">Tidak Memadai</option>
-                         </select>
+                        <label className="text-xs font-medium text-gray-700 block mb-1">Status KKP</label>
+                        {(() => {
+                          const hasValidFraudPersons = audit.work_paper_persons && 
+                            audit.work_paper_persons.length > 0 && 
+                            audit.work_paper_persons.some(p => p.fraud_staff && p.fraud_staff.trim() !== '');
+                          const isUploaded = audit.is_real_fraud && hasValidFraudPersons;
+                          
+                          return isUploaded ? (
+                            <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              ✓ Sudah Upload KKP
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                              ○ Belum Upload KKP
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     <div>
@@ -517,6 +565,7 @@ const AuditorWorkpapers: React.FC = () => {
                     <th className="px-2 py-3 text-center min-w-[80px] font-semibold text-gray-600 align-bottom">Absensi Exit</th>
                     <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">LHA</th>
                     <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">RTA</th>
+                    <th className="px-2 py-3 text-center min-w-[130px] font-semibold text-gray-600 align-bottom">Status LHA</th>
                     <th className="px-2 py-3 text-center min-w-[120px] font-semibold text-gray-600 align-bottom">Monitoring</th>
                     <th className="px-2 py-3 min-w-[200px] font-semibold text-gray-600 align-bottom">Komentar</th>
                   </>
@@ -528,6 +577,7 @@ const AuditorWorkpapers: React.FC = () => {
                     <th className="px-2 py-3 text-center min-w-[90px] font-semibold text-gray-600 align-bottom">KK Pemeriksaan</th>
                     <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">SHA</th>
                     <th className="px-2 py-3 text-center min-w-[60px] font-semibold text-gray-600 align-bottom">RTA</th>
+                    <th className="px-2 py-3 text-center min-w-[110px] font-semibold text-gray-600 align-bottom">Status KKP</th>
                     <th className="px-2 py-3 min-w-[200px] font-semibold text-gray-600 align-bottom">Komentar</th>
                   </>
                 )}
@@ -536,7 +586,7 @@ const AuditorWorkpapers: React.FC = () => {
             <tbody className="divide-y divide-gray-100">
               {filteredAudits.length === 0 ? (
                 <tr>
-                  <td colSpan={activeTab === 'regular' ? 13 : 7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={activeTab === 'regular' ? 14 : 8} className="px-4 py-8 text-center text-gray-500">
                     Tidak ada audit yang sesuai dengan filter Anda.
                   </td>
                 </tr>
@@ -578,6 +628,18 @@ const AuditorWorkpapers: React.FC = () => {
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.exit_attendance_list_reg} onChange={(v) => handleCheckboxChange(audit.id, 'exit_attendance_list_reg', v)} /></td>
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.audit_result_letter_reg} onChange={(v) => handleCheckboxChange(audit.id, 'audit_result_letter_reg', v)} /></td>
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.rta_reg} onChange={(v) => handleCheckboxChange(audit.id, 'rta_reg', v)} /></td>
+                        <td className="px-2 py-3 text-center">
+                          {audit.rating ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                              Sudah Upload LHA
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap">
+                              Belum Upload LHA
+                            </span>
+                          )}
+                        </td>
+
                         <td className="px-2 py-3">
                           <select
                             value={audit.monitoring_reg || ''}
@@ -611,6 +673,24 @@ const AuditorWorkpapers: React.FC = () => {
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.audit_wp_fr} onChange={(v) => handleCheckboxChange(audit.id, 'audit_wp_fr', v)} /></td>
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.audit_report_fr} onChange={(v) => handleCheckboxChange(audit.id, 'audit_report_fr', v)} /></td>
                         <td className="px-2 py-3 text-center"><CheckboxCell checked={audit.detailed_findings_fr} onChange={(v) => handleCheckboxChange(audit.id, 'detailed_findings_fr', v)} /></td>
+                        <td className="px-2 py-3 text-center">
+                          {(() => {
+                            const hasValidFraudPersons = audit.work_paper_persons && 
+                              audit.work_paper_persons.length > 0 && 
+                              audit.work_paper_persons.some(p => p.fraud_staff && p.fraud_staff.trim() !== '');
+                            const isUploaded = audit.is_real_fraud && hasValidFraudPersons;
+                            
+                            return isUploaded ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                ✓ Sudah Upload
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                ○ Belum Upload
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-2 py-3">
                           <input
                             type="text"

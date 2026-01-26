@@ -15,6 +15,7 @@ import {
 
 import html2canvas from 'html2canvas';
 import LazyEChart from '../components/common/LazyEChart';
+import AuditSchedule from '../components/dashboard/AuditSchedule';
 import {
     ChartConfig,
     ChartContainer,
@@ -167,7 +168,7 @@ const Dashboard = () => {
   // Only keep state that is not cached
   const [searchTerm] = useState('');
   const [activeSection] = useState<'main'>('main');
-  const [dashboardTab, setDashboardTab] = useState<'performance' | 'mapping'>('performance');
+  const [dashboardTab, setDashboardTab] = useState<'performance' | 'mapping' | 'schedule'>('performance');
 
   // Use cached audited branches geo data - transform to match local interface
   const auditedBranchesGeo = cachedAuditedBranchesGeo.map(branch => ({
@@ -654,7 +655,22 @@ const getRegionAuditDataByMonth = () => {
               >
                 Audit Mapping
               </button>
+              <button
+                onClick={() => setDashboardTab('schedule')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  dashboardTab === 'schedule'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Audit Schedule
+              </button>
             </div>
+
+            {/* Audit Schedule Content */}
+            {dashboardTab === 'schedule' && (
+              <AuditSchedule />
+            )}
 
             {/* Audit Mapping Content */}
             {dashboardTab === 'mapping' && (

@@ -21,18 +21,7 @@ interface AdminIssue {
   monitoring?: string; // Optional, only for regular audits
 }
 
-// Interface for audit schedule data
-interface AuditSchedule {
-  no?: number;
-  branch_name: string;
-  region?: string;
-  isAudited?: boolean;
-  audit_period_start?: string | null;
-  audit_period_end?: string | null;
-  execution_order?: number;
-  priority?: number;
-  status?: string;
-}
+
 
 const AccountSettingsPage = () => {
   const { user } = useAuth();
@@ -55,140 +44,11 @@ const AccountSettingsPage = () => {
   const [userRole, setUserRole] = useState('');
   const [userData, setUserData] = useState<any>(null);
   
-  // State for audit schedule data
-  const [auditScheduleData, setAuditScheduleData] = useState<AuditSchedule[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(true);
-  const [selectedRegion, setSelectedRegion] = useState<string>('A');
-  
   // Tab state
-  const [activeTab, setActiveTab] = useState<'performance' | 'issues' | 'schedule'>('performance');
+  const [activeTab, setActiveTab] = useState<'performance' | 'issues'>('performance');
 
   useEffect(() => {
-    // Function to fetch audit schedule data - DEFINED FIRST
-    const fetchAuditScheduleData = async () => {
-      try {
-        setLoadingSchedule(true);
-        
-        // Get audit_schedule data (for priority, branch_name, region)
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from('audit_schedule')
-          .select('id, no, branch_name, region')
-          .order('no', { ascending: true });
 
-        console.log('=== AUDIT SCHEDULE DEBUG ===');
-        console.log('Schedule Data:', scheduleData);
-        console.log('Schedule Error:', scheduleError);
-        console.log('Schedule Count:', scheduleData?.length || 0);
-
-        if (scheduleError) {
-          console.error("Error fetching audit_schedule:", scheduleError);
-          setLoadingSchedule(false);
-          return;
-        }
-
-        // Get audit_master data (for audit period, execution order calculation, status)
-        // Only get regular audits
-        const { data: auditMasterData, error: auditError } = await supabase
-          .from('audit_master')
-          .select('branch_name, audit_period_start, audit_period_end, created_at, audit_type')
-          .or('audit_type.ilike.%regular%,audit_type.ilike.%reguler%');
-
-        console.log('Audit Master Data:', auditMasterData);
-        console.log('Audit Master Error:', auditError);
-        console.log('Audit Master Count:', auditMasterData?.length || 0);
-
-        if (auditError) {
-          console.error("Error fetching audit_master:", auditError);
-        }
-
-        // Create map of audited branches (VLOOKUP by branch_name)
-        const auditedBranchMap: Record<string, {
-          audit_period_start: string | null;
-          audit_period_end: string | null;
-          created_at: string;
-        }> = {};
-
-        auditMasterData?.forEach(audit => {
-          // Store the earliest audit for each branch (in case multiple audits exist)
-          if (!auditedBranchMap[audit.branch_name] || 
-              new Date(audit.created_at) < new Date(auditedBranchMap[audit.branch_name].created_at)) {
-            auditedBranchMap[audit.branch_name] = {
-              audit_period_start: audit.audit_period_start,
-              audit_period_end: audit.audit_period_end,
-              created_at: audit.created_at
-            };
-          }
-        });
-
-        console.log('Audited Branch Map:', auditedBranchMap);
-
-        // Group audits by region for execution order calculation
-        const auditsByRegion: Record<string, Array<{
-          branch_name: string;
-          created_at: string;
-        }>> = {};
-
-        auditMasterData?.forEach(audit => {
-          // Find region from scheduleData
-          const scheduleItem = scheduleData?.find(s => s.branch_name === audit.branch_name);
-          const region = scheduleItem?.region;
-          
-          if (region && !auditsByRegion[region]?.find(a => a.branch_name === audit.branch_name)) {
-            if (!auditsByRegion[region]) {
-              auditsByRegion[region] = [];
-            }
-            auditsByRegion[region].push({
-              branch_name: audit.branch_name,
-              created_at: auditedBranchMap[audit.branch_name].created_at
-            });
-          }
-        });
-
-        console.log('Audits by Region:', auditsByRegion);
-
-        // Calculate execution order per region (sorted by created_at, earliest = 1)
-        const executionOrderMap: Record<string, number> = {};
-        Object.keys(auditsByRegion).forEach(region => {
-          const sortedAudits = auditsByRegion[region].sort((a, b) => 
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          
-          sortedAudits.forEach((audit, index) => {
-            executionOrderMap[audit.branch_name] = index + 1;
-          });
-        });
-
-        console.log('Execution Order Map:', executionOrderMap);
-
-        // Combine schedule with audit data (VLOOKUP result)
-        const formattedSchedule = scheduleData?.map((item: any) => {
-          const auditData = auditedBranchMap[item.branch_name];
-          const isAudited = !!auditData;
-          
-          return {
-            no: parseInt(item.no) || 0,
-            branch_name: item.branch_name,
-            region: item.region,
-            priority: parseInt(item.no) || 0,
-            status: isAudited ? 'Audited' : 'Unaudited',
-            isAudited: isAudited,
-            audit_period_start: auditData?.audit_period_start || null,
-            audit_period_end: auditData?.audit_period_end || null,
-            execution_order: executionOrderMap[item.branch_name] || undefined
-          };
-        }) || [];
-        
-        console.log('Formatted Schedule:', formattedSchedule);
-        console.log('Region A data:', formattedSchedule.filter(s => s.region === 'A'));
-        console.log('=== END DEBUG ===');
-        
-        setAuditScheduleData(formattedSchedule);
-      } catch (error) {
-        console.error('Error fetching audit schedule data:', error);
-      } finally {
-        setLoadingSchedule(false);
-      }
-    };
     
     
     const fetchAdminIssues = async (profileData: any) => {
@@ -362,7 +222,6 @@ const AccountSettingsPage = () => {
         setLoadingAdminIssues(false);
         setLoadingBranches(false);
         setLoadingStats(false);
-        setLoadingSchedule(false);
         return;
       }
       
@@ -379,7 +238,6 @@ const AccountSettingsPage = () => {
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
-        setLoadingSchedule(false);
         return;
       }
 
@@ -393,7 +251,6 @@ const AccountSettingsPage = () => {
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
-        setLoadingSchedule(false);
         return;
       }
 
@@ -434,7 +291,7 @@ const AccountSettingsPage = () => {
         setLoadingBranches(false);
         setLoadingStats(false);
         setLoadingAdminIssues(false);
-        setLoadingSchedule(false);
+
         return;
       }
       
@@ -524,7 +381,7 @@ const AccountSettingsPage = () => {
     
     fetchData();
     fetchUserRole();
-    fetchAuditScheduleData(); // Call independently so it always runs
+
   }, [user]);
 
   if (!user) {
@@ -569,16 +426,7 @@ const AccountSettingsPage = () => {
         >
           Administration Issues
         </button>
-        <button
-          onClick={() => setActiveTab('schedule')}
-          className={`px-6 py-3 text-sm font-semibold rounded-t-lg transition-all ${
-            activeTab === 'schedule'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          Audit Schedule
-        </button>
+
       </div>
 
       {/* User Performance Tab */}
@@ -747,88 +595,7 @@ const AccountSettingsPage = () => {
         </div>
       )}
 
-      {/* Audit Schedule Tab */}
-      {activeTab === 'schedule' && showAuditSections && (
-        <div>
-          {/* Region Tabs */}
-          <div className="mb-4">
-            <div className="flex flex-wrap gap-2 border-b border-gray-200">
-              {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'].map((region) => (
-                <button
-                  key={region}
-                  onClick={() => setSelectedRegion(region)}
-                  className={`px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-                    selectedRegion === region
-                      ? 'text-blue-600 border-blue-600 bg-blue-50'
-                      : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {region}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">PRIORITY</TableHead>
-                  <TableHead className="w-20 whitespace-nowrap">EXE ORDER</TableHead>
-                  <TableHead>BRANCH NAME</TableHead>
-                  <TableHead>AUDIT PERIOD</TableHead>
-                  <TableHead>STATUS</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingSchedule ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading...</TableCell>
-                  </TableRow>
-                ) : auditScheduleData.filter(schedule => 
-                    schedule.region === selectedRegion
-                  ).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">No audit schedule found for Region {selectedRegion}</TableCell>
-                  </TableRow>
-                ) : (
-                  auditScheduleData
-                    .filter(schedule => schedule.region === selectedRegion)
-                    .sort((a, b) => (a.no || 0) - (b.no || 0)) // Sort by priority ascending
-                    .map((schedule, idx) => {
-                      let rowColorClass = '';
-                      
-                      if (schedule.execution_order !== null && schedule.execution_order !== undefined) {
-                        const executionOrder = Number(schedule.execution_order);
-                        const priority = Number(schedule.no);
-                        
-                        if (executionOrder === priority) {
-                          rowColorClass = 'bg-green-100';
-                        } else {
-                          rowColorClass = 'bg-red-100';
-                        }
-                      }
-                      
-                      return (
-                        <TableRow key={idx} className={rowColorClass}>
-                          <TableCell>{schedule.no || '-'}</TableCell>
-                          <TableCell>{schedule.execution_order || '-'}</TableCell>
-                          <TableCell>{schedule.branch_name}</TableCell>
-                          <TableCell>
-                            {schedule.audit_period_start && schedule.audit_period_end 
-                              ? `${new Date(schedule.audit_period_start).toLocaleString('en-US', { month: 'long', year: 'numeric' })} - ${new Date(schedule.audit_period_end).toLocaleString('en-US', { month: 'long', year: 'numeric' })}`
-                              : 'To Be Discussed'}
-                          </TableCell>
-                          <TableCell>{schedule.status || (schedule.isAudited ? 'Completed' : 'Scheduled')}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
