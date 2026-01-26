@@ -401,6 +401,8 @@ const AccountSettingsPage = () => {
       }
       
       setTargetColor(color);
+      setMotivationMessage(message || "Mari semangat mengejar target audit bulanan!");
+      setLoadingStats(false);
       // Deduplicate checklist audits to avoid double records (one empty, one full)
       // PRIORITY: Choose the record that has MORE checklist items filled (true)
       const countChecklistFilled = (audit: any) => {
@@ -460,19 +462,13 @@ const AccountSettingsPage = () => {
         .eq('user_id', user.id)
         .maybeSingle();
       
-      console.log('=== USER ROLE DEBUG ===');
-      console.log('User ID:', user.id);
-      console.log('Role data from DB:', data);
-      console.log('Role value:', data?.role);
-      console.log('========================');
-      
       setUserRole(data?.role || '');
     };
     
     fetchData();
     fetchUserRole();
 
-  }, [user, activeTab]);
+  }, [user?.id]);
 
   if (!user) {
     return (
@@ -485,12 +481,6 @@ const AccountSettingsPage = () => {
   // Only show audit stats, running text, and audited branches for these roles
   const allowedRoles = ['superadmin', 'qa', 'dvs', 'manager', 'user'];
   const showAuditSections = allowedRoles.includes(userRole);
-  
-  console.log('=== AUDIT SECTIONS DEBUG ===');
-  console.log('Current userRole:', userRole);
-  console.log('Allowed roles:', allowedRoles);
-  console.log('Show audit sections:', showAuditSections);
-  console.log('=============================');
 
   return (
     <div className="px-1 py-1 w-full">
@@ -530,7 +520,7 @@ const AccountSettingsPage = () => {
             sisaTarget={sisaTarget}
             targetColor={targetColor}
             loading={loadingStats}
-            adminIssuesCount={adminIssues.length}
+            adminIssuesCount={adminIssues.filter(i => i.missing_documents !== "Semua dokumen sudah lengkap").length}
           />
 
           {/* Statistik Audit */}
