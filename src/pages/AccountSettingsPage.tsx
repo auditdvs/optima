@@ -74,7 +74,6 @@ const AccountSettingsPage = () => {
             dapa_supporting_data_reg: "Data Dukung DAPA",
             assignment_letter_reg: "Surat Tugas",
             entrance_agenda_reg: "Entrance Agenda",
-            entrance_attendance_reg: "Absensi Entrance",
             audit_wp_reg: "KK Pemeriksaan",
             exit_meeting_minutes_reg: "BA Exit Meeting",
             exit_attendance_list_reg: "Absensi Exit",
@@ -117,10 +116,11 @@ const AccountSettingsPage = () => {
         };
         
       // Process regular audits - filter by missing documents OR monitoring issue
-      // Regular audit: 9 items checked (excluding dapa_reg/dapa perubahan as it is optional)
+      // Regular audit: Required items including DAPA
+      // REMOVED: entrance_attendance_reg (Absensi Entrance - not applicable)
       const regularDocumentFields = [
-        'dapa_supporting_data_reg', 'assignment_letter_reg',
-        'entrance_agenda_reg', 'entrance_attendance_reg', 'audit_wp_reg',
+        'dapa_reg', 'dapa_supporting_data_reg', 'assignment_letter_reg',
+        'entrance_agenda_reg', 'audit_wp_reg',
         'exit_meeting_minutes_reg', 'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg'
       ];
       
@@ -410,7 +410,7 @@ const AccountSettingsPage = () => {
          const allKeys = [
             // Regular keys
             'dapa_supporting_data_reg', 'assignment_letter_reg', 'entrance_agenda_reg', 
-            'entrance_attendance_reg', 'audit_wp_reg', 'exit_meeting_minutes_reg', 
+            'audit_wp_reg', 'exit_meeting_minutes_reg', 
             'exit_attendance_list_reg', 'audit_result_letter_reg', 'rta_reg',
             // Fraud keys
             "data_prep", "assignment_letter_fr", "audit_wp_fr", "audit_report_fr", "detailed_findings_fr"
