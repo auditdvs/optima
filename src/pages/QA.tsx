@@ -650,15 +650,12 @@ const QASection: React.FC = () => {
                             ];
 
                             rawMembers.forEach(part => {
-                                // Check if part seems to be an academic title
-                                // Logic: matching list OR typically short (<= 5 chars) and possibly starting with dot
                                 const upperPart = part.toUpperCase().replace(/\./g, '');
                                 const isTitle = academicTitles.some(t => 
                                     upperPart === t.toUpperCase().replace(/\./g, '')
                                 ) || (part.length <= 5 && part.includes('.'));
 
                                 if (isTitle && cleanMembers.length > 0) {
-                                    // Append to last member
                                     cleanMembers[cleanMembers.length - 1] += `, ${part}`;
                                 } else if (part) {
                                     cleanMembers.push(part);

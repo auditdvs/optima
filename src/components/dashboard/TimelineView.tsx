@@ -100,7 +100,7 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
 
   const getTimelineWidth = (columns: TimelineColumn[]) => Math.max(1000, columns.reduce((acc, col) => acc + col.width, 0));
 
-  const calculateDatePosition = (date: Date, columns: TimelineColumn[], totalWidth: number) => {
+  const calculateDatePosition = (date: Date, columns: TimelineColumn[], totalWidth: number, snapToEnd: boolean = false) => {
      // Find column index that contains the date
      const dateTime = date.getTime();
      const colIndex = columns.findIndex(c => dateTime >= c.start.getTime() && dateTime <= c.end.getTime());
@@ -110,12 +110,16 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
        const col = columns[colIndex];
        const colLeft = colIndex * col.width; 
        
-       // Calculate percentage within the column
-       const duration = col.end.getTime() - col.start.getTime();
-       const offset = dateTime - col.start.getTime();
-       const percent = Math.max(0, Math.min(1, offset / duration));
-       
-       return colLeft + (percent * col.width);
+       // For cleaner grid alignment:
+       // - If snapToEnd is true (end date), snap to end of column (100%)
+       // - If snapToEnd is false (start date), snap to start of column (0%)
+       if (snapToEnd) {
+         // End date: snap to end of the column
+         return colLeft + col.width;
+       } else {
+         // Start date: snap to start of the column
+         return colLeft;
+       }
      }
      
      // Date out of range handling
@@ -139,6 +143,9 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
     
     // Helper to process items (letters or addendums)
     const processItem = (item: any, isAddendum: boolean) => {
+      // Skip rejected items
+      if (item.status?.toLowerCase() === 'rejected') return;
+      
       // Use audit_start_date/audit_end_date (Pelaksanaan Audit) as priority
       let startStr: string | null = null;
       let endStr: string | null = null;
@@ -154,11 +161,8 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
         if (originalLetter) {
           const origEndStr = originalLetter.audit_end_date || originalLetter.audit_period_end;
           if (origEndStr) {
-            const originalLetterEndDate = new Date(origEndStr);
-            // Addendum bar starts the day after original letter ends
-            const addendumStart = new Date(originalLetterEndDate);
-            addendumStart.setDate(addendumStart.getDate() + 1);
-            startStr = addendumStart.toISOString();
+            // Addendum bar starts on the same day as original letter ends (for visual connection)
+            startStr = origEndStr;
           }
         }
         
@@ -235,8 +239,53 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
             return;
         }
 
-        if (!auditorsMap.has(cleanName)) {
-          auditorsMap.set(cleanName, []);
+        // Normalize name to handle variations (remove extra spaces, normalize case, etc.)
+        const normalizeName = (name: string): string => {
+          return name
+            .trim()
+            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+            .toLowerCase();
+        };
+
+        const normalizedName = normalizeName(cleanName);
+        
+        // Check if auditor already exists with similar name
+        let matchedKey: string | null = null;
+        
+        // Try to find exact match first (normalized)
+        for (const existingKey of auditorsMap.keys()) {
+          if (normalizeName(existingKey) === normalizedName) {
+            matchedKey = existingKey;
+            break;
+          }
+        }
+        
+        // If no exact match, try fuzzy matching (for truncated names or slight variations)
+        if (!matchedKey) {
+          for (const existingKey of auditorsMap.keys()) {
+            const normalizedExisting = normalizeName(existingKey);
+            
+            // Check if one name is a prefix of another (truncation case)
+            if (normalizedExisting.startsWith(normalizedName) || normalizedName.startsWith(normalizedExisting)) {
+              // Use the longer name as the canonical one
+              matchedKey = existingKey.length >= cleanName.length ? existingKey : cleanName;
+              
+              // If we're switching to a longer name, migrate the data
+              if (matchedKey !== existingKey) {
+                const existingData = auditorsMap.get(existingKey) || [];
+                auditorsMap.delete(existingKey);
+                auditorsMap.set(matchedKey, existingData);
+              }
+              break;
+            }
+          }
+        }
+        
+        // Use matched key or original cleaned name
+        const finalKey = matchedKey || cleanName;
+        
+        if (!auditorsMap.has(finalKey)) {
+          auditorsMap.set(finalKey, []);
         }
         
         // Get letter number
@@ -247,7 +296,7 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
         // Add (Addendum) label to branch name for addendums
         const branchLabel = isAddendum ? `${item.branch_name} (Addendum)` : item.branch_name;
         
-        auditorsMap.get(cleanName)?.push({
+        auditorsMap.get(finalKey)?.push({
           id: item.id,
           branch: branchLabel,
           letterNo,
@@ -425,7 +474,7 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
          {/* Top Scrollbar - syncs with body */}
         <div className="flex-none">
           <div className="flex">
-            <div className="w-[200px] flex-none"></div>
+            <div className="w-[280px] flex-none"></div>
             <div 
               id="timeline-top-scroll"
               className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
@@ -445,7 +494,7 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
          {/* Header Section - Sticky */}
         <div className="flex-none overflow-hidden border-b border-gray-200 bg-gray-50 z-20">
           <div className="flex">
-            <div className="w-[200px] flex-none p-3 font-semibold text-gray-700 border-r border-gray-200 bg-gray-50 flex items-center z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+            <div className="w-[280px] flex-none p-3 font-semibold text-gray-700 border-r border-gray-200 bg-gray-50 flex items-center z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
               Auditor
             </div>
             <div className="flex-1 overflow-hidden relative" ref={(el) => {
@@ -536,7 +585,7 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
                 return (
                   <div key={auditorName} className="flex border-b border-gray-100 hover:bg-gray-50/80 transition-colors group/row" style={{ minHeight: `${containerHeight}px` }}>
                     {/* Sticky Auditor Name - z-30 to stay above bars */}
-                    <div className="sticky left-0 w-[200px] flex-none border-r border-gray-200 p-3 text-sm font-medium text-gray-900 flex items-center z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]" style={{ backgroundColor: 'white' }}>
+                    <div className="sticky left-0 w-[280px] flex-none border-r border-gray-200 p-3 text-sm font-medium text-gray-900 flex items-center z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]" style={{ backgroundColor: 'white' }}>
                       <span className="truncate" title={auditorName}>{auditorName}</span>
                     </div>
 
@@ -557,8 +606,8 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
 
                        {/* Assignments Bars */}
                        {assignmentsWithRows.map((assignment, idx) => {
-                         const startPx = calculateDatePosition(assignment.start, columns, 0);
-                         const endPx = calculateDatePosition(assignment.end, columns, 0);
+                         const startPx = calculateDatePosition(assignment.start, columns, 0, false);
+                         const endPx = calculateDatePosition(assignment.end, columns, 0, true);
                          
                          // Min width 10px if start/end are same or very close
                          const widthPx = Math.max(10, endPx - startPx); 
