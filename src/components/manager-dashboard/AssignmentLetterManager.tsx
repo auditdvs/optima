@@ -1,5 +1,5 @@
 import { saveAs } from 'file-saver';
-import { Check, Eye, FileDown, X, XCircle } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Eye, FileDown, X, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
@@ -53,6 +53,7 @@ interface LpjSubmission {
   created_at: string;
   created_by: string;
   submitter_name?: string;
+  status_approve?: 'open' | 'close';
 }
 
 export default function AssignmentLetterManager({ refreshTrigger, initialTab = 'letter' }: AssignmentLetterManagerProps) {
@@ -70,6 +71,17 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj' | 'mutasi'>(initialTab || 'letter');
   const [lpjSubmissions, setLpjSubmissions] = useState<LpjSubmission[]>([]);
   const [lpjFilter, setLpjFilter] = useState<'all' | 'submitted' | 'pending'>('all');
+  const [lpjSortField, setLpjSortField] = useState<'letter_number' | 'type' | null>(null);
+  const [lpjSortOrder, setLpjSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Sorting states for Surat Tugas
+  const [letterSortField, setLetterSortField] = useState<'letter_number' | 'status' | null>(null);
+  const [letterSortOrder, setLetterSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Sorting states for Addendum
+  const [addendumSortField, setAddendumSortField] = useState<'letter_number' | 'status' | null>(null);
+  const [addendumSortOrder, setAddendumSortOrder] = useState<'asc' | 'desc'>('asc');
+  
   const [showAddendumDetailModal, setShowAddendumDetailModal] = useState(false);
   const [showAddendumRejectModal, setShowAddendumRejectModal] = useState(false);
   const [addendumRejectionReason, setAddendumRejectionReason] = useState('');
@@ -809,32 +821,44 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
     }
   };
 
-  const handleDownloadLPJFile = async (item: any) => {
+  const handleDownloadLPJFile = async (item: any, isAcc: boolean = true) => {
     if (!item.lpj || !item.lpj.file_url) return;
     
     try {
-      toast.loading('Downloading file...', { id: 'download-lpj' });
+      const label = isAcc ? 'ACC' : 'Original';
+      toast.loading(`Downloading file ${label}...`, { id: 'download-lpj' });
+      
+      let fileUrl = item.lpj.file_url;
+      
+      // If downloading original (non-ACC) version, convert URL from perdin_acc to perdin bucket
+      if (!isAcc) {
+        // Extract file path from URL and reconstruct for perdin bucket
+        // URL format: https://xxx.supabase.co/storage/v1/object/public/perdin_acc/path/to/file.xlsx
+        // Convert to: https://xxx.supabase.co/storage/v1/object/public/perdin/path/to/file.xlsx
+        fileUrl = item.lpj.file_url.replace('/perdin_acc/', '/perdin/');
+      }
       
       // Fetch the file as blob
-      const response = await fetch(item.lpj.file_url);
+      const response = await fetch(fileUrl);
       if (!response.ok) throw new Error('Download failed');
       
       const blob = await response.blob();
       
       // Determine extension from original URL or content-type
-      const urlPart = item.lpj.file_url.split('?')[0]; // Remove query params
+      const urlPart = fileUrl.split('?')[0]; // Remove query params
       const extension = urlPart.split('.').pop() || 'xlsx';
       
       // Sanitize filename parts
       const safeNo = item.assigment_letter.replace(/[\/\\?%*:|"<>]/g, '_'); // Replace invalid file chars with _
       const safeType = item.type.replace(/[\/\\?%*:|"<>]/g, '_');
       const safeInputter = (item.lpj.submitter_name || 'Unknown').replace(/[\/\\?%*:|"<>]/g, '_');
+      const suffix = isAcc ? '_ACC' : '_Original';
       
-      const filename = `${safeNo}_${safeType}_${safeInputter}.${extension}`;
+      const filename = `${safeNo}_${safeType}_${safeInputter}${suffix}.${extension}`;
       
       saveAs(blob, filename);
       
-      toast.success('File downloaded', { id: 'download-lpj' });
+      toast.success(`File ${label} downloaded`, { id: 'download-lpj' });
     } catch (error) {
       console.error('Download error:', error);
       toast.error('Gagal mendownload file', { id: 'download-lpj' });
@@ -1038,11 +1062,46 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Surat</th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (lpjSortField === 'letter_number') {
+                          setLpjSortOrder(lpjSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setLpjSortField('letter_number');
+                          setLpjSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Nomor Surat
+                        {lpjSortField === 'letter_number' && (
+                          lpjSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (lpjSortField === 'type') {
+                          setLpjSortOrder(lpjSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setLpjSortField('type');
+                          setLpjSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Jenis
+                        {lpjSortField === 'type' && (
+                          lpjSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inputter</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status LPJ</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
                   </tr>
                 </thead>
@@ -1081,16 +1140,35 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                     ];
                     
                     // Apply filter
-                    const filteredItems = allItems.filter(item => {
+                    let filteredItems = allItems.filter(item => {
                       if (lpjFilter === 'submitted') return item.hasLpj;
                       if (lpjFilter === 'pending') return !item.hasLpj;
                       return true;
                     });
                     
+                    // Apply sorting
+                    if (lpjSortField) {
+                      filteredItems = [...filteredItems].sort((a, b) => {
+                        let valueA = '';
+                        let valueB = '';
+                        
+                        if (lpjSortField === 'letter_number') {
+                          valueA = a.assigment_letter || '';
+                          valueB = b.assigment_letter || '';
+                        } else if (lpjSortField === 'type') {
+                          valueA = a.type || '';
+                          valueB = b.type || '';
+                        }
+                        
+                        const comparison = valueA.localeCompare(valueB, 'id', { numeric: true });
+                        return lpjSortOrder === 'asc' ? comparison : -comparison;
+                      });
+                    }
+                    
                     if (filteredItems.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                          <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
                             {lpjFilter === 'pending' ? 'Semua surat sudah memiliki LPJ 🎉' : 
                              lpjFilter === 'submitted' ? 'Belum ada LPJ yang diinput' : 
                              'Tidak ada data'}
@@ -1125,14 +1203,65 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {item.lpj ? (
-                            <button 
-                              onClick={() => handleDownloadLPJFile(item)}
-                              className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800"
+                          {item.hasLpj && item.lpj ? (
+                            <select
+                              value={item.lpj.status_approve || 'open'}
+                              disabled={item.lpj.status_approve === 'close'}
+                              onChange={async (e) => {
+                                const newStatus = e.target.value as 'open' | 'close';
+                                if (newStatus === 'open' && item.lpj?.status_approve === 'close') {
+                                  toast.error('Status Close tidak dapat diubah kembali ke Open');
+                                  return;
+                                }
+
+                                try {
+                                  const { error } = await supabase
+                                    .from('lpj_submissions')
+                                    .update({ status_approve: newStatus })
+                                    .eq('id', item.lpj!.id);
+                                  
+                                  if (error) throw error;
+                                  
+                                  toast.success(`Status berhasil diubah ke ${newStatus === 'open' ? 'Open' : 'Close'}`);
+                                  fetchLpjSubmissions();
+                                } catch (error) {
+                                  console.error('Error updating status:', error);
+                                  toast.error('Gagal mengubah status');
+                                }
+                              }}
+                              className={`px-2 py-1 text-xs rounded-lg border focus:ring-2 focus:ring-indigo-500 appearance-none ${
+                                (item.lpj.status_approve || 'open') === 'open' 
+                                  ? 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-pointer' 
+                                  : 'bg-green-100 border-green-300 text-green-800 font-medium cursor-not-allowed'
+                              }`}
                             >
-                              <FileDown className="w-4 h-4 mr-1" />
-                              Download
-                            </button>
+                              <option value="open">Open</option>
+                              <option value="close">Close</option>
+                            </select>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {item.lpj ? (
+                            <div className="flex flex-row gap-3">
+                              <button 
+                                onClick={() => handleDownloadLPJFile(item, true)}
+                                className="inline-flex items-center text-xs text-green-600 hover:text-green-800"
+                                title="Download file yang sudah diverifikasi (ACC)"
+                              >
+                                <FileDown className="w-3 h-3 mr-1" />
+                                ACC
+                              </button>
+                              <button 
+                                onClick={() => handleDownloadLPJFile(item, false)}
+                                className="inline-flex items-center text-xs text-orange-600 hover:text-orange-800"
+                                title="Download file original (belum ACC)"
+                              >
+                                <FileDown className="w-3 h-3 mr-1" />
+                                Original
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
@@ -1147,30 +1276,90 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
         </div>
       ) : activeTab === 'letter' ? (
         /* Surat Tugas Table */
-        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Surat</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Audit Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dibuat oleh</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pelaksanaan Audit</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="overflow-x-auto" style={{ transform: 'rotateX(180deg)' }}>
+            <div style={{ transform: 'rotateX(180deg)' }}>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (letterSortField === 'letter_number') {
+                          setLetterSortOrder(letterSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setLetterSortField('letter_number');
+                          setLetterSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Nomor Surat
+                        {letterSortField === 'letter_number' && (
+                          letterSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Audit Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (letterSortField === 'status') {
+                          setLetterSortOrder(letterSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setLetterSortField('status');
+                          setLetterSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Status
+                        {letterSortField === 'status' && (
+                          letterSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dibuat oleh</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pelaksanaan Audit</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {letters.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                    Belum ada surat tugas
-                  </td>
-                </tr>
-              ) : (
-                letters.map((letter, index) => (
+              {(() => {
+                let sortedLetters = [...letters];
+                
+                if (letterSortField) {
+                  sortedLetters.sort((a, b) => {
+                    let valueA = '';
+                    let valueB = '';
+                    
+                    if (letterSortField === 'letter_number') {
+                      valueA = a.assigment_letter || '';
+                      valueB = b.assigment_letter || '';
+                    } else if (letterSortField === 'status') {
+                      valueA = a.status || '';
+                      valueB = b.status || '';
+                    }
+                    
+                    const comparison = valueA.localeCompare(valueB, 'id', { numeric: true });
+                    return letterSortOrder === 'asc' ? comparison : -comparison;
+                  });
+                }
+                
+                if (sortedLetters.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                        Belum ada surat tugas
+                      </td>
+                    </tr>
+                  );
+                }
+                
+                return sortedLetters.map((letter, index) => (
                   <tr key={letter.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {index + 1}
@@ -1237,38 +1426,100 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
-          </table>
+              </table>
+            </div>
+          </div>
         </div>
       ) : activeTab === 'addendum' ? (
         /* Addendum Table */
-        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Addendum</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor ST</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link File</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode Audit</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="overflow-x-auto" style={{ transform: 'rotateX(180deg)' }}>
+            <div style={{ transform: 'rotateX(180deg)' }}>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (addendumSortField === 'letter_number') {
+                          setAddendumSortOrder(addendumSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAddendumSortField('letter_number');
+                          setAddendumSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Nomor Addendum
+                        {addendumSortField === 'letter_number' && (
+                          addendumSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor ST</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabang</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anggaran</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link File</th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => {
+                        if (addendumSortField === 'status') {
+                          setAddendumSortOrder(addendumSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAddendumSortField('status');
+                          setAddendumSortOrder('asc');
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        Status
+                        {addendumSortField === 'status' && (
+                          addendumSortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periode Audit</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {addendums.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                    Belum ada addendum
-                  </td>
-                </tr>
-              ) : (
-                addendums.map((addendum, index) => (
+              {(() => {
+                let sortedAddendums = [...addendums];
+                
+                if (addendumSortField) {
+                  sortedAddendums.sort((a, b) => {
+                    let valueA = '';
+                    let valueB = '';
+                    
+                    if (addendumSortField === 'letter_number') {
+                      valueA = a.assigment_letter || '';
+                      valueB = b.assigment_letter || '';
+                    } else if (addendumSortField === 'status') {
+                      valueA = a.status || '';
+                      valueB = b.status || '';
+                    }
+                    
+                    const comparison = valueA.localeCompare(valueB, 'id', { numeric: true });
+                    return addendumSortOrder === 'asc' ? comparison : -comparison;
+                  });
+                }
+                
+                if (sortedAddendums.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                        Belum ada addendum
+                      </td>
+                    </tr>
+                  );
+                }
+                
+                return sortedAddendums.map((addendum, index) => (
                   <tr key={addendum.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {index + 1}
@@ -1358,10 +1609,12 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
-          </table>
+              </table>
+            </div>
+          </div>
         </div>
       ) : activeTab === 'mutasi' ? (
         /* Audit Mutasi Table */

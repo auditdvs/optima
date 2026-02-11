@@ -2,6 +2,7 @@ import { Plus, Search, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import THCTable from '../components/THCTable';
 import { supabase } from '../lib/supabaseClient';
 
 interface Auditor {
@@ -86,8 +87,9 @@ const QASection: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedRegion, setSelectedRegion] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [inputStatus, setInputStatus] = useState<string>('all');
+  const [activeMainTab, setActiveMainTab] = useState<'pending' | 'completed'>('pending');
+  const [activeSubTab, setActiveSubTab] = useState<'regular' | 'fraud'>('regular');
+  const [activeWorkpaperTab, setActiveWorkpaperTab] = useState<'audit' | 'thc'>('audit');
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -379,20 +381,31 @@ const QASection: React.FC = () => {
     // Region filter
     const matchesRegion = !selectedRegion || audit.region === selectedRegion;
 
-    // Type filter
-    const matchesType = !selectedType || audit.audit_type === selectedType;
+    // Date Limit Logic: "H+3" means audit must have ended at least 3 days ago from today
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const thresholdDate = new Date(today);
+    thresholdDate.setDate(thresholdDate.getDate() - 3);
 
-    // Input Status filter (Done vs Pending)
-    let matchesStatus = true;
-    if (inputStatus !== 'all') {
-      const isDone = audit.audit_type === 'fraud' 
-        ? (!!audit.rating && audit.work_paper_persons && audit.work_paper_persons.length > 0)
-        : !!audit.rating;
-      
-      matchesStatus = inputStatus === 'done' ? isDone : !isDone;
-    }
+    const endDate = new Date(audit.audit_end_date);
+    const isPastEndDate = endDate <= thresholdDate;
 
-    return matchesSearch && matchesDate && matchesRegion && matchesType && matchesStatus;
+    // Tab Logic (Pending vs Done)
+    // Regular: status based on LHA (rating)
+    // Fraud: status based on KKP (work_paper_persons)
+    const isDoneRegular = !!audit.rating;
+    const isDoneFraud = audit.work_paper_persons && audit.work_paper_persons.length > 0;
+    
+    // Match audit type with sub-tab
+    const matchesSubTab = audit.audit_type === activeSubTab;
+    
+    // Determine if audit is done based on its type
+    const isDone = audit.audit_type === 'fraud' ? isDoneFraud : isDoneRegular;
+    
+    // Match main tab (pending vs completed)
+    const matchesMainTab = activeMainTab === 'pending' ? !isDone : isDone;
+
+    return matchesSearch && matchesDate && matchesRegion && isPastEndDate && matchesSubTab && matchesMainTab;
   });
 
   const availableYears = Array.from(new Set(
@@ -436,14 +449,97 @@ const QASection: React.FC = () => {
   }
 
   return (
-    <div className="space-y-2 p-0 mb-2 flex flex-col">
-      <h2 className="text-2xl font-bold">Update data input audits</h2>
+    <div className="space-y-4 p-0 mb-6">
+      <div className="flex items-center justify-between">
+         <h2 className="text-2xl font-bold text-gray-800">DVS Workpapers</h2>
+
+         {/* Workpaper Section Tabs */}
+         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+           <button
+             onClick={() => setActiveWorkpaperTab('audit')}
+             className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
+               activeWorkpaperTab === 'audit'
+                 ? 'bg-white text-indigo-600 shadow-sm'
+                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
+             }`}
+           >
+             Data Audit
+           </button>
+           <button
+             onClick={() => setActiveWorkpaperTab('thc')}
+             className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
+               activeWorkpaperTab === 'thc'
+                 ? 'bg-white text-indigo-600 shadow-sm'
+                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
+             }`}
+           >
+             THC Task
+           </button>
+         </div>
+      </div>
+
+      {/* THC Task Section */}
+      {activeWorkpaperTab === 'thc' && <THCTable />}
+
+      {/* Data Audit Section */}
+      {activeWorkpaperTab === 'audit' && (
+      <>
+      {/* Main Tabs */}
+      <div className="flex flex-col gap-2">
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveMainTab('pending')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+              activeMainTab === 'pending'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Belum Input
+          </button>
+          <button
+            onClick={() => setActiveMainTab('completed')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+              activeMainTab === 'completed'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Sudah Input
+          </button>
+        </div>
+      </div>
 
       {/* Search bar and table container */}
       <div className="rounded-md border shadow-sm">
         {/* Filters */}
         <div className="bg-white p-4 border-b flex justify-between items-center flex-wrap gap-4">
-          <h3 className="text-lg font-medium">Audit Tasks</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-medium">Audit Tasks</h3>
+            {/* Sub Tabs */}
+            <div className="flex space-x-1 bg-gray-50 p-1 rounded-lg border">
+              <button
+                onClick={() => setActiveSubTab('regular')}
+                className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                  activeSubTab === 'regular'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Reguler
+              </button>
+              <button
+                onClick={() => setActiveSubTab('fraud')}
+                className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                  activeSubTab === 'fraud'
+                    ? 'bg-red-500 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Fraud
+              </button>
+            </div>
+          </div>
           <div className="flex items-center space-x-4 flex-wrap">
             <div className="w-32">
               <select
@@ -458,35 +554,6 @@ const QASection: React.FC = () => {
               </select>
             </div>
 
-            <div className="w-28">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md text-sm ${
-                  selectedType === 'fraud' ? 'bg-red-50 text-red-700 border-red-200' :
-                  selectedType === 'regular' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''
-                }`}
-              >
-                <option value="">All Types</option>
-                <option value="regular">Regular</option>
-                <option value="fraud">Fraud</option>
-              </select>
-            </div>
-
-             <div className="w-32">
-              <select
-                value={inputStatus}
-                onChange={(e) => setInputStatus(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md text-sm ${
-                  inputStatus === 'done' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                  inputStatus === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''
-                }`}
-              >
-                <option value="all">All Status</option>
-                <option value="done">Done Input</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
 
             <div className="w-32">
               <select
@@ -545,8 +612,9 @@ const QASection: React.FC = () => {
                 <th className="p-3 font-medium text-gray-600">Start Date</th>
                 <th className="p-3 font-medium text-gray-600">End Date</th>
                 <th className="p-3 font-medium text-gray-600">Type</th>
+                <th className="p-3 font-medium text-gray-600">Staf Fraud</th>
                 <th className="p-3 font-medium text-gray-600">Rating</th>
-                <th className="p-3 font-medium text-gray-600">Status LHA</th>
+                <th className="p-3 font-medium text-gray-600">{activeSubTab === 'regular' ? 'Status LHA' : 'Status KKP'}</th>
                 <th className="p-3 font-medium text-gray-600">Auditors</th>
                 <th className="p-3 font-medium text-gray-600">Actions</th>
               </tr>
@@ -569,6 +637,31 @@ const QASection: React.FC = () => {
                         {audit.audit_type}
                       </span>
                     </td>
+                    
+                    {/* Kolom Staf Fraud (baru) */}
+                    <td className="p-3 text-gray-700">
+                      {((audit.audit_type === 'fraud' || audit.has_field_fraud) && audit.work_paper_persons && audit.work_paper_persons.length > 0) ? (
+                        <div className="flex flex-col gap-1">
+                          {audit.work_paper_persons.map((person, idx) => (
+                            <div key={idx} className="text-xs bg-gray-50 p-1.5 rounded border border-gray-200">
+                              <div className="font-semibold text-gray-700">{person.fraud_staff}</div>
+                              <div className="text-gray-500">
+                                {new Intl.NumberFormat('id-ID', { 
+                                  style: 'currency', 
+                                  currency: 'IDR',
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0
+                                }).format(person.fraud_amount)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    
+                    {/* Kolom Rating (cleaned up) */}
                     <td className="p-3 text-gray-700">
                       {audit.rating ? (
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -588,28 +681,10 @@ const QASection: React.FC = () => {
                           <span className="text-orange-500 text-xs font-medium">Belum diinput</span>
                         )
                       )}
-                      
-                      {/* Display Fraud Details (Staff & Amount) for Fraud Audits */}
-                      {audit.audit_type === 'fraud' && audit.work_paper_persons && audit.work_paper_persons.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-1">
-                          {audit.work_paper_persons.map((person, idx) => (
-                            <div key={idx} className="text-xs bg-gray-50 p-1.5 rounded border border-gray-200">
-                              <div className="font-semibold text-gray-700">{person.fraud_staff}</div>
-                              <div className="text-gray-500">
-                                {new Intl.NumberFormat('id-ID', { 
-                                  style: 'currency', 
-                                  currency: 'IDR',
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 0
-                                }).format(person.fraud_amount)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </td>
                     <td className="p-3 text-gray-700">
                       {audit.audit_type === 'regular' ? (
+                        // Status LHA for Regular audits
                         audit.rating ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                             Sudah Upload
@@ -620,7 +695,16 @@ const QASection: React.FC = () => {
                           </span>
                         )
                       ) : (
-                        <span className="text-gray-400 text-xs">-</span>
+                        // Status KKP for Fraud audits
+                        audit.work_paper_persons && audit.work_paper_persons.length > 0 ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                            Sudah Input
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap">
+                            Belum
+                          </span>
+                        )
                       )}
                     </td>
                     <td className="p-3 text-gray-700">
@@ -934,6 +1018,9 @@ const QASection: React.FC = () => {
           </div>
         </div>
       )}
+      </>
+      )}
+
     </div>
   );
 };

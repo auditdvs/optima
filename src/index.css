@@ -1,9 +1,15 @@
 /* Import Inter font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
 
 /* Apply Inter globally */
-html, body, #root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+html,
+body,
+#root {
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif !important;
 }
 
 /* Marquee animation */
@@ -20,7 +26,7 @@ html, body, #root {
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -56,32 +62,29 @@ html, body, #root {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
   }
-  
 
-/* Scrollbar vertikal */
-::-webkit-scrollbar {
-  width: 0.5rem;  
-  height: 0.5rem;
-}
+  /* Scrollbar vertikal */
+  ::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
 
+  /* Track (background dari scrollbar) */
+  ::-webkit-scrollbar-track {
+    background-color: #d4d9e1;
+    border-radius: 9999px;
+  }
 
-/* Track (background dari scrollbar) */
-::-webkit-scrollbar-track {
-  background-color: #d4d9e1; 
-  border-radius: 9999px;
-}
+  /* Thumb (bagian geser) */
+  ::-webkit-scrollbar-thumb {
+    background-color: #888b91;
+    border-radius: 9999px;
+  }
 
-/* Thumb (bagian geser) */
-::-webkit-scrollbar-thumb {
-  background-color: #888b91;
-  border-radius: 9999px;    
-}
-
-.force-align-top {
-  vertical-align: top !important;
-}
+  .force-align-top {
+    vertical-align: top !important;
+  }
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -115,40 +118,38 @@ html, body, #root {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
   }
-  .review-textarea, .review-input-field {
-  direction: ltr !important;
-  text-align: left !important;
+  .review-textarea,
+  .review-input-field {
+    direction: ltr !important;
+    text-align: left !important;
+  }
 }
 
-}
- 
-
- 
 @layer base {
   * {
     @apply border-border;
-
   }
   body {
     @apply bg-background text-foreground;
-
   }
-
 }
 
 /* Tambahkan di bawah kode yang sudah ada, di luar @layer base */
 
 /* Override khusus untuk semua elemen input di aplikasi */
-input, textarea, [contenteditable="true"], .review-textarea, .review-input-field {
+input,
+textarea,
+[contenteditable="true"],
+.review-textarea,
+.review-input-field {
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: isolate !important;
 }
 
 /* Khusus untuk elemen td dengan class review */
-td[data-column="review"], 
+td[data-column="review"],
 td[data-column-id="review"] {
   direction: ltr !important;
   text-align: left !important;
@@ -156,30 +157,52 @@ td[data-column-id="review"] {
 }
 
 /* Khusus untuk reparasi Toastify RTL issue */
-.Toastify, .Toastify__toast-container, .Toastify__toast {
+.Toastify,
+.Toastify__toast-container,
+.Toastify__toast {
   direction: ltr !important;
   text-align: left !important;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes pulseEffect {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes slideInFromLeft {
-  0% { opacity: 0; transform: translateX(-50px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes appear {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .animate-fadeIn {
@@ -261,7 +284,7 @@ td[data-column-id="review"] {
 
 /* Fix for autofill background in Chrome, Safari, and Edge */
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
+input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 30px rgba(30, 58, 138, 0.3) inset !important;
@@ -282,7 +305,7 @@ input:-webkit-autofill:active {
 /* Tambahkan ke file CSS global Anda */
 .copy-email-btn {
   background-color: #eef2ff; /* indigo-50 */
-  color: #3730a3;            /* indigo-800 */
+  color: #3730a3; /* indigo-800 */
   min-width: 80px;
   width: auto;
   height: 32px;
@@ -303,7 +326,10 @@ input:-webkit-autofill:active {
   color: #3730a3; /* indigo-800 */
   position: static;
   transform: none;
-  transition: color 0.4s, opacity 0.4s, transform 0.4s;
+  transition:
+    color 0.4s,
+    opacity 0.4s,
+    transform 0.4s;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -320,7 +346,9 @@ input:-webkit-autofill:active {
   line-height: 13px;
   font-size: 0.95em;
   pointer-events: none;
-  transition: opacity 0.4s, transform 0.4s;
+  transition:
+    opacity 0.4s,
+    transform 0.4s;
 }
 
 .copy-email-btn:focus {
@@ -352,7 +380,6 @@ input:-webkit-autofill:active {
   background-color: #6366f1; /* indigo-500 */
   color: #fff;
 }
-
 
 /* Delete button style */
 .delete-button {
@@ -424,27 +451,28 @@ input:-webkit-autofill:active {
 }
 
 .loader-ring-a {
-  stroke: #9708F4;
+  stroke: #9708f4;
 }
 
 .loader-ring-b {
   animation-name: ringB;
-  stroke: #5E14E4;
+  stroke: #5e14e4;
 }
 
 .loader-ring-c {
   animation-name: ringC;
-  stroke: #9708F4;
+  stroke: #9708f4;
 }
 
 .loader-ring-d {
   animation-name: ringD;
-  stroke: #5E14E4;
+  stroke: #5e14e4;
 }
 
 /* Animations */
 @keyframes ringA {
-  from, 4% {
+  from,
+  4% {
     stroke-dasharray: 0 660;
     stroke-width: 20;
     stroke-dashoffset: -330;
@@ -462,7 +490,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -595;
   }
 
-  40%, 54% {
+  40%,
+  54% {
     stroke-dasharray: 0 660;
     stroke-width: 20;
     stroke-dashoffset: -660;
@@ -480,7 +509,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -925;
   }
 
-  90%, to {
+  90%,
+  to {
     stroke-dasharray: 0 660;
     stroke-width: 20;
     stroke-dashoffset: -990;
@@ -488,7 +518,8 @@ input:-webkit-autofill:active {
 }
 
 @keyframes ringB {
-  from, 12% {
+  from,
+  12% {
     stroke-dasharray: 0 220;
     stroke-width: 20;
     stroke-dashoffset: -110;
@@ -506,7 +537,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -195;
   }
 
-  48%, 62% {
+  48%,
+  62% {
     stroke-dasharray: 0 220;
     stroke-width: 20;
     stroke-dashoffset: -220;
@@ -524,7 +556,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -305;
   }
 
-  98%, to {
+  98%,
+  to {
     stroke-dasharray: 0 220;
     stroke-width: 20;
     stroke-dashoffset: -330;
@@ -550,7 +583,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -175;
   }
 
-  36%, 58% {
+  36%,
+  58% {
     stroke-dasharray: 0 440;
     stroke-width: 20;
     stroke-dashoffset: -220;
@@ -568,7 +602,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -395;
   }
 
-  94%, to {
+  94%,
+  to {
     stroke-dasharray: 0 440;
     stroke-width: 20;
     stroke-dashoffset: -440;
@@ -576,7 +611,8 @@ input:-webkit-autofill:active {
 }
 
 @keyframes ringD {
-  from, 8% {
+  from,
+  8% {
     stroke-dasharray: 0 440;
     stroke-width: 20;
     stroke-dashoffset: 0;
@@ -594,7 +630,8 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -175;
   }
 
-  44%, 50% {
+  44%,
+  50% {
     stroke-dasharray: 0 440;
     stroke-width: 20;
     stroke-dashoffset: -220;
@@ -612,51 +649,57 @@ input:-webkit-autofill:active {
     stroke-dashoffset: -395;
   }
 
-  86%, to {
+  86%,
+  to {
     stroke-dasharray: 0 440;
     stroke-width: 20;
     stroke-dashoffset: -440;
   }
 }
 
-{
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-  }
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
-
 
 /* Blob animation for Login page */
 @keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
 }
 
 .animate-blob {

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CountUp from '../components/common/CountUp';
 import CurrencyCountUp from '../components/common/CurrencyCountUp';
-import EChartComponent from '../components/common/EChartComponent';
+import LazyEChart from '../components/common/LazyEChart';
 import AuditorPerforma from '../components/dashboard/AuditorPerforma';
 import AuditSummary from '../components/dashboard/AuditSummary';
 import FraudData from '../components/dashboard/FraudData';
@@ -88,7 +88,7 @@ const ManagerDashboard = () => {
   const [auditors, setAuditors] = useState<Auditor[]>([]);
   const [isAuditorListOpen, setIsAuditorListOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'auditorCounts' | 'auditSummary' | 'fraudData' | 'assignmentLetters'>('main');
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Track if data is loaded for skipAnimation
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const navigate = useNavigate();
   const [activeSubTab, setActiveSubTab] = useState<'letter' | 'addendum'>('letter');
@@ -123,11 +123,64 @@ const ManagerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      // Fetch total branches
       const { data: branchesData } = await supabase
         .from('branches')
         .select('name', { count: 'exact' });
 
-      // Fetch all audit records from audit_master
+      // Fetch approved letters to count Regular and Special audits
+      const { data: approvedLetters } = await supabase
+        .from('letter')
+        .select('id, audit_type')
+        .eq('status', 'approved');
+
+      // Count regular audits from approved letters (audit_type = 'reguler')
+      const regularAudits = approvedLetters?.filter(letter => 
+        letter.audit_type?.toLowerCase() === 'reguler' || 
+        letter.audit_type?.toLowerCase() === 'regular'
+      ).length || 0;
+
+      // Count special audits from approved letters (audit_type = 'khusus')
+      const specialAudits = approvedLetters?.filter(letter => 
+        letter.audit_type?.toLowerCase() === 'khusus' || 
+        letter.audit_type?.toLowerCase() === 'special'
+      ).length || 0;
+
+      // Fetch fraud cases count from work_paper_persons (count staff with fraud data)
+      const { data: fraudPersonsData } = await supabase
+        .from('work_paper_persons')
+        .select('id, fraud_staff, fraud_amount, payment_fraud')
+        .not('fraud_staff', 'is', null);
+
+      // Filter out empty fraud_staff entries and count unique fraud cases (staff)
+      const validFraudCases = fraudPersonsData?.filter(person => 
+        person.fraud_staff && person.fraud_staff.trim() !== ''
+      ) || [];
+      
+      const fraudCasesCount = validFraudCases.length;
+
+      // Calculate fraud financial stats from work_paper_persons
+      const totalFraud = validFraudCases.reduce((sum, person) => sum + (person.fraud_amount || 0), 0);
+      const fraudRecovery = validFraudCases.reduce((sum, person) => sum + (person.payment_fraud || 0), 0);
+      const outstandingFraud = totalFraud - fraudRecovery;
+
+      // Fetch total auditors
+      const { data: auditorsData } = await supabase
+        .from('auditors')
+        .select('name', { count: 'exact' });
+
+      setStats({
+        totalBranches: branchesData?.length || 0,
+        regularAudits,
+        specialAudits,
+        fraudAudits: fraudCasesCount,
+        totalAuditors: auditorsData?.length || 0,
+        totalFraud, 
+        fraudRecovery,
+        outstandingFraud
+      });
+
+      // Fetch audit_master for trends chart
       const { data: auditMasterData } = await supabase
         .from('audit_master')
         .select(`
@@ -141,56 +194,6 @@ const ManagerDashboard = () => {
           audit_period_start,
           audit_period_end
         `);
-
-      // Count regular audits
-      const regularAudits = auditMasterData?.filter(wp => wp.audit_type === 'Regular' || wp.audit_type === 'regular' || wp.audit_type?.toLowerCase().includes('reguler')).length || 0;
-
-      // Count special audits
-      const specialAudits = auditMasterData?.filter(wp => wp.audit_type === 'Special' || wp.audit_type === 'special' || wp.audit_type?.toLowerCase().includes('khusus')).length || 0;
-
-      // For fraud stats, we might still need work_papers or similar if audit_master doesn't have amounts
-      // Assuming for now we just use audit_master for counts. 
-      // If fraud amounts are needed, they presumably come from a different table now or stuck with work_papers? 
-      // The user specially mentioned audit_master.
-      
-      // Let's try to get fraud counts from audit_master too if type is fraud
-      const fraudAuditCount = auditMasterData?.filter(wp => wp.audit_type?.toLowerCase().includes('fraud') || wp.audit_type?.toLowerCase().includes('investigasi')).length || 0;
-
-      // We'll keep the separate fraud fetch for amounts if available, otherwise 0
-      // Previous code used work_papers for amounts. I will try to fetch work_papers separately JUST for amounts if it still exists, 
-      // but if the user says "data source changed", I should rely on audit_master for the main metrics.
-      // I'll set amounts to 0 for now to be safe with the new schema, or keep the old query separate?
-      // "yang di Manager Dashboard data source nya udah berubah deh, dari tabel audit_master" -> "The data source in Manager Dashboard has changed, (it is now) from table audit_master"
-      
-      // I will use audit_master for the TRENDS and COUNTS.
-      // I will temporarily set financial stats to 0 or leave them if I can't find source.
-      
-      // Actually the previous code fetched `work_papers` and used it for everything. 
-      // I will replace that with `audit_master` fetching.
-
-      const fraudCases = fraudAuditCount; 
-      
-      // Since audit_master doesn't have fraud_amount, we'll set these to 0 or leave them alone?
-      // I'll set them to 0 to avoid errors accessing missing columns.
-      const totalFraud = 0;
-      const fraudRecovery = 0;
-      const outstandingFraud = 0;
-
-      // Fetch total auditors
-      const { data: auditorsData } = await supabase
-        .from('auditors')
-        .select('name', { count: 'exact' });
-
-      setStats({
-        totalBranches: branchesData?.length || 0,
-        regularAudits,
-        specialAudits, // Count from audit_master now
-        fraudAudits: fraudCases,
-        totalAuditors: auditorsData?.length || 0,
-        totalFraud, 
-        fraudRecovery,
-        outstandingFraud
-      });
 
       // Fetch and process audit trends using audit_master data
       if (auditMasterData) {
@@ -466,7 +469,7 @@ const ManagerDashboard = () => {
           <Card>
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold mb-4">Audit Trends</h2>
-              <EChartComponent option={getAuditTrendsOption()} style={{ height: '400px', width: '100%' }} />
+              <LazyEChart option={getAuditTrendsOption()} style={{ height: '400px', width: '100%' }} />
             </CardContent>
           </Card>
         </>

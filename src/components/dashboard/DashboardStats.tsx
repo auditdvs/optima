@@ -13,6 +13,10 @@ interface DashboardStatsProps {
     totalFraud: number;
     totalFraudCases: number;
     totalFraudulentBranches: number;
+    // Survey stats
+    surveyAvgScore: number;
+    surveyTotalRespondents: number;
+    surveyTotalBranches: number;
   };
   skipAnimation?: boolean; // Skip CountUp animation when data is from cache
 }
@@ -23,7 +27,7 @@ const DashboardStats = ({ stats, skipAnimation = false }: DashboardStatsProps) =
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Total Branches Card */}
       <Card className="bg-white">
         <CardContent className="p-3">
@@ -114,6 +118,39 @@ const DashboardStats = ({ stats, skipAnimation = false }: DashboardStatsProps) =
                   />
                   <span>branches involved</span>
                 </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auditee Satisfaction Card */}
+      <Card className="bg-white">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-50 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-purple-600"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-xm text-gray-600 mt-2 mb-0.5">Kepuasan Auditee</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-semibold">
+                   {stats.surveyAvgScore ? stats.surveyAvgScore.toFixed(2) : '0.00'}
+                </span>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    dari 5.00
+                  </span>
+                  <div className="flex gap-2">
+                    <span className="text-[10px] text-purple-600 font-medium whitespace-nowrap">
+                      {stats.surveyTotalRespondents || 0} responden
+                    </span>
+                    <span className="text-[10px] text-gray-400">|</span>
+                    <span className="text-[10px] text-purple-600 font-medium whitespace-nowrap">
+                      {stats.surveyTotalBranches || 0} cabang
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

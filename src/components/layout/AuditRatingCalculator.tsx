@@ -197,12 +197,12 @@ function AuditRatingCalculator() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 <a 
-                  href="https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents//Surat%20Edaran%20Audit%20Rating%20KOMIDA%202021.pdf" 
+                  href="https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents/Memo%20Intern%20-%20Penetapan%20Audit%20Rating.pdf" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-sm text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  Surat Edaran Audit Rating KOMIDA 2021
+                  Memo Intern - Penetapan Audit Rating
                 </a>
               </div>
             </div>

@@ -15,8 +15,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 menit dalam milidetik
-const WARNING_BEFORE_TIMEOUT = 5 * 60 * 1000; // Peringatan 5 menit sebelum timeout
+const INACTIVITY_TIMEOUT = Infinity; // Disabled - tidak ada auto logout karena inaktivitas
+const WARNING_BEFORE_TIMEOUT = 5 * 60 * 1000; // Tidak dipakai karena timeout disabled
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize as null - session check will set the proper values

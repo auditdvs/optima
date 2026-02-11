@@ -25,6 +25,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useDashboardCache } from '../contexts/DashboardCacheContext';
 import { useMapCache } from '../contexts/MapCacheContext';
+import { supabase } from '../lib/supabase';
 
 // sesuaikan path jika berbeda
 const auditorMapping = [
@@ -181,6 +182,84 @@ const Dashboard = () => {
   
   const [months] = useState(['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
 
+  // Survey Stats State
+  const [surveyStats, setSurveyStats] = useState({
+    avgScore: 0,
+    totalRespondents: 0,
+    totalBranches: 0
+  });
+
+  useEffect(() => {
+    const fetchSurveyStats = async () => {
+      try {
+        const { data: responses, error } = await supabase
+          .from('survey_responses')
+          .select('*');
+        
+        if (error) throw error;
+        
+        if (responses && responses.length > 0) {
+          const totalRespondents = responses.length;
+          
+          // Get unique branches
+          const tokenIds = [...new Set(responses.map(r => r.token_id))];
+          let totalBranches = 0;
+          
+          if (tokenIds.length > 0) {
+            const { data: tokens } = await supabase
+              .from('survey_tokens')
+              .select('branch_name')
+              .in('id', tokenIds);
+            
+            if (tokens) {
+              totalBranches = new Set(tokens.map(t => t.branch_name)).size;
+            }
+          }
+
+          // Calculate average score (Only Sections A, B, C, D which are numeric 1-5 scales)
+          let totalAvgSum = 0;
+          
+          responses.forEach(r => {
+            let sum = 0;
+            let count = 0;
+            // Helper to sum scale values
+            const add = (val: any) => {
+              if (typeof val === 'number') {
+                sum += val;
+                count++;
+              }
+            };
+            
+            // Section A
+            add(r.a1); add(r.a2); add(r.a3); add(r.a4); add(r.a5); add(r.a6);
+            // Section B
+            add(r.b1); add(r.b2); add(r.b3);
+            // Section C
+            add(r.c1); add(r.c2); add(r.c3); add(r.c4); add(r.c5); add(r.c6); add(r.c7);
+            // Section D
+            add(r.d1); add(r.d2); add(r.d3); add(r.d4);
+            
+            if (count > 0) {
+              totalAvgSum += (sum / count);
+            }
+          });
+          
+          const avgScore = totalAvgSum / totalRespondents;
+          
+          setSurveyStats({
+            avgScore,
+            totalRespondents,
+            totalBranches
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching survey stats:', err);
+      }
+    };
+    
+    fetchSurveyStats();
+  }, []);
+
   // NOTE: All dashboard data fetching has been moved to DashboardCacheContext
   // Data is now automatically cached and shared across navigations
   
@@ -218,7 +297,11 @@ const Dashboard = () => {
     totalAudits: workPapers.length,
     totalFraud: totalFraudAmount, // From work_paper_persons
     totalFraudCases: totalFraudStaffCount, // From work_paper_persons (unique fraud_staff count)
-    totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size
+    totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size,
+    // Add survey stats
+    surveyAvgScore: surveyStats.avgScore,
+    surveyTotalRespondents: surveyStats.totalRespondents,
+    surveyTotalBranches: surveyStats.totalBranches
   };
 
   // Filter branches based on search term

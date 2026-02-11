@@ -34,21 +34,49 @@ const getRomanNumeral = (month: number): string => {
   return romanNumerals[month];
 };
 
-const generateLetterNumber = (letters: RPMRegistration[]): string => {
+const generateLetterNumber = async (): Promise<string> => {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const month = getRomanNumeral(currentDate.getMonth());
   
-  // Count only letters from the current year by extracting year from letter_number
-  const lettersThisYear = letters.filter(letter => {
-    if (!letter.letter_number) return false;
-    const parts = letter.letter_number.split('/');
-    const letterYear = parseInt(parts[parts.length - 1], 10);
-    return letterYear === currentYear;
-  });
-  
-  const number = String(lettersThisYear.length + 1).padStart(3, '0');
-  return `${number}/KMD-AUDIT/QA/${month}/${currentYear}`;
+  try {
+    // Query database untuk mendapatkan semua surat RPM di tahun ini
+    const { data: lettersThisYear, error } = await supabase
+      .from('rpm_registration')
+      .select('letter_number')
+      .gte('created_at', `${currentYear}-01-01`)
+      .lte('created_at', `${currentYear}-12-31`);
+
+    if (error) {
+      console.error('Error querying RPM letters:', error);
+      throw error;
+    }
+
+    // Parse nomor dari semua surat yang ada, cari yang terbesar
+    let maxNumber = 0;
+    lettersThisYear?.forEach(letter => {
+      if (letter.letter_number) {
+        // Extract nomor dari format "060/RPM/KMD-AUDIT/II/2026"
+        const match = letter.letter_number.match(/^(\d+)\//); 
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) {
+            maxNumber = num;
+          }
+        }
+      }
+    });
+
+    // Nomor berikutnya adalah max + 1
+    const nextNumber = maxNumber + 1;
+    const paddedNumber = String(nextNumber).padStart(3, '0');
+
+    return `${paddedNumber}/RPM/KMD-AUDIT/${month}/${currentYear}`;
+  } catch (error) {
+    console.error('Error generating RPM letter number:', error);
+    // Fallback
+    return `001/RPM/KMD-AUDIT/${month}/${currentYear}`;
+  }
 };
 
 const getDueDate = (status: RPMRegistration['status']): string => {
@@ -107,8 +135,33 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
     letter_date: new Date().toISOString().split('T')[0]
   });
 
+  // Preview letter number state
+  const [previewLetterNumber, setPreviewLetterNumber] = useState<string>('');
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
   // Check if there are unsaved changes
   const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
+
+  // Fetch preview letter number
+  const fetchPreviewLetterNumber = async () => {
+    setLoadingPreview(true);
+    try {
+      const letterNumber = await generateLetterNumber();
+      setPreviewLetterNumber(letterNumber);
+    } catch (error) {
+      console.error('Error fetching preview:', error);
+      setPreviewLetterNumber('Error');
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  // Update preview when modal opens or branch changes
+  useEffect(() => {
+    if (showAddModal && newLetter.branch_or_region_ho && newLetter.region) {
+      fetchPreviewLetterNumber();
+    }
+  }, [showAddModal, newLetter.branch_or_region_ho, newLetter.region]);
 
   // Handle branch selection - auto-fill region
   const handleBranchSelect = (branchName: string) => {
@@ -173,7 +226,7 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
     fetchLetters();
   }, [refreshTrigger]);
 
-  // Add new letter
+  // Add new letter with retry logic
   const handleAddLetter = async () => {
     if (!newLetter.region || !newLetter.branch_or_region_ho || !newLetter.subject) {
       toast.error('Please fill all required fields');
@@ -181,18 +234,47 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
     }
 
     try {
-      const letterNumber = generateLetterNumber(letters);
       const dueDate = getDueDate(newLetter.status as RPMRegistration['status']);
 
-      const { error } = await supabase
-        .from('rpm_registration')
-        .insert([{
-          ...newLetter,
-          letter_number: letterNumber,
-          due_date: dueDate
-        }]);
+      // Retry logic untuk handle concurrent submission
+      let insertSuccess = false;
+      let attempts = 0;
+      const maxAttempts = 3;
 
-      if (error) throw error;
+      while (!insertSuccess && attempts < maxAttempts) {
+        attempts++;
+
+        try {
+          // Generate nomor surat baru di setiap attempt
+          const letterNumber = await generateLetterNumber();
+
+          const { error } = await supabase
+            .from('rpm_registration')
+            .insert([{
+              ...newLetter,
+              letter_number: letterNumber,
+              due_date: dueDate
+            }]);
+
+          if (error) {
+            // Check duplicate key error
+            if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+              console.warn(`Attempt ${attempts}: Duplicate RPM number detected, retrying...`);
+              
+              if (attempts < maxAttempts) {
+                // Random delay 100-300ms
+                await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+                continue;
+              }
+            }
+            throw error;
+          }
+
+          insertSuccess = true;
+        } catch (attemptError: any) {
+          if (attempts >= maxAttempts) throw attemptError;
+        }
+      }
 
       toast.success('Letter added successfully');
       setShowAddModal(false);
@@ -374,6 +456,15 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
 
   // Table columns
   const columns = [
+    columnHelper.display({
+      id: 'row_number',
+      header: 'No',
+      cell: info => (
+        <span className="text-sm font-medium text-gray-700">
+          {info.row.index + 1}
+        </span>
+      ),
+    }),
     columnHelper.accessor('letter_number', {
       header: ({ column }) => (
         <button
@@ -623,7 +714,7 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
 
                 {/* Branch selection with auto-fill Regional */}
                 <div className="flex gap-3">
-                  <div className="flex-1">
+                  <div className="flex-1 relative z-20">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cabang/Region/HO *</label>
                     <select
                       value={newLetter.branch_or_region_ho}
@@ -648,15 +739,6 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
                   </div>
                 </div>
 
-                {/* Letter Number Preview - Shown after region and branch are filled */}
-                {newLetter.region && newLetter.branch_or_region_ho && (
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                    <label className="block text-xs font-medium text-indigo-600 mb-1">Preview Nomor Surat</label>
-                    <p className="text-lg font-bold text-indigo-800">{generateLetterNumber(letters)}</p>
-                    <p className="text-xs text-indigo-500 mt-1">Nomor surat akan di-generate otomatis saat disimpan</p>
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Perihal *</label>
                   <textarea
@@ -669,18 +751,65 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={newLetter.status}
-                    onChange={(e) => setNewLetter({ ...newLetter, status: e.target.value as RPMRegistration['status'] })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="Adequate">Memadai</option>
-                    <option value="Reminder 1">Reminder 1</option>
-                    <option value="Reminder 2">Reminder 2</option>
-                    <option value="Inadequate">Tidak Memadai</option>
-                  </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newLetter.status === 'Adequate'}
+                        onChange={() => setNewLetter({ ...newLetter, status: 'Adequate' })}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      />
+                      <span className="text-sm text-gray-700">Memadai</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newLetter.status === 'Reminder 1'}
+                        onChange={() => setNewLetter({ ...newLetter, status: 'Reminder 1' })}
+                        className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                      />
+                      <span className="text-sm text-gray-700">Reminder 1</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newLetter.status === 'Reminder 2'}
+                        onChange={() => setNewLetter({ ...newLetter, status: 'Reminder 2' })}
+                        className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">Reminder 2</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newLetter.status === 'Inadequate'}
+                        onChange={() => setNewLetter({ ...newLetter, status: 'Inadequate' })}
+                        className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                      />
+                      <span className="text-sm text-gray-700">Tidak Memadai</span>
+                    </label>
+                  </div>
                 </div>
+
+                {/* Letter Number Preview - Moved to bottom to avoid blocking dropdown */}
+                {newLetter.region && newLetter.branch_or_region_ho && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                    <label className="block text-xs font-medium text-indigo-600 mb-1">Preview Nomor Surat</label>
+                    {loadingPreview ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-sm text-gray-500">Generating...</p>
+                      </div>
+                    ) : (
+                      <p className="text-lg font-bold text-indigo-800">{previewLetterNumber}</p>
+                    )}
+                    <p className="text-xs text-indigo-500 mt-1">Nomor surat akan di-generate otomatis saat disimpan</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">

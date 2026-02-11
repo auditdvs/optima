@@ -1,5 +1,7 @@
 import { AlertTriangle, Calendar, FileText, MapPin, Upload, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -26,6 +28,8 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewLetterNumber, setPreviewLetterNumber] = useState<string>('');
+  const [loadingPreview, setLoadingPreview] = useState(true);
   const [formData, setFormData] = useState({
     branch_name: '',
     region: '',
@@ -46,7 +50,21 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
   useEffect(() => {
     fetchBranches();
     fetchAuditors();
+    fetchPreviewLetterNumber();
   }, []);
+
+  const fetchPreviewLetterNumber = async () => {
+    setLoadingPreview(true);
+    try {
+      const letterNumber = await generateLetterNumber();
+      setPreviewLetterNumber(letterNumber);
+    } catch (error) {
+      console.error('Error fetching preview letter number:', error);
+      setPreviewLetterNumber('Error generating preview');
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -87,15 +105,48 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
 
   const generateLetterNumber = async () => {
     try {
-      const { data, error } = await supabase
-        .rpc('generate_letter_number');
+      // Query database untuk mendapatkan semua surat di tahun ini
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth() + 1;
+      const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      const romanMonth = romanMonths[currentMonth - 1];
 
-      if (error) throw error;
+      // Get semua surat di tahun ini
+      const { data: lettersThisYear, error } = await supabase
+        .from('letter')
+        .select('assigment_letter')
+        .gte('tanggal_input', `${currentYear}-01-01`)
+        .lte('tanggal_input', `${currentYear}-12-31`);
 
-      return data;
+      if (error) {
+        console.error('Error querying letters:', error);
+        throw error;
+      }
+
+      // Parse nomor dari semua surat yang ada, cari yang terbesar
+      let maxNumber = 0;
+      lettersThisYear?.forEach(letter => {
+        if (letter.assigment_letter) {
+          // Extract nomor dari format "060/KMD-AUDIT/II/2026"
+          const match = letter.assigment_letter.match(/^(\d+)\//);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNumber) {
+              maxNumber = num;
+            }
+          }
+        }
+      });
+
+      // Nomor berikutnya adalah max + 1
+      const nextNumber = maxNumber + 1;
+      const paddedNumber = String(nextNumber).padStart(3, '0');
+
+      // Format: 061/KMD-AUDIT/II/2026 (tanpa QA karena ini surat tugas, bukan RPM)
+      return `${paddedNumber}/KMD-AUDIT/${romanMonth}/${currentYear}`;
     } catch (error) {
       console.error('Error generating letter number:', error);
-      // Fallback jika function gagal
+      // Fallback jika query gagal
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth() + 1;
       const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -245,29 +296,65 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
         return `${monthStr}-01`; // Add day 01 to make it a valid date
       };
       
-      const { error } = await supabase
-        .from('letter')
-        .insert({
-            assigment_letter: letterNumber,
-            branch_name: formData.branch_name,
-            region: formData.region,
-            audit_type: formData.audit_type,
-            audit_period_start: convertMonthToDate(formData.audit_period_start),
-            audit_period_end: convertMonthToDate(formData.audit_period_end),
-            audit_start_date: formData.audit_start_date,
-            audit_end_date: formData.audit_end_date,
-            team: formData.team.join(','),
-            leader: formData.leader,
-            risk: formData.risk,
-            priority: formData.priority,
-            transport: formData.transport,
-            konsumsi: formData.konsumsi,
-            etc: formData.etc,
-            file_url: fileUrl, // Simpan URL file Excel jika ada
-            status: 'pending' // Default status adalah pending untuk approval
-        });
+      
+      // Retry logic untuk handle concurrent submission
+      let insertSuccess = false;
+      let attempts = 0;
+      const maxAttempts = 3;
+      let finalLetterNumber = letterNumber;
 
-      if (error) throw error;
+      while (!insertSuccess && attempts < maxAttempts) {
+        attempts++;
+        
+        try {
+          // Generate nomor baru di setiap retry (kecuali attempt pertama)
+          if (attempts > 1) {
+            console.log(`Attempt ${attempts}: Generating new letter number...`);
+            finalLetterNumber = await generateLetterNumber();
+          }
+
+          const { error } = await supabase
+            .from('letter')
+            .insert({
+                assigment_letter: finalLetterNumber,
+                branch_name: formData.branch_name,
+                region: formData.region,
+                audit_type: formData.audit_type,
+                audit_period_start: convertMonthToDate(formData.audit_period_start),
+                audit_period_end: convertMonthToDate(formData.audit_period_end),
+                audit_start_date: formData.audit_start_date,
+                audit_end_date: formData.audit_end_date,
+                team: formData.team.join(','),
+                leader: formData.leader,
+                risk: formData.risk,
+                priority: formData.priority,
+                transport: formData.transport,
+                konsumsi: formData.konsumsi,
+                etc: formData.etc,
+                file_url: fileUrl,
+                status: 'pending'
+            });
+
+          if (error) {
+            // Check duplicate key error
+            if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+              console.warn(`Attempt ${attempts}: Duplicate detected, retrying...`);
+              
+              if (attempts < maxAttempts) {
+                // Random delay 100-300ms
+                await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+                continue;
+              }
+            }
+            throw error;
+          }
+
+          insertSuccess = true;
+        } catch (attemptError: any) {
+          if (attempts >= maxAttempts) throw attemptError;
+        }
+      }
+
 
       setUploadProgress(100);
       toast.success('Assignment Letter berhasil dibuat');
@@ -284,6 +371,27 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
     <div className="bg-white rounded-lg shadow-sm p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Isi form surat tugas</h2>
+      </div>
+
+      {/* Preview Nomor Surat */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+            <FileText className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Preview Nomor Surat</p>
+            {loadingPreview ? (
+              <div className="flex items-center gap-2 mt-1">
+                <div className="h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm text-gray-500">Generating...</p>
+              </div>
+            ) : (
+              <p className="text-lg font-bold text-gray-900 mt-1">{previewLetterNumber}</p>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-gray-600 mt-2 ml-13">Nomor ini akan otomatis di-generate saat form disimpan</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -461,22 +569,40 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Periode Mulai</label>
-                <input
-                  type="month"
-                  name="audit_period_start"
-                  value={formData.audit_period_start}
-                  onChange={handleInputChange}
+                <DatePicker
+                  selected={formData.audit_period_start ? new Date(`${formData.audit_period_start}-01`) : null}
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      setFormData({ ...formData, audit_period_start: `${year}-${month}` });
+                    } else {
+                      setFormData({ ...formData, audit_period_start: '' });
+                    }
+                  }}
+                  showMonthYearPicker
+                  dateFormat="MM/yyyy"
+                  placeholderText="Pilih bulan dan tahun"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Periode Selesai</label>
-                <input
-                  type="month"
-                  name="audit_period_end"
-                  value={formData.audit_period_end}
-                  onChange={handleInputChange}
+                <DatePicker
+                  selected={formData.audit_period_end ? new Date(`${formData.audit_period_end}-01`) : null}
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      setFormData({ ...formData, audit_period_end: `${year}-${month}` });
+                    } else {
+                      setFormData({ ...formData, audit_period_end: '' });
+                    }
+                  }}
+                  showMonthYearPicker
+                  dateFormat="MM/yyyy"
+                  placeholderText="Pilih bulan dan tahun"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />

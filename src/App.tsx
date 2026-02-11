@@ -10,6 +10,7 @@ import { MapCacheProvider } from './contexts/MapCacheContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import AssignmentLetter from './pages/AssignmentLetter';
+import AuditeeSurvey from './pages/AuditeeSurvey';
 import AuditorWorkpapers from './pages/AuditorWorkpapers';
 import BranchDirectory from './pages/BranchDirectory';
 import Broadcast from './pages/Broadcast';
@@ -24,6 +25,7 @@ import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
 import SupportTickets from './pages/SupportTickets';
+import SurveyTokenManager from './pages/SurveyTokenManager';
 import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UnauthorizedPage from './pages/UnauthorizedPage';
@@ -168,7 +170,15 @@ function App() {
                   <SupportTickets />
                 </PrivateRoute>
                 } />
+                <Route path="survey-manager" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user']}>
+                  <SurveyTokenManager />
+                </PrivateRoute>
+                } />
             </Route>
+            {/* Public routes for auditee survey - no auth required */}
+            <Route path="/survey" element={<AuditeeSurvey />} />
+            <Route path="/survey/:token" element={<AuditeeSurvey />} />
           </Routes>
           <ToastContainer position="top-right" autoClose={5000} />
           <Toaster 

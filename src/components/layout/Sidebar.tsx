@@ -1,24 +1,25 @@
 import {
-    ChartPie,
-    ChevronsUpDown,
-    FileCheck,
-    FilePenLine,
-    FileText,
-    FileVideo,
-    GitPullRequest,
-    History,
-    KeyRound,
-    LayoutDashboard,
-    Library,
-    LogOut,
-    Megaphone,
-    ScanFace,
-    Table2,
-    Ticket,
-    UserRoundPen,
-    Users,
-    Wrench,
-    X
+  ChartPie,
+  ChevronsUpDown,
+  ClipboardCheck,
+  FileCheck,
+  Blocks,
+  FileText,
+  FileVideo,
+  GitPullRequest,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  Library,
+  LogOut,
+  Megaphone,
+  ScanFace,
+  Table2,
+  Ticket,
+  UserRoundPen,
+  Users,
+  Wrench,
+  X
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -85,43 +86,58 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
           role: userRole || 'user',
           profile_pic: 'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default.jfif'
         };
+          
         
         setAccountData(defaultData); // Set default first
         
+        // 1. Try fetch from profiles
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', user.id)  // Use 'id' not 'user_id'
           .single();
           
-        if (profileData) {
-          let { data: accData, error: accError } = await supabase
+        // 2. Try fetch from account
+        let accData: any = null;
+        let { data: accountResult, error: accError } = await supabase
+          .from('account')
+          .select('*')
+          .eq('user_id', user.id) // Try user_id first for account table too
+          .single();
+          
+        if (accountResult) {
+          accData = accountResult;
+        } else {
+           // Fallback for account table using id
+           const { data: altAccData } = await supabase
             .from('account')
             .select('*')
             .eq('id', user.id)
             .single();
-            
-          if (!accData || accError) {
-            const { data: altAccData } = await supabase
-              .from('account')
-              .select('*')
-              .eq('user_id', user.id)
-              .single();
-            if (altAccData) accData = altAccData;
-          }
-          
-          let profilePicUrl = defaultData.profile_pic;
-          if (accData && accData.profile_pic) {
-            profilePicUrl = accData.profile_pic;
-          }
-          
-          setAccountData({
-            full_name: accData?.full_name || profileData.full_name || defaultData.full_name,
-            profile_pic: profilePicUrl,
-            role: accData?.role || userRole || 'user',
-            nickname: accData?.nickname || profileData.full_name?.split(' ')[0] || defaultData.nickname
-          });
+           if (altAccData) accData = altAccData;
         }
+
+        // 3. Update state with best available data
+        let profilePicUrl = accData?.profile_pic || defaultData.profile_pic;
+        
+        // Prioritize: Account -> Profile -> Metadata -> Default
+        const fullName = accData?.full_name || 
+                         profileData?.full_name || 
+                         (user.user_metadata?.full_name) || 
+                         defaultData.full_name;
+                         
+        const nickname = accData?.nickname || 
+                         profileData?.full_name?.split(' ')[0] || 
+                         (user.user_metadata?.full_name?.split(' ')[0]) || 
+                         defaultData.nickname;
+
+        setAccountData({
+          full_name: fullName,
+          profile_pic: profilePicUrl,
+          role: accData?.role || userRole || 'user',
+          nickname: nickname
+        });
+
       } catch (error) {
         console.error('Error fetching profile:', error);
       }
@@ -159,19 +175,20 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
     },
   ];
 
-  if (userRole === 'superadmin' || userRole === 'manager') {
+  if (userRole?.toLowerCase() === 'superadmin' || userRole?.toLowerCase() === 'manager') {
     const dashboardGroup = menuGroups.find(group => group.key === 'dashboard');
     if (dashboardGroup) {
       dashboardGroup.items.push({ path: '/manager-dashboard', icon: ChartPie, label: 'Manager' });
     }
   }
 
-  if (userRole === 'superadmin' || userRole === 'qa' || userRole === 'dvs' || userRole === 'manager' || userRole === 'user') {
+  if (['superadmin', 'qa', 'dvs', 'manager', 'user'].includes(userRole?.toLowerCase() || '')) {
     const auditItems = [];
-    if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole)) auditItems.push({ path: '/qa-section', icon: FilePenLine, label: 'Update Audits' });
-    if (['superadmin', 'qa', 'manager'].includes(userRole)) auditItems.push({ path: '/qa-management', icon: Users, label: 'QA Workpapers' });
-    if (['superadmin', 'qa', 'manager', 'dvs', 'user', 'risk'].includes(userRole)) auditItems.push({ path: '/auditor-workpapers', icon: FileCheck, label: 'Auditor Workpapers' });
-    if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole)) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
+    if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole.toLowerCase())) auditItems.push({ path: '/qa-section', icon: Blocks, label: 'DVS Workpapers' });
+    if (['superadmin', 'qa', 'manager'].includes(userRole.toLowerCase())) auditItems.push({ path: '/qa-management', icon: Users, label: 'QA Workpapers' });
+    if (['superadmin', 'qa', 'manager', 'dvs', 'user', 'risk'].includes(userRole.toLowerCase())) auditItems.push({ path: '/auditor-workpapers', icon: FileCheck, label: 'Auditor Workpapers' });
+    if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
+    if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/survey-manager', icon: ClipboardCheck, label: 'Survei Kepuasan' });
     auditItems.push({ path: '/tools', icon: Wrench, label: 'Tools' });
 
     if (auditItems.length > 0) {
@@ -179,9 +196,9 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
     }
   }
 
-  if (['superadmin', 'qa', 'user', 'dvs', 'manager'].includes(userRole)) {
+  if (['superadmin', 'qa', 'user', 'dvs', 'manager'].includes(userRole?.toLowerCase() || '')) {
     const communicationItems = [];
-    if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole)) communicationItems.push({ path: '/broadcast', icon: Megaphone, label: 'Broadcast' });
+    if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole?.toLowerCase() || '')) communicationItems.push({ path: '/broadcast', icon: Megaphone, label: 'Broadcast' });
     communicationItems.push({ path: '/notification-history', icon: History, label: 'History' });
     communicationItems.push({ path: '/pull-request', icon: GitPullRequest, label: 'Req Database' });
     communicationItems.push({ path: '/support-tickets', icon: Ticket, label: 'Support Tickets' });
@@ -191,7 +208,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
     }
   }
 
-  if (userRole === 'superadmin') {
+  if (userRole?.toLowerCase() === 'superadmin') {
     menuGroups.push({
       title: "Admin",
       key: "administration",

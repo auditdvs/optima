@@ -1,7 +1,7 @@
-import { Edit, Plus, RefreshCcw, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit, Plus, RefreshCcw, Search, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Ganti ke react-toastify
-import EChartComponent from '../components/common/EChartComponent';
+import LazyEChart from '../components/common/LazyEChart';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useMapCache } from '../contexts/MapCacheContext';
@@ -23,6 +23,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void; children: React.Reac
 interface BranchData {
   id: string;
   name: string;
+  code: string; // Kode Cabang
   region: string;
   coordinates: string;
   email: string;
@@ -78,7 +79,7 @@ const BranchDirectory: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<BranchData | null>(null);
   const [editForm, setEditForm] = useState<Partial<BranchData>>({});
-  const [addForm, setAddForm] = useState<Partial<BranchData>>({ name: '', region: '', email: '', coordinates: '' });
+  const [addForm, setAddForm] = useState<Partial<BranchData>>({ name: '', code: '', region: '', email: '', coordinates: '' });
   const [showSuccessPopup, setShowSuccessPopup] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -88,6 +89,17 @@ const BranchDirectory: React.FC = () => {
   
   // Search state specifically for map view
   const [mapSearchTerm, setMapSearchTerm] = useState('');
+  
+  // Sort state
+  const [sortColumn, setSortColumn] = useState<'name' | 'code' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  // Incomplete data filter state
+  const [showEmptyCode, setShowEmptyCode] = useState(false);
+  const [showEmptyRegion, setShowEmptyRegion] = useState(false);
+  const [showEmptyEmail, setShowEmptyEmail] = useState(false);
+  const [showEmptyLocation, setShowEmptyLocation] = useState(false);
+
 
   // Filter map points based on search
   const filteredMapBranches = React.useMemo(() => {
@@ -158,15 +170,48 @@ const BranchDirectory: React.FC = () => {
 
   // Sorting function
   const sortedBranches = React.useMemo(() => {
-    if (regionFilter) return branches;
-    return [...branches].sort((a, b) => {
-      // Urutkan region A-Z, lalu nama cabang A-Z
-      if (a.region === b.region) {
-        return a.name.localeCompare(b.name);
-      }
-      return a.region.localeCompare(b.region);
-    });
-  }, [branches, regionFilter]);
+    let sorted = [...branches];
+    
+    // Apply manual sorting if sortColumn is set
+    if (sortColumn) {
+      sorted.sort((a, b) => {
+        let aVal = '';
+        let bVal = '';
+        
+        if (sortColumn === 'name') {
+          aVal = String(a.name || '');
+          bVal = String(b.name || '');
+        } else if (sortColumn === 'code') {
+          aVal = String(a.code || '');
+          bVal = String(b.code || '');
+        }
+        
+        // Numeric sort if both values are numbers
+        const aNum = Number(aVal);
+        const bNum = Number(bVal);
+        
+        if (!isNaN(aNum) && !isNaN(bNum) && aVal !== '' && bVal !== '') {
+          // Both are valid numbers, do numeric comparison
+          const comparison = aNum - bNum;
+          return sortDirection === 'asc' ? comparison : -comparison;
+        } else {
+          // Fallback to string comparison
+          const comparison = aVal.localeCompare(bVal);
+          return sortDirection === 'asc' ? comparison : -comparison;
+        }
+      });
+    } else if (!regionFilter) {
+      // Default sorting: region A-Z, then name A-Z
+      sorted.sort((a, b) => {
+        if (a.region === b.region) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.region.localeCompare(b.region);
+      });
+    }
+    
+    return sorted;
+  }, [branches, regionFilter, sortColumn, sortDirection]);
 
   const filtered = sortedBranches.filter(item => {
     const matchesSearch =
@@ -175,8 +220,17 @@ const BranchDirectory: React.FC = () => {
       (item.email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesRegion = regionFilter ? item.region === regionFilter : true;
+    
+    // Helper to check if field is empty
+    const isEmpty = (val: any) => !val || val === '' || val === '-';
+    
+    // Incomplete data filters (show only empty if checked)
+    const matchesEmptyCode = showEmptyCode ? isEmpty(item.code) : true;
+    const matchesEmptyRegion = showEmptyRegion ? isEmpty(item.region) : true;
+    const matchesEmptyEmail = showEmptyEmail ? isEmpty(item.email) : true;
+    const matchesEmptyLocation = showEmptyLocation ? isEmpty(item.coordinates) : true;
 
-    return matchesSearch && matchesRegion;
+    return matchesSearch && matchesRegion && matchesEmptyCode && matchesEmptyRegion && matchesEmptyEmail && matchesEmptyLocation;
   });
 
   // Fungsi untuk Google Maps link
@@ -189,6 +243,25 @@ const BranchDirectory: React.FC = () => {
       return `${match[2]},${match[1]}`; // lat,lng
     }
     return coordinates;
+  }
+
+  // Format kode cabang jadi 3 digit (001, 002, 099, 100)
+  function formatBranchCode(code: string | number | null | undefined): string {
+    if (!code) return '-';
+    const codeStr = String(code);
+    // If it's a number, pad with leading zeros
+    if (!isNaN(Number(codeStr))) {
+      return codeStr.padStart(3, '0');
+    }
+    // If not a number, return as is
+    return codeStr;
+  }
+
+  // Check if branch is Head Office
+  function isHeadOffice(branchName: string): boolean {
+    if (!branchName) return false;
+    const name = branchName.toLowerCase();
+    return name.includes('head office') || name.includes('kantor pusat') || name.includes('ho ');
   }
 
   // Edit Modal logic
@@ -284,6 +357,7 @@ const BranchDirectory: React.FC = () => {
     }
     const payload = {
       name: addForm.name?.trim() || null,
+      code: addForm.code?.trim() || null,
       region: addForm.region?.trim() || null,
       email: addForm.email?.trim() || null,
       coordinates: coordinates,
@@ -296,7 +370,7 @@ const BranchDirectory: React.FC = () => {
     if (!error && data && data[0]) {
       setBranches(prev => [...prev, data[0]]);
       setShowAddModal(false);
-      setAddForm({ name: '', region: '', email: '', coordinates: '' });
+      setAddForm({ name: '', code: '', region: '', email: '', coordinates: '' });
 
       await supabase.from('branch_activity').insert({
         branch_id: data[0].id,
@@ -309,6 +383,18 @@ const BranchDirectory: React.FC = () => {
       toast.success("Branch berhasil ditambahkan!");
     } else {
       toast.error(error?.message || "Gagal menambah branch");
+    }
+  };
+
+  // Sort handler
+  const handleSort = (column: 'name' | 'code') => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to asc
+      setSortColumn(column);
+      setSortDirection('asc');
     }
   };
 
@@ -428,7 +514,7 @@ const BranchDirectory: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <EChartComponent
+                <LazyEChart
                   option={{
                     backgroundColor: 'transparent',
                     tooltip: {
@@ -698,6 +784,51 @@ const BranchDirectory: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  
+                  {/* Incomplete Data Filters */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex-none text-xs font-semibold text-gray-500 uppercase tracking-wider mr-1">
+                        Show Only Incomplete:
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={showEmptyCode}
+                          onChange={(e) => setShowEmptyCode(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="text-xs text-gray-700 font-medium">Kode Cabang</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={showEmptyRegion}
+                          onChange={(e) => setShowEmptyRegion(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="text-xs text-gray-700 font-medium">Region</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={showEmptyEmail}
+                          onChange={(e) => setShowEmptyEmail(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="text-xs text-gray-700 font-medium">Email</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={showEmptyLocation}
+                          onChange={(e) => setShowEmptyLocation(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="text-xs text-gray-700 font-medium">Location</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -712,7 +843,7 @@ const BranchDirectory: React.FC = () => {
                         <div>
                           <h3 className="font-semibold text-gray-900">{branch.name}</h3>
                           <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                            Region {branch.region}
+                            {branch.region === 'HO' ? 'HO' : `Region ${branch.region}`}
                           </div>
                         </div>
                         <div className="flex gap-1">
@@ -772,7 +903,28 @@ const BranchDirectory: React.FC = () => {
                   <TableHeader className="bg-gray-50/80">
                     <TableRow>
                       <TableHead className="w-16 font-semibold text-gray-700 text-center">No.</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Branch Name</TableHead>
+                      <TableHead 
+                        className="font-semibold text-gray-700 cursor-pointer hover:text-indigo-600 transition-colors select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Branch Name</span>
+                          {sortColumn === 'name' && (
+                            sortDirection === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="font-semibold text-gray-700 cursor-pointer hover:text-indigo-600 transition-colors select-none"
+                        onClick={() => handleSort('code')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Kode Cabang</span>
+                          {sortColumn === 'code' && (
+                            sortDirection === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+                          )}
+                        </div>
+                      </TableHead>
                       <TableHead className="font-semibold text-gray-700">Region</TableHead>
                       <TableHead className="font-semibold text-gray-700">Email Contact</TableHead>
                       <TableHead className="font-semibold text-gray-700">Location</TableHead>
@@ -788,8 +940,11 @@ const BranchDirectory: React.FC = () => {
                             <span className="font-medium text-gray-900 block">{branch.name}</span>
                           </TableCell>
                           <TableCell>
+                            <span className="text-sm text-gray-600">{formatBranchCode(branch.code)}</span>
+                          </TableCell>
+                          <TableCell>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                              Reg {branch.region}
+                              {branch.region === 'HO' ? 'HO' : `Reg ${branch.region}`}
                             </span>
                           </TableCell>
                           <TableCell className="max-w-xs">
@@ -882,6 +1037,15 @@ const BranchDirectory: React.FC = () => {
               />
             </div>
             <div className="flex flex-col">
+              <label className="text-sm text-gray-600 mb-1">Kode Cabang</label>
+              <input
+                className="border-b focus:border-indigo-500 outline-none px-2 py-1 bg-gray-50 rounded-t transition-all"
+                placeholder="Kode Cabang"
+                value={editForm.code || ''}
+                onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col">
               <label className="text-sm text-gray-600 mb-1">Region</label>
               <input
                 className="border-b focus:border-indigo-500 outline-none px-2 py-1 bg-gray-50 rounded-t transition-all"
@@ -969,6 +1133,15 @@ const BranchDirectory: React.FC = () => {
                 value={addForm.name || ''}
                 onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
                 required
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-600 mb-1">Kode Cabang</label>
+              <input
+                className="border-b focus:border-green-500 outline-none px-2 py-1 bg-gray-50 rounded-t transition-all"
+                placeholder="Kode Cabang"
+                value={addForm.code || ''}
+                onChange={e => setAddForm(f => ({ ...f, code: e.target.value }))}
               />
             </div>
             <div className="flex flex-col">

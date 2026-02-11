@@ -260,41 +260,48 @@ const AccountSettingsPage = () => {
       
       const normalize = (str: string) => str.toLowerCase().replace(/[.,]/g, '').trim();
       const userTokens = normalize(fullName).split(/\s+/);
-      const userInitials = userTokens.map(t => t[0]).join(''); 
       
       // Function to check if two name strings are likely the same person
       const isMatch = (dbName: string) => {
         if (!dbName) return false;
         const normDbName = normalize(dbName);
+        const normFullName = normalize(fullName);
         
-        // 1. Exact match or includes
-        if (normDbName.includes(normalize(fullName)) || normalize(fullName).includes(normDbName)) return true;
+        // 0. Exact match (case insensitive) - handles single-word names like "Ahmad"
+        if (normDbName === normFullName) return true;
         
-        // 2. Initials User vs Initials DB Match (e.g. DFA vs DFA)
+        // Filter out short tokens (titles like SE, MM, etc) - only keep meaningful words
+        const filterShortTokens = (tokens: string[]) => tokens.filter(t => t.length > 3);
+        
         const dbTokens = normDbName.split(/\s+/);
-        const dbInitials = dbTokens.map(t => t[0]).join('');
-        if (userInitials === dbInitials && userInitials.length >= 2) return true;
+        const dbTokensFiltered = filterShortTokens(dbTokens);
+        const userTokensFiltered = filterShortTokens(userTokens);
         
-        // 3. User Initials match DB Name (e.g. User=DFA, DB=Dara Fusvita Adityacakra) -> handled above by dbInitials check? No.
-        // If User is "Dara Fusvita A.C", Initials "DFA". DB is "Dara Fusvita Adityacakra", Initials "DFA". Matches!
+        // 1. Contains match (min 2 meaningful words)
+        if (userTokensFiltered.length >= 2 && dbTokensFiltered.length >= 2) {
+          const userJoined = userTokensFiltered.join(' ');
+          const dbJoined = dbTokensFiltered.join(' ');
+          if (dbJoined.includes(userJoined) || userJoined.includes(dbJoined)) return true;
+        }
         
-        // 4. Token Intersection (Fuzzy)
-        // Check if significant number of tokens match
-        let matchCount = 0;
-        userTokens.forEach(uToken => {
-            // Check if this user token matches any db token (starts with)
-            // e.g. User "A.C" (AC) vs DB "Adityacakra" -> "adityacakra" starts with "a" (too weak), but "ac"? No.
-            // Better: Check exact matches of major words
-            if (dbTokens.some(dToken => dToken === uToken || dToken.startsWith(uToken) || uToken.startsWith(dToken))) {
-                matchCount++;
-            }
+        // 2. Initials match (only for meaningful tokens)
+        if (dbTokensFiltered.length >= 3 && userTokensFiltered.length >= 3) {
+          const dbInitials = dbTokensFiltered.map(t => t[0]).join('');
+          const userInitialsFiltered = userTokensFiltered.map(t => t[0]).join('');
+          if (userInitialsFiltered === dbInitials) return true;
+        }
+        
+        // 3. Token Intersection - only for meaningful tokens
+        // Tokens must match EXACTLY (no prefix matching to avoid "achmad" matching "achmadani")
+        let exactMatchCount = 0;
+        userTokensFiltered.forEach(uToken => {
+          if (dbTokensFiltered.some(dToken => dToken === uToken)) {
+            exactMatchCount++;
+          }
         });
         
-        // If 2 or more names match (e.g. Dara + Fusvita), valid.
-        if (matchCount >= 2) return true;
-        
-        // Special case: "A.C" vs "Adityacakra"
-        // If User has "Dara Fusvita", and DB has "Dara Fusvita", that's 2 matches.
+        // Need at least 2 exact matching meaningful tokens
+        if (exactMatchCount >= 2) return true;
         
         return false;
       };
@@ -434,14 +441,10 @@ const AccountSettingsPage = () => {
             const newCount = countChecklistFilled(a);
             
             // If new record has more completed items, replace the existing one
-            // Also if counts are equal, prefer the one with the later ID (assuming newer) or just keep existing?
-            // Let's prefer the one with MORE items.
             if (newCount > existingCount) {
                dedupMap.set(key, a);
             } else if (newCount === existingCount) {
-                // If equal completeness, pick the one with later end date or just later ID?
-                // Let's simply keep existing unless we have reason.
-                // Actually, let's compare dates just in case.
+
             }
          } else {
             dedupMap.set(key, a);
