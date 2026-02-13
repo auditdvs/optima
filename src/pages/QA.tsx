@@ -58,6 +58,24 @@ interface WorkPaperPerson {
   fraud_amount: number;
 }
 
+interface AddendumInfo {
+  id: string;
+  assigment_letter: string;
+  addendum_type: string;
+  branch_name: string;
+  region: string;
+  audit_type: string;
+  status: string;
+  start_date?: string;
+  end_date?: string;
+  tanggal_input?: string;
+  leader?: string;
+  team?: string;
+  new_leader?: string;
+  new_team?: string;
+  keterangan?: string;
+}
+
 interface Branch {
   id: string;
   name: string;
@@ -70,6 +88,7 @@ const QASection: React.FC = () => {
   const [auditMasters, setAuditMasters] = useState<AuditMaster[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [auditors, setAuditors] = useState<Auditor[]>([]);
+  const [addendums, setAddendums] = useState<AddendumInfo[]>([]);
   const [loading, setLoading] = useState(true);
   
   // State for Input/Edit Modal
@@ -97,6 +116,7 @@ const QASection: React.FC = () => {
     fetchBranches();
     fetchAuditors();
     fetchAuditMasters();
+    fetchAddendums();
 
     const timer = setTimeout(() => {
       setLoading(false);
@@ -193,6 +213,34 @@ const QASection: React.FC = () => {
       toast.error('Failed to fetch audit data');
     }
   };
+
+  const fetchAddendums = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('addendum')
+        .select('id, assigment_letter, addendum_type, branch_name, region, audit_type, status, start_date, end_date, tanggal_input, leader, team, new_leader, new_team, keterangan')
+        .eq('status', 'approved')
+        .order('tanggal_input', { ascending: false });
+      
+      if (error) throw error;
+      if (data) {
+        setAddendums(data);
+      }
+    } catch (error) {
+      console.error('Error fetching addendums:', error);
+    }
+  };
+
+  // Helper to get addendums for a specific audit (matched by branch_name only)
+  const getAddendumsForAudit = (audit: AuditMaster): AddendumInfo[] => {
+    return addendums.filter(a => 
+      a.branch_name === audit.branch_name
+    );
+  };
+
+  // Visibility helpers for conditional columns
+  const showAddendumCol = activeSubTab === 'regular' && activeMainTab === 'pending';
+  const showStafFraudCol = activeMainTab === 'completed';
 
   const fetchFraudPersons = async (auditId: string) => {
     try {
@@ -612,7 +660,12 @@ const QASection: React.FC = () => {
                 <th className="p-3 font-medium text-gray-600">Start Date</th>
                 <th className="p-3 font-medium text-gray-600">End Date</th>
                 <th className="p-3 font-medium text-gray-600">Type</th>
-                <th className="p-3 font-medium text-gray-600">Staf Fraud</th>
+                {showAddendumCol && (
+                  <th className="p-3 font-medium text-gray-600">Addendum</th>
+                )}
+                {showStafFraudCol && (
+                  <th className="p-3 font-medium text-gray-600">Staf Fraud</th>
+                )}
                 <th className="p-3 font-medium text-gray-600">Rating</th>
                 <th className="p-3 font-medium text-gray-600">{activeSubTab === 'regular' ? 'Status LHA' : 'Status KKP'}</th>
                 <th className="p-3 font-medium text-gray-600">Auditors</th>
@@ -638,7 +691,31 @@ const QASection: React.FC = () => {
                       </span>
                     </td>
                     
-                    {/* Kolom Staf Fraud (baru) */}
+                    {/* Kolom Addendum (hanya di Belum Input + Regular) */}
+                    {showAddendumCol && (() => {
+                      const auditAddendums = getAddendumsForAudit(audit);
+                      return (
+                        <td className="p-3 text-gray-700">
+                          {auditAddendums.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {auditAddendums.map((add, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <div className="font-semibold text-yellow-800">{add.assigment_letter}</div>
+                                  {add.addendum_type && (
+                                    <div className="text-yellow-500 font-bold truncate max-w-[150px]" title={add.addendum_type}>{add.addendum_type}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </td>
+                      );
+                    })()}
+
+                    {/* Kolom Staf Fraud (hanya di Sudah Input) */}
+                    {showStafFraudCol && (
                     <td className="p-3 text-gray-700">
                       {((audit.audit_type === 'fraud' || audit.has_field_fraud) && audit.work_paper_persons && audit.work_paper_persons.length > 0) ? (
                         <div className="flex flex-col gap-1">
@@ -660,6 +737,7 @@ const QASection: React.FC = () => {
                         <span className="text-gray-400 text-xs">-</span>
                       )}
                     </td>
+                    )}
                     
                     {/* Kolom Rating (cleaned up) */}
                     <td className="p-3 text-gray-700">
@@ -769,7 +847,7 @@ const QASection: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={10} className="p-4 text-center text-gray-500">
+                  <td colSpan={11} className="p-4 text-center text-gray-500">
                     No audit tasks found
                   </td>
                 </tr>
