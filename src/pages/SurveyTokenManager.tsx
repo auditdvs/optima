@@ -1,29 +1,28 @@
 import {
-  Calendar,
-  CheckCircle,
-  ClipboardCopy,
-  Clock,
-  Download,
-  Eye,
-  Plus,
-  QrCode,
-  RefreshCw,
-  Search,
-  Ticket,
-  Trash2,
-  Users,
-  X,
-  XCircle
+    Calendar,
+    CheckCircle,
+    ClipboardCopy,
+    Clock,
+    Download,
+    Eye,
+    Plus,
+    QrCode,
+    RefreshCw,
+    Search,
+    Ticket,
+    Trash2,
+    Users,
+    X
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '../components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -36,7 +35,6 @@ interface SurveyToken {
   created_by: string;
   creator_name: string;
   created_at: string;
-  expires_at: string;
   is_active: boolean;
   response_count: number;
 }
@@ -253,17 +251,14 @@ function SurveyTokenManager() {
       }
 
       const token = generateToken();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
       const { error } = await supabase
         .from('survey_tokens')
         .insert({
           token,
           branch_name: branch.branch_name,
-          branch_code: trueBranchCode, // Use the looked-up code or empty string
+          branch_code: trueBranchCode,
           created_by: user?.id,
-          expires_at: expiresAt.toISOString(),
         });
 
       if (error) throw error;
@@ -332,19 +327,10 @@ function SurveyTokenManager() {
     });
   };
 
-  // Check if token is expired
-  const isExpired = (expiresAt: string) => {
-    return new Date(expiresAt) < new Date();
-  };
-
-  // Get status info
   // Get status info
   const getStatusInfo = (token: SurveyToken) => {
     if (token.response_count >= 5) {
       return { label: 'Closed', color: 'bg-gray-100 text-gray-700 border border-gray-200', icon: CheckCircle };
-    }
-    if (isExpired(token.expires_at)) {
-      return { label: 'Kadaluarsa', color: 'bg-red-100 text-red-700', icon: XCircle };
     }
     if (token.is_active) {
       return { label: 'Aktif', color: 'bg-green-100 text-green-700', icon: CheckCircle };
@@ -413,22 +399,22 @@ function SurveyTokenManager() {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{tokens.length}</p>
             <p className="text-sm font-medium text-gray-500">Total Token</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <p className="text-2xl font-bold text-green-600">
-              {tokens.filter(t => !isExpired(t.expires_at) && t.is_active).length}
+              {tokens.filter(t => t.is_active && t.response_count < 5).length}
             </p>
             <p className="text-sm font-medium text-gray-500">Token Aktif</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <p className="text-2xl font-bold text-red-600">
-              {tokens.filter(t => isExpired(t.expires_at)).length}
+            <p className="text-2xl font-bold text-gray-600">
+              {tokens.filter(t => t.response_count >= 5).length}
             </p>
-            <p className="text-sm font-medium text-gray-500">Kadaluarsa</p>
+            <p className="text-sm font-medium text-gray-500">Closed (5/5)</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <p className="text-2xl font-bold text-indigo-600">
@@ -470,9 +456,6 @@ function SurveyTokenManager() {
                       Tanggal Dibuat
                     </th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Kadaluarsa
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="text-center px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -511,9 +494,6 @@ function SurveyTokenManager() {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {formatDate(token.created_at)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {formatDate(token.expires_at)}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg ${status.color}`}>
@@ -620,7 +600,7 @@ function SurveyTokenManager() {
                 </Select>
               </div>
 
-              {/* Date Info */}
+              {/* Info */}
               <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
@@ -635,10 +615,10 @@ function SurveyTokenManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-gray-400" />
+                  <CheckCircle className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Masa Berlaku Token</p>
-                    <p className="text-sm text-gray-500">3 hari (dapat digunakan oleh banyak user)</p>
+                    <p className="text-sm font-medium text-gray-700">Batas Responden</p>
+                    <p className="text-sm text-gray-500">Maks 5 responden, link otomatis tutup setelah penuh</p>
                   </div>
                 </div>
               </div>
@@ -702,8 +682,8 @@ function SurveyTokenManager() {
                   <p className="text-xs font-medium text-gray-500">Dibuat</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-sm font-bold text-gray-700">{formatDate(selectedToken.expires_at)}</p>
-                  <p className="text-xs font-medium text-gray-500">Kadaluarsa</p>
+                  <p className="text-sm font-bold text-gray-700">{selectedToken.response_count} / 5</p>
+                  <p className="text-xs font-medium text-gray-500">Responden</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4">
                   {(() => {

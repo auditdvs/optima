@@ -37,6 +37,10 @@ function Layout({ children }: LayoutProps) {
     attachment_url?: string;
     attachment_name?: string;
   } | null>(null);
+
+  // Survey reminder state
+  const [showSurveyReminder, setShowSurveyReminder] = useState(false);
+  const [incompleteSurveyBranches, setIncompleteSurveyBranches] = useState<{ branch_name: string; response_count: number }[]>([]);
   
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
@@ -464,6 +468,64 @@ function Layout({ children }: LayoutProps) {
     setPopupNotification(null);
   };
 
+  // Check for incomplete survey tokens
+  useEffect(() => {
+    const checkIncompleteSurveys = async () => {
+      if (!user) return;
+
+      // Only show once per day
+      const today = new Date().toDateString();
+      const lastShown = localStorage.getItem('survey_reminder_popup_last_shown');
+      if (lastShown === today) return;
+
+      try {
+        // Fetch tokens created by this user
+        const { data: tokens, error: tokensError } = await supabase
+          .from('survey_tokens')
+          .select('id, branch_name')
+          .eq('created_by', user.id)
+          .eq('is_active', true);
+
+        if (tokensError || !tokens || tokens.length === 0) return;
+
+        // Fetch response counts
+        const tokenIds = tokens.map(t => t.id);
+        const { data: responses, error: respError } = await supabase
+          .from('survey_responses')
+          .select('token_id')
+          .in('token_id', tokenIds);
+
+        if (respError) return;
+
+        // Count per token
+        const countMap: Record<string, number> = {};
+        responses?.forEach(r => {
+          countMap[r.token_id] = (countMap[r.token_id] || 0) + 1;
+        });
+
+        // Filter tokens with < 5 responses
+        const incomplete = tokens
+          .map(t => ({ branch_name: t.branch_name, response_count: countMap[t.id] || 0 }))
+          .filter(t => t.response_count < 5);
+
+        if (incomplete.length > 0) {
+          setIncompleteSurveyBranches(incomplete);
+          setShowSurveyReminder(true);
+          localStorage.setItem('survey_reminder_popup_last_shown', today);
+        }
+      } catch (error) {
+        console.error('Error checking incomplete surveys:', error);
+      }
+    };
+
+    checkIncompleteSurveys();
+  }, [user]);
+
+  const handleSurveyReminderOk = () => {
+    setShowSurveyReminder(false);
+    navigate('/survey-manager');
+  };
+
   const theme = getPriorityTheme(highestPriority);
   
   return (
@@ -783,6 +845,68 @@ function Layout({ children }: LayoutProps) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Survey Reminder Popup */}
+      {showSurveyReminder && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-300 border border-gray-100">
+            
+            <div className="p-8">
+              {/* Header */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mb-4 border border-amber-200">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 text-center">Survei Belum Lengkap</h3>
+                <p className="text-gray-500 text-sm mt-1">Halo, <span className="font-medium text-amber-600">{user?.user_metadata?.full_name || userFullName || 'Auditor'}</span></p>
+              </div>
+
+              {/* Content */}
+              <div className="mb-6 bg-amber-50 rounded-xl p-4 border border-amber-100">
+                <p className="text-sm text-amber-800 mb-3">
+                  Beberapa cabang masih belum mencapai <strong>5 responden</strong> survei kepuasan:
+                </p>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {incompleteSurveyBranches.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
+                      <span className="text-sm font-medium text-gray-800">{item.branch_name}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        item.response_count === 0 
+                          ? 'bg-red-100 text-red-700' 
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {item.response_count}/5
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSurveyReminder(false)}
+                  className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-semibold rounded-xl transition-all hover:border-gray-300"
+                >
+                  Nanti Saja
+                </button>
+                <button
+                  onClick={handleSurveyReminderOk}
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 group"
+                >
+                  <span>Kelola Survei</span>
+                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

@@ -1,12 +1,12 @@
 import {
-  AlertCircle,
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardCheck,
-  Loader2,
-  Send,
-  Ticket
+    AlertCircle,
+    CheckCircle,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardCheck,
+    Loader2,
+    Send,
+    Ticket
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -18,7 +18,6 @@ interface TokenInfo {
   token: string;
   branch_name: string;
   branch_code: string | null;
-  expires_at: string;
   is_active: boolean;
 }
 
@@ -135,7 +134,7 @@ function AuditeeSurvey() {
       
       const { data, error: fetchError } = await supabase
         .from('survey_tokens')
-        .select('id, token, branch_name, branch_code, expires_at, is_active')
+        .select('id, token, branch_name, branch_code, is_active')
         .eq('token', tokenToValidate.toUpperCase())
         .single();
 
@@ -143,13 +142,6 @@ function AuditeeSurvey() {
 
       if (fetchError || !data) {
         showError('Token tidak ditemukan');
-        setIsValidating(false);
-        return;
-      }
-
-      // Check if expired
-      if (new Date(data.expires_at) < new Date()) {
-        showError('Token sudah kadaluarsa');
         setIsValidating(false);
         return;
       }

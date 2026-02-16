@@ -28,6 +28,8 @@ interface SurveySummary {
   avg_score: number;
   latest_survey_date: string;
   feedbacks: FeedbackDetail[];
+  auditor_leader: string;
+  auditor_team: string;
 }
 
 interface FeedbackDetail {
@@ -291,7 +293,7 @@ const AuditorPerforma = () => {
       // Fetch survey tokens with responses
       const { data: tokens, error: tokensError } = await supabase
         .from('survey_tokens')
-        .select('id, branch_name, created_at');
+        .select('id, branch_name, created_at, creator_name');
       
       if (tokensError) throw tokensError;
       
@@ -301,6 +303,25 @@ const AuditorPerforma = () => {
         .select('*');
       
       if (responsesError) throw responsesError;
+
+      // Fetch audit_master data to get leader/team by branch_name
+      const { data: auditMasters, error: auditError } = await supabase
+        .from('audit_master')
+        .select('branch_name, leader, team')
+        .order('audit_start_date', { ascending: false });
+      
+      if (auditError) throw auditError;
+
+      // Build a map: branch_name -> { leader, team } (use latest audit)
+      const auditMap: Record<string, { leader: string; team: string }> = {};
+      auditMasters?.forEach(am => {
+        if (!auditMap[am.branch_name]) {
+          auditMap[am.branch_name] = {
+            leader: am.leader || '-',
+            team: am.team || '-'
+          };
+        }
+      });
       
       // Calculate summary per branch
       const branchSummary: Record<string, SurveySummary> = {};
@@ -331,7 +352,9 @@ const AuditorPerforma = () => {
                 total_responses: 0,
                 avg_score: 0,
                 latest_survey_date: token.created_at,
-                feedbacks: []
+                feedbacks: [],
+                auditor_leader: auditMap[token.branch_name]?.leader || '-',
+                auditor_team: auditMap[token.branch_name]?.team || '-'
               };
             }
             
@@ -689,6 +712,9 @@ const AuditorPerforma = () => {
                         Rating
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Auditor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Survei Terakhir
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -741,6 +767,19 @@ const AuditorPerforma = () => {
                                     }`}
                                   />
                                 ))}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              <div className="flex flex-col gap-0.5">
+                                {branch.auditor_leader !== '-' && (
+                                  <span className="font-semibold text-blue-700">{branch.auditor_leader} <span className="text-[10px] text-blue-500">(L)</span></span>
+                                )}
+                                {branch.auditor_team !== '-' && (
+                                  <span className="text-xs text-gray-600">{branch.auditor_team}</span>
+                                )}
+                                {branch.auditor_leader === '-' && branch.auditor_team === '-' && (
+                                  <span className="text-gray-400">-</span>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
