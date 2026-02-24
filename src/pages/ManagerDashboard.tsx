@@ -12,12 +12,13 @@ import FraudData from '../components/dashboard/FraudData';
 import AssignmentLetterManager from '../components/manager-dashboard/AssignmentLetterManager';
 import { Card, CardContent } from '../components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from "../components/ui/dialog";
 import { supabase } from '../lib/supabaseClient';
+import { supabaseService } from '../lib/supabaseService';
 import '../styles/radioButtons.css';
 
 const checkUserAccess = async (supabase: any) => {
@@ -68,7 +69,7 @@ interface AuditTrend {
 
 interface Auditor {
   name: string;
-  auditor_id: string;
+  id: string;
 }
 
 const ManagerDashboard = () => {
@@ -164,17 +165,39 @@ const ManagerDashboard = () => {
       const fraudRecovery = validFraudCases.reduce((sum, person) => sum + (person.payment_fraud || 0), 0);
       const outstandingFraud = totalFraud - fraudRecovery;
 
-      // Fetch total auditors
-      const { data: auditorsData } = await supabase
-        .from('auditors')
-        .select('name', { count: 'exact' });
+      // Fetch total auditors (users with role 'user' from profiles + user_roles, excluding banned)
+      const { data: userRolesData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'user');
+
+      const auditorUserIds = userRolesData?.map(r => r.user_id) || [];
+
+      let auditorCount = 0;
+      if (auditorUserIds.length > 0) {
+        // Get auth users to check ban status
+        const { data: { users: authUsers } } = await supabaseService.auth.admin.listUsers();
+        const bannedIds = new Set(
+          (authUsers || [])
+            .filter((u: any) => u.banned_until && new Date(u.banned_until) > new Date())
+            .map((u: any) => u.id)
+        );
+
+        const activeAuditorIds = auditorUserIds.filter(id => !bannedIds.has(id));
+
+        const { data: auditorProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('id', activeAuditorIds);
+        auditorCount = auditorProfiles?.length || 0;
+      }
 
       setStats({
         totalBranches: branchesData?.length || 0,
         regularAudits,
         specialAudits,
         fraudAudits: fraudCasesCount,
-        totalAuditors: auditorsData?.length || 0,
+        totalAuditors: auditorCount,
         totalFraud, 
         fraudRecovery,
         outstandingFraud
@@ -207,16 +230,52 @@ const ManagerDashboard = () => {
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('name, auditor_id');
-      
-      if (error) {
-        console.error('Error fetching auditors:', error);
+      // Get user IDs with role 'user'
+      const { data: userRolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'user');
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
         return;
       }
-      
-      setAuditors(data || []);
+
+      const auditorUserIds = userRolesData?.map(r => r.user_id) || [];
+
+      if (auditorUserIds.length === 0) {
+        setAuditors([]);
+        return;
+      }
+
+      // Get auth users to check ban status
+      const { data: { users: authUsers } } = await supabaseService.auth.admin.listUsers();
+      const bannedIds = new Set(
+        (authUsers || [])
+          .filter((u: any) => u.banned_until && new Date(u.banned_until) > new Date())
+          .map((u: any) => u.id)
+      );
+
+      const activeAuditorIds = auditorUserIds.filter(id => !bannedIds.has(id));
+
+      // Get profiles for active (non-banned) users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', activeAuditorIds)
+        .order('full_name');
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return;
+      }
+
+      setAuditors(
+        (profilesData || []).map(p => ({
+          name: p.full_name || 'No Name',
+          id: p.id
+        }))
+      );
     } catch (error) {
       console.error('Error fetching auditors:', error);
       setAuditors([]);
@@ -486,7 +545,7 @@ const ManagerDashboard = () => {
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                    Auditor ID
+                    No
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                     Name
@@ -497,7 +556,7 @@ const ManagerDashboard = () => {
                 {auditors.map((auditor, index) => (
                   <tr key={index}>
                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {auditor.auditor_id}
+                      {index + 1}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                       {auditor.name}

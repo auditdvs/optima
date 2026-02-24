@@ -171,6 +171,7 @@ const Dashboard = () => {
   const [activeSection] = useState<'main'>('main');
   const [dashboardTab, setDashboardTab] = useState<'performance' | 'mapping' | 'schedule'>('performance');
 
+
   // Use cached audited branches geo data - transform to match local interface
   const auditedBranchesGeo = cachedAuditedBranchesGeo.map(branch => ({
     ...branch,
@@ -717,7 +718,7 @@ const getRegionAuditDataByMonth = () => {
         <Card className="bg-white shadow-sm">
           <CardContent className="p-4">
             {/* Tab Navigation */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
               <button
                 onClick={() => setDashboardTab('performance')}
                 className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${

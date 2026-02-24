@@ -932,7 +932,7 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
                   </div>
                 ) : rcmResults.length === 0 ? (
                   <div className="text-gray-500 text-center py-8">
-                    {rcmQuery ? 'Tidak ada hasil ditemukan' : 'Masukkan kata kunci untuk mencari data matriks'}
+                    {rcmQuery ? 'Tidak ada hasil ditemukan' : 'Masukkan kata kunci untuk mencari data matriks (Sumber: RCM 2025)'}
                   </div>
                 ) : (
                   <div className="space-y-4">

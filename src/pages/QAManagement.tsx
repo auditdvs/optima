@@ -18,12 +18,12 @@ interface AuditMaster {
   audit_type: 'regular' | 'fraud' | 'special';
   audit_start_date: string;
   audit_end_date: string;
-  audit_period_start?: string; // MM,YYYY format
-  audit_period_end?: string;   // MM,YYYY format
+  audit_period_start?: string; 
+  audit_period_end?: string;   
   leader?: string;
   team?: string;
-  rating?: 'high' | 'medium' | 'low'; // Existing rating (Monitoring Rating)
-  rating_by_qa?: 'high' | 'medium' | 'low'; // New field: Rating by QA
+  rating?: 'high' | 'medium' | 'low'; 
+
   
   // Regular Audit Fields
   dapa_reg?: boolean;
@@ -57,6 +57,7 @@ interface ApprovedDocument {
   date: string;
   status: string;
   raw_data: any;
+  qa_check?: boolean;
   created_by_name?: string;
 }
 
@@ -139,7 +140,7 @@ const QAManagement: React.FC = () => {
   // --- State ---
   const [audits, setAudits] = useState<AuditMaster[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'rating' | 'approved_docs' | 'matriks'>('rating');
+  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'approved_docs' | 'matriks'>('approved_docs');
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,7 +174,7 @@ const QAManagement: React.FC = () => {
   // Approved Docs Filters & Sort
   const [docTypeFilter, setDocTypeFilter] = useState<string>('All');
   const [docCreatedByFilter, setDocCreatedByFilter] = useState<string>('All');
-  const [docSortOrder, setDocSortOrder] = useState<'asc' | 'desc' | null>(null); // For Letter Number
+  const [docSortOrder, setDocSortOrder] = useState<'asc' | 'desc' | null>('asc'); // Default start with ASC (smallest first)
 
   // --- Effects ---
 
@@ -318,6 +319,7 @@ const QAManagement: React.FC = () => {
           date: l.tanggal_input || l.created_at || new Date().toISOString(),
           status: l.status,
           raw_data: l,
+          qa_check: l.qa_check,
           created_by_name: l.created_by ? profileMap.get(l.created_by) || '-' : '-'
         })),
         ...(addendums || []).map(a => ({
@@ -329,6 +331,7 @@ const QAManagement: React.FC = () => {
           date: a.tanggal_input || a.created_at || new Date().toISOString(),
           status: a.status,
           raw_data: a,
+          qa_check: a.qa_check,
           created_by_name: a.created_by ? profileMap.get(a.created_by) || '-' : '-'
         }))
       ];
@@ -390,6 +393,29 @@ const QAManagement: React.FC = () => {
     }
   };
 
+  const handleToggleQACheck = async (doc: ApprovedDocument) => {
+     const newStatus = !doc.qa_check;
+     const table = doc.type === 'Surat Tugas' ? 'letter' : 'addendum';
+     
+     // Optimistic update
+     setApprovedDocs(prev => prev.map(d => d.id === doc.id && d.type === doc.type ? { ...d, qa_check: newStatus } : d));
+     
+     try {
+       const { error } = await supabase
+         .from(table)
+         .update({ qa_check: newStatus })
+         .eq('id', doc.id);
+         
+       if (error) throw error;
+       toast.success('Checklist updated');
+     } catch (err) {
+       console.error(err);
+       toast.error('Failed to update checklist');
+       // Revert
+       setApprovedDocs(prev => prev.map(d => d.id === doc.id && d.type === doc.type ? { ...d, qa_check: !newStatus } : d));
+     }
+  };
+
   const handleExport = () => {
     if (activeTab === 'approved_docs') {
       // Handle approved docs export if needed, or simple disabled for now
@@ -434,14 +460,6 @@ const QAManagement: React.FC = () => {
           'Audit Report': a.audit_report_fr ? 'Yes' : 'No',
           'Detailed Findings': a.detailed_findings_fr ? 'Yes' : 'No',
           'Comment': a.comment_fr
-        };
-      } else if (activeTab === 'rating') {
-        return {
-          'Branch Name': a.branch_name,
-          'Audit Period': `${a.audit_start_date} - ${a.audit_end_date}`,
-          'PIC': `${a.leader || '-'} / ${a.team || '-'}`,
-          'Monitoring Rating': a.rating,
-          'Rating by QA': a.rating_by_qa
         };
       } else {
         return base;
@@ -581,8 +599,6 @@ const QAManagement: React.FC = () => {
     // Regular and Special tabs filter by audit_type
     if (activeTab === 'regular' && a.audit_type !== 'regular') return false;
     if (activeTab === 'special' && a.audit_type !== 'fraud') return false;
-    // Rating tab: Only Regular audits
-    if (activeTab === 'rating' && a.audit_type !== 'regular') return false;
     
     // Search
     const searchLower = searchTerm.toLowerCase();
@@ -639,16 +655,7 @@ const QAManagement: React.FC = () => {
         <div className="flex flex-col gap-3 w-full md:w-auto">
           {/* Unified Tabs - Scrollable on mobile */}
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto scrollbar-hide w-full md:w-auto">
-             <button
-              onClick={() => setActiveTab('rating')}
-              className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === 'rating' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Rating
-            </button>
+
             <button
               onClick={() => setActiveTab('approved_docs')}
               className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
@@ -771,7 +778,7 @@ const QAManagement: React.FC = () => {
           </div>
 
           {docsLoading ? (
-            <div className="flex justify-center p-12">
+            <div className="flex justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
             </div>
           ) : (
@@ -779,10 +786,10 @@ const QAManagement: React.FC = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">No</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Type</th>
                       <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors group select-none"
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors group select-none"
                         onClick={toggleSort}
                       >
                         <div className="flex items-center gap-2">
@@ -792,11 +799,12 @@ const QAManagement: React.FC = () => {
                            <ArrowUpDown size={14} className="text-gray-400 group-hover:text-gray-600" />}
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch/Region</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Branch Details</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created By</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Status</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">QA Check</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Action</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -808,44 +816,62 @@ const QAManagement: React.FC = () => {
                       </tr>
                     ) : (
                       filteredDocs.map((doc, idx) => (
-                        <tr key={`${doc.type}-${doc.id}`} className="hover:bg-gray-50 transition-colors">
-                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
-                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                             <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                         <tr key={`${doc.type}-${doc.id}`} className="hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none">
+                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">{idx + 1}</td>
+                           <td className="px-4 py-3 whitespace-nowrap text-xs">
+                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
                                doc.type === 'Surat Tugas' 
                                  ? 'bg-blue-50 text-blue-700 border-blue-200' 
                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                              }`}>
-                               {doc.type}
+                               {doc.type === 'Surat Tugas' ? 'SURAT TUGAS' : 'ADDENDUM'}
                              </span>
                            </td>
-                           <td className="px-6 py-4 text-sm font-medium text-gray-900">{doc.letter_number}</td>
-                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                             {doc.branch_name} <span className="text-gray-400 mx-1">•</span> {doc.region}
+                           <td className="px-4 py-3 text-sm font-medium text-gray-700 hover:text-indigo-600 transition-colors">
+                              {doc.letter_number}
                            </td>
-                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                             {new Date(doc.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                           <td className="px-4 py-3 whitespace-nowrap">
+                             <div className="flex flex-col">
+                               <span className="text-sm font-semibold text-gray-800">{doc.branch_name}</span>
+                               <span className="text-[10px] text-gray-400 uppercase tracking-wide">{doc.region}</span>
+                             </div>
                            </td>
-                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                               {doc.created_by_name}
-                             </td>
-                             <td className="px-6 py-4 whitespace-nowrap">
-                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                               doc.status === 'approved' ? 'bg-green-100 text-green-800' :
-                               doc.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                               doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                               'bg-gray-100 text-gray-800'
+                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                             {new Date(doc.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                           </td>
+                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
+                             {(doc.created_by_name?.length || 0) > 20 ? `${doc.created_by_name?.substring(0, 20)}...` : (doc.created_by_name || '-')}
+                           </td>
+                           <td className="px-4 py-3 whitespace-nowrap text-center">
+                             <span className={`px-2 py-0.5 inline-flex text-[10px] leading-4 font-bold uppercase rounded-full border ${
+                               doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                               doc.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                               doc.status === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                               'bg-gray-100 text-gray-600 border-gray-200'
                              }`}>
                                {doc.status}
                              </span>
                            </td>
-                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                           <td className="px-4 py-3 whitespace-nowrap text-center">
+                              <button 
+                                onClick={() => handleToggleQACheck(doc)}
+                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm ${
+                                  doc.qa_check 
+                                    ? 'bg-green-600 text-white hover:bg-green-700 hover:shadow-md' 
+                                    : 'bg-white border text-gray-300 hover:border-indigo-300 hover:text-indigo-300'
+                                }`}
+                                title={doc.qa_check ? "Checked by QA" : "Mark as Checked"}
+                              >
+                                <Check size={16} strokeWidth={3} />
+                              </button>
+                           </td>
+                           <td className="px-4 py-3 whitespace-nowrap text-center">
                               <button
                                 onClick={() => {
                                   setSelectedDoc(doc);
                                   setShowDocDetailModal(true);
                                 }}
-                                className="text-indigo-600 hover:text-indigo-900 flex items-center justify-center bg-indigo-50 p-2 rounded-md hover:bg-indigo-100 transition-colors"
+                                className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-all"
                                 title="View Details"
                               >
                                 <Eye className="w-4 h-4" />
@@ -917,15 +943,7 @@ const QAManagement: React.FC = () => {
                       <h3 className="font-bold text-gray-900">{audit.branch_name}</h3>
                       <div className="text-xs text-gray-500 mt-0.5">{audit.region}</div>
                     </div>
-                     {activeTab === 'rating' && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                          audit.rating === 'high' ? 'bg-red-100 text-red-700' :
-                          audit.rating === 'low' ? 'bg-green-100 text-green-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {audit.rating || 'N/A'}
-                        </span>
-                     )}
+
                   </div>
 
                   {/* Body Content based on Tab */}
@@ -1014,26 +1032,7 @@ const QAManagement: React.FC = () => {
                      )}
 
                      {/* Rating Tab Inputs */}
-                     {activeTab === 'rating' && (
-                        <div>
-                           <label className="text-xs font-medium text-gray-700 block mb-1">Rating by QA</label>
-                           <select
-                              value={audit.rating_by_qa || ''}
-                              onChange={(e) => handleTextChange(audit.id, 'rating_by_qa', e.target.value)}
-                              className={`w-full text-sm border rounded-lg p-2.5 font-medium transition-colors ${
-                                audit.rating_by_qa === 'high' ? 'bg-red-50 text-red-700 border-red-200' :
-                                audit.rating_by_qa === 'low' ? 'bg-green-50 text-green-700 border-green-200' :
-                                audit.rating_by_qa === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
-                                'border-gray-200'
-                              }`}
-                            >
-                              <option value="">- Select QA Rating -</option>
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                        </div>
-                     )}
+
                   </div>
                 </div>
               ))
@@ -1073,14 +1072,7 @@ const QAManagement: React.FC = () => {
                         <th className="px-4 py-3 min-w-[200px]">Comment</th>
                       </>
                     )}
-                    {activeTab === 'rating' && (
-                      <>
-                        <th className="px-4 py-3 min-w-[150px]">Audit Period</th>
-                        <th className="px-4 py-3 min-w-[150px]">PIC</th>
-                        <th className="px-4 py-3 text-center min-w-[120px]">Monitoring Rating</th>
-                        <th className="px-4 py-3 text-center min-w-[120px]">Rating by QA</th>
-                      </>
-                    )}
+
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -1164,42 +1156,7 @@ const QAManagement: React.FC = () => {
                           </td>
                         </>
                       )}
-                      {activeTab === 'rating' && (
-                        <>
-                          <td className="px-4 py-3 text-xs">
-                            {new Date(audit.audit_start_date).toLocaleDateString()} - {new Date(audit.audit_end_date).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-xs">
-                            <div className="font-medium">{audit.leader || '-'}</div>
-                            <div className="text-gray-500">{audit.team || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              audit.rating === 'high' ? 'bg-red-100 text-red-800' :
-                              audit.rating === 'low' ? 'bg-green-100 text-green-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {audit.rating || 'N/A'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <select
-                              value={audit.rating_by_qa || ''}
-                              onChange={(e) => handleTextChange(audit.id, 'rating_by_qa', e.target.value)}
-                              className={`text-xs border rounded p-1 font-medium ${
-                                audit.rating_by_qa === 'high' ? 'bg-red-50 text-red-700 border-red-200' :
-                                audit.rating_by_qa === 'low' ? 'bg-green-50 text-green-700 border-green-200' :
-                                audit.rating_by_qa === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : ''
-                              }`}
-                            >
-                              <option value="">- Select -</option>
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                          </td>
-                        </>
-                      )}
+
                     </tr>
                   ))}
                   {filteredAudits.length === 0 && (

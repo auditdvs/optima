@@ -7,6 +7,7 @@ import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DashboardCacheProvider } from './contexts/DashboardCacheContext';
 import { MapCacheProvider } from './contexts/MapCacheContext';
+import { PresenceProvider } from './contexts/PresenceContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import AssignmentLetter from './pages/AssignmentLetter';
@@ -14,9 +15,11 @@ import AuditeeSurvey from './pages/AuditeeSurvey';
 import AuditorWorkpapers from './pages/AuditorWorkpapers';
 import BranchDirectory from './pages/BranchDirectory';
 import Broadcast from './pages/Broadcast';
+import ChatPage from './pages/ChatPage';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
+import FraudStaffPage from './pages/FraudStaffPage';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
 import NotificationHistory from './pages/NotificationHistory';
@@ -30,6 +33,7 @@ import Tools from './pages/Tools';
 import Tutorials from './pages/Tutorials';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import UpdateLocation from './pages/UpdateLocation';
+import VideoCallPage from './pages/VideoCallPage';
 
 const queryClient = new QueryClient();
 
@@ -70,6 +74,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PresenceProvider>
         <MapCacheProvider>
           <DashboardCacheProvider>
             <Router>
@@ -143,6 +148,11 @@ function App() {
                   <NotificationHistory />
                 </PrivateRoute>
               } />
+              <Route path="chat" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <ChatPage />
+                </PrivateRoute>
+              } />
               <Route path="email-address" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
                   <EmailAddress />
@@ -176,6 +186,18 @@ function App() {
                 </PrivateRoute>
                 } />
             </Route>
+            {/* Fullscreen Video Call Route */}
+            <Route path="/video-call" element={
+              <PrivateRoute>
+                 <VideoCallPage />
+              </PrivateRoute>
+            } />
+            {/* Hidden: Fraud Staff Info — opens in new browser tab */}
+            <Route path="/fraud-staff" element={
+              <PrivateRoute>
+                <FraudStaffPage />
+              </PrivateRoute>
+            } />
             {/* Public routes for auditee survey - no auth required */}
             <Route path="/survey" element={<AuditeeSurvey />} />
             <Route path="/survey/:token" element={<AuditeeSurvey />} />
@@ -193,6 +215,7 @@ function App() {
         </Router>
       </DashboardCacheProvider>
     </MapCacheProvider>
+    </PresenceProvider>
     </AuthProvider>
   </QueryClientProvider>
   );

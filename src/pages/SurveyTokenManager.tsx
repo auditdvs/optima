@@ -1,28 +1,28 @@
 import {
-    Calendar,
-    CheckCircle,
-    ClipboardCopy,
-    Clock,
-    Download,
-    Eye,
-    Plus,
-    QrCode,
-    RefreshCw,
-    Search,
-    Ticket,
-    Trash2,
-    Users,
-    X
+  Calendar,
+  CheckCircle,
+  ClipboardCopy,
+  Clock,
+  Download,
+  Eye,
+  Plus,
+  QrCode,
+  RefreshCw,
+  Search,
+  Ticket,
+  Trash2,
+  Users,
+  X
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '../components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -68,6 +68,7 @@ function SurveyTokenManager() {
   const [availableBranches, setAvailableBranches] = useState<AuditBranch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed' | 'inactive'>('all');
   
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -339,10 +340,23 @@ function SurveyTokenManager() {
   };
 
   // Filter tokens
-  const filteredTokens = tokens.filter((token) =>
-    token.branch_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    token.token.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTokens = tokens.filter((token) => {
+    // Search filter
+    const matchesSearch = token.branch_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      token.token.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status filter
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = token.is_active && token.response_count < 5;
+    } else if (statusFilter === 'closed') {
+      matchesStatus = token.response_count >= 5;
+    } else if (statusFilter === 'inactive') {
+      matchesStatus = !token.is_active && token.response_count < 5;
+    }
+    
+    return matchesSearch && matchesStatus;
+  });
 
   // View token details
   const handleViewDetails = (token: SurveyToken) => {
@@ -387,6 +401,18 @@ function SurveyTokenManager() {
               className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all"
             />
           </div>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all text-sm font-medium text-gray-700 cursor-pointer"
+          >
+            <option value="all">Semua Status</option>
+            <option value="active">Aktif</option>
+            <option value="closed">Closed (5/5)</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
 
           {/* Refresh */}
           <button

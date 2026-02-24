@@ -146,7 +146,7 @@ const AuditStats = ({ audits }: { audits: any[] }) => {
       }
 
       const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
-      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
+      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus') || type?.toLowerCase().includes('addendum');
 
       // --- Bar Chart Data ---
       const allMonths = ['01','02','03','04','05','06','07','08','09','10','11','12'];

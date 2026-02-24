@@ -1,9 +1,10 @@
 import {
+  Blocks,
   ChartPie,
+  ChevronDown,
   ChevronsUpDown,
   ClipboardCheck,
   FileCheck,
-  Blocks,
   FileText,
   FileVideo,
   GitPullRequest,
@@ -19,6 +20,7 @@ import {
   UserRoundPen,
   Users,
   Wrench,
+  Slack,
   X
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -35,7 +37,7 @@ const DEFAULT_PROFILE_PICS = [
   'https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/profile-pics//default4.png',
 ];
 
-function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onToggleCollapse?: (collapsed: boolean) => void }) {
+function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCollapsed: boolean; onToggleCollapse?: (collapsed: boolean) => void; unreadChatCount?: number }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { userRole, user, signOut } = useAuth();
@@ -51,6 +53,15 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
   const [editFullName, setEditFullName] = useState('');
   const [editProfilePic, setEditProfilePic] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Collapsible groups state (Accordion style)
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  
+  // Reprocess count state
+  const [reprocessCount, setReprocessCount] = useState(0);
+
+  const toggleGroup = (key: string) => {
+    setOpenGroup(prev => prev === key ? null : key);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -99,7 +110,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
           
         // 2. Try fetch from account
         let accData: any = null;
-        let { data: accountResult, error: accError } = await supabase
+        let { data: accountResult } = await supabase
           .from('account')
           .select('*')
           .eq('user_id', user.id) // Try user_id first for account table too
@@ -146,6 +157,64 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
     fetchData();
   }, [user, userRole]);
 
+  // Fetch Reprocess Queue Count
+  useEffect(() => {
+    const fetchReprocessCount = async () => {
+      if (userRole !== 'superadmin') return;
+
+      try {
+        const { count: addendumCount } = await supabase
+          .from('addendum')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'approved')
+          .or('um_locked.is.null,um_locked.eq.false');
+
+        const { count: letterCount } = await supabase
+          .from('letter')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'approved')
+          .or('um_locked.is.null,um_locked.eq.false');
+
+        setReprocessCount((addendumCount || 0) + (letterCount || 0));
+      } catch (error) {
+        console.error('Error fetching reprocess count:', error);
+      }
+    };
+
+    fetchReprocessCount();
+
+    // Polling fallback every 5 seconds (performance impact is minimal as we only fetch count header)
+    const interval = setInterval(fetchReprocessCount, 5000);
+    
+    // Subscribe to changes with a single channel for better management
+    const subscription = supabase
+      .channel('reprocess-queue-changes-v2')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'addendum' }, 
+        (payload) => {
+          console.log('Realtime: Addendum changed', payload);
+          fetchReprocessCount();
+        }
+      )
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'letter' }, 
+        (payload) => {
+          console.log('Realtime: Letter changed', payload);
+          fetchReprocessCount();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Reprocess Queue Subscription Status:', status);
+      });
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(subscription);
+    };
+  }, [userRole]);
+
   function formatDate(dateString: string) {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -158,7 +227,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
 
   const menuGroups = [
     {
-      title: "Main",
+      title: "",
       key: "dashboard",
       items: [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -199,6 +268,14 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
   if (['superadmin', 'qa', 'user', 'dvs', 'manager'].includes(userRole?.toLowerCase() || '')) {
     const communicationItems = [];
     if (['superadmin', 'qa', 'dvs', 'manager'].includes(userRole?.toLowerCase() || '')) communicationItems.push({ path: '/broadcast', icon: Megaphone, label: 'Broadcast' });
+    
+    // Setup Chat Item with Badge
+    const chatItem: any = { path: '/chat', icon: Slack, label: 'Audit Hub' };
+    if (unreadChatCount > 0) {
+      chatItem.badge = unreadChatCount;
+    }
+    communicationItems.push(chatItem);
+
     communicationItems.push({ path: '/notification-history', icon: History, label: 'History' });
     communicationItems.push({ path: '/pull-request', icon: GitPullRequest, label: 'Req Database' });
     communicationItems.push({ path: '/support-tickets', icon: Ticket, label: 'Support Tickets' });
@@ -209,12 +286,32 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
   }
 
   if (userRole?.toLowerCase() === 'superadmin') {
+    const adminItem = { path: '/add-user', icon: KeyRound, label: 'Admin Menu' };
+    
+    // Add badge component if count > 0
+    if (reprocessCount > 0) {
+      (adminItem as any).badge = reprocessCount;
+    }
+
     menuGroups.push({
-      title: "Admin",
+      title: "",
       key: "administration",
-      items: [{ path: '/add-user', icon: KeyRound, label: 'Admin Menu' }]
+      items: [adminItem]
     });
   }
+
+  // Auto-expand group based on active route
+  useEffect(() => {
+    if (isCollapsed) return;
+    
+    const activeGroup = menuGroups.find(group => 
+      group.items.some(item => isActive(item.path))
+    );
+
+    if (activeGroup && activeGroup.items.length > 1) {
+      setOpenGroup(activeGroup.key);
+    }
+  }, [location.pathname, userRole, isCollapsed]);
   
   return (
     <>
@@ -259,16 +356,37 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-6 px-3 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
-        {menuGroups.map((group) => (
+        {menuGroups.map((group) => {
+          const isCollapsible = group.items.length > 1 && !!group.title;
+          const isOpen = !isCollapsible || group.key === openGroup;
+
+          return (
           <div key={group.key}>
-            {!isCollapsed && group.items.length > 0 && (
-              <div className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                {group.title}
-              </div>
-            )}
+            {!isCollapsed && (isCollapsible ? (
+              <button 
+                onClick={() => toggleGroup(group.key)}
+                className="w-full flex items-center justify-between px-3 mb-2 group/header"
+              >
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover/header:text-gray-600 transition-colors">
+                  {group.title}
+                </span>
+                <ChevronDown 
+                  className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} 
+                />
+              </button>
+            ) : (
+             // Static header for single items (optional, usually hidden for cleaner look or kept as separator)
+             // Only render if title exists
+             group.title ? (
+               <div className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {group.title}
+               </div>
+             ) : null
+            ))}
             
-            <div className="space-y-1">
-              {group.items.map(({ path, icon: Icon, label }) => {
+            <div className={`space-y-1 transition-all duration-200 ${!isCollapsed && !isOpen ? 'hidden' : 'block'}`}>
+              {group.items.map((item) => {
+                const { path, icon: Icon, label } = item;
                 const active = isActive(path);
                 return (
                   <Link
@@ -276,7 +394,7 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
                     to={path}
                     title={isCollapsed ? label : ''}
                     className={`
-                      flex items-center px-3 py-2 rounded-md transition-all duration-200 group
+                      flex items-center px-3 py-2 rounded-md transition-all duration-200 group relative
                       ${active 
                         ? 'bg-indigo-50 text-indigo-700 font-medium' 
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
@@ -292,12 +410,29 @@ function Sidebar({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean; onTo
                       `} 
                     />
                     {!isCollapsed && <span className="text-sm">{label}</span>}
+                    
+                    {/* Badge */}
+                    {(item as any).badge && (
+                      <span className={`
+                        flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 
+                        rounded-full text-[10px] font-bold shadow-sm
+                        transition-all duration-200
+                        ${isCollapsed 
+                          ? 'absolute -top-1 -right-1 z-10' 
+                          : 'ml-auto'
+                        }
+                        bg-amber-100 text-amber-700 border border-amber-200
+                      `}>
+                        {(item as any).badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer / User Profile */}

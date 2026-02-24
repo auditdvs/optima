@@ -159,6 +159,8 @@ function Login() {
         setError('Nice try. That email or password is incorrect.');
       } else if (err?.message?.includes('Email not confirmed')) {
         setError('Email belum dikonfirmasi. Silakan cek inbox Anda.');
+      } else if (err?.message?.includes('banned') || err?.message?.includes('user_banned')) {
+        setError('BANNED:Anda sudah tidak memiliki akses lagi ke dalam platform.');
       } else {
         setError('Gagal masuk. Silakan coba lagi.');
       }
@@ -199,14 +201,31 @@ function Login() {
       {/* Custom Minimalist Centered Error Popup */}
       {error && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
-          <div className="bg-red-500 shadow-2xl p-6 rounded-2xl flex flex-col items-center text-center animate-in zoom-in-95 fade-in duration-300 pointer-events-auto max-w-sm mx-4">
-            <h3 className="text-lg font-bold text-white mb-1 font-display">
-              Access Denied
-            </h3>
-            
-            <p className="text-white/90 text-sm leading-relaxed font-medium">
-              {error}
-            </p>
+          <div className={`${error.startsWith('BANNED:') ? 'bg-gray-900' : 'bg-red-500'} shadow-2xl p-6 rounded-2xl flex flex-col items-center text-center animate-in zoom-in-95 fade-in duration-300 pointer-events-auto max-w-sm mx-4`}>
+            {error.startsWith('BANNED:') ? (
+              <>
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1 font-display">
+                  Akses Ditolak
+                </h3>
+                <p className="text-white/80 text-sm leading-relaxed font-medium">
+                  {error.replace('BANNED:', '')}
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-bold text-white mb-1 font-display">
+                  Access Denied
+                </h3>
+                <p className="text-white/90 text-sm leading-relaxed font-medium">
+                  {error}
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

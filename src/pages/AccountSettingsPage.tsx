@@ -11,6 +11,7 @@ interface AuditedBranch {
   audit_type: string;
   audit_start_date?: string | null;
   audit_end_date?: string | null;
+  reference_number?: string;
 }
 
 // New interface for administration issues
@@ -19,6 +20,7 @@ interface AdminIssue {
   branch_name: string;
   audit_type: string;
   audit_start_date?: string;
+  reference_number?: string;
   missing_documents: string;
   monitoring?: string; // Optional, only for regular audits
 }
@@ -153,6 +155,7 @@ const AccountSettingsPage = () => {
             branch_name: audit.branch_name,
             audit_type: 'regular',
             audit_start_date: audit.audit_start_date,
+            reference_number: audit.reference_number,
             missing_documents: missingDocsStr,
             monitoring: monitoringStatus
           };
@@ -176,6 +179,7 @@ const AccountSettingsPage = () => {
             branch_name: audit.branch_name,
             audit_type: 'fraud',
             audit_start_date: audit.audit_start_date,
+            reference_number: audit.reference_number,
             missing_documents: missingDocsStr
           };
         });
@@ -243,12 +247,23 @@ const AccountSettingsPage = () => {
     // Get assignment letters (Surat Tugas)
     const { data: letters, error: letterError } = await supabase
       .from('letter')
-      .select('id, branch_name, audit_type, audit_start_date, audit_end_date, team, leader, status')
-      .eq('status', 'Approved');
+      .select('id, branch_name, audit_type, audit_start_date, audit_end_date, team, leader, status, assigment_letter')
+      .eq('status', 'Approved')
+      .order('id', { ascending: false });
 
     if (letterError) {
       console.error('Error fetching letters:', letterError);
       // Continue even if letter fetch fails, rely on audit_master
+    }
+
+    // Get Addendums (Approved)
+    const { data: addendums, error: addendumError } = await supabase
+      .from('addendum')
+      .select('*, letter ( branch_name, assigment_letter )') // Fetch related letter details
+      .eq('status', 'approved');
+
+    if (addendumError) {
+       console.error('Error fetching addendums:', addendumError);
     }
 
     console.log('Profile full_name:', profileData.full_name);
@@ -327,6 +342,24 @@ const AccountSettingsPage = () => {
       return teamMembers.some((member: string) => isMatch(member));
     };
 
+    // Extended Helper to check Addendum-specific new_leader/new_team
+    const isUserInAuditOrAddendum = (record: any, fullName: string) => {
+       // Check standard fields
+       if (isUserInAudit(record, fullName)) return true;
+       
+       // Check Addendum specific fields
+       // Check New Leader
+       if (record.new_leader && isUserInAudit({ leader: record.new_leader }, fullName)) return true; // Reusing logic by mocking object
+       
+       // Check New Team
+       if (record.new_team) {
+          // Mock object with team = new_team
+          if (isUserInAudit({ team: record.new_team }, fullName)) return true;
+       }
+       
+       return false;
+    };
+
       if ((!auditMaster || auditMaster.length === 0) && (!letters || letters.length === 0)) {
         setTotalRegular(0);
         setTotalFraud(0);
@@ -340,17 +373,96 @@ const AccountSettingsPage = () => {
 
         return;
       }
+
+      // Helper for robust audit type matching (Regular vs Reguler, Fraud vs Investigasi)
+      const matchAuditType = (t1?: string, t2?: string) => {
+         const s1 = t1?.toLowerCase() || '';
+         const s2 = t2?.toLowerCase() || '';
+         
+         const isReg1 = s1.includes('regular') || s1.includes('reguler');
+         const isReg2 = s2.includes('regular') || s2.includes('reguler');
+         if (isReg1 && isReg2) return true;
+         
+         const isFraud1 = s1.includes('fraud') || s1.includes('investigasi') || s1.includes('khusus');
+         const isFraud2 = s2.includes('fraud') || s2.includes('investigasi') || s2.includes('khusus');
+         if (isFraud1 && isFraud2) return true;
+         
+         return s1.trim() === s2.trim();
+      };
       
       // Filter audits and letters where user is involved
       const auditMasterRecords = auditMaster || [];
       const letterRecords = letters || [];
+      const addendumRecords = addendums || [];
       
-      const filteredAudits = auditMasterRecords.filter(record => isUserInAudit(record, profileData.full_name));
-      const filteredLetters = letterRecords.filter(record => isUserInAudit(record, profileData.full_name));
+      const filteredAudits = auditMasterRecords
+          .filter(record => isUserInAudit(record, profileData.full_name))
+          .map(record => {
+              // Add reference number
+              let refNum = undefined;
+              
+              // 1. Try letter_id lookup
+              if (record.letter_id && letterRecords.length > 0) {
+                  const matchedLetter = letterRecords.find(l => String(l.id) === String(record.letter_id));
+                  if (matchedLetter) refNum = matchedLetter.assigment_letter;
+              }
+              
+              // 2. Fallback: Manual Lookup by Branch & Type (if letter_id failed or missing)
+              if (!refNum && letterRecords.length > 0) {
+                  const match = letterRecords.find(l => 
+                     l.branch_name?.toLowerCase().trim() === record.branch_name?.toLowerCase().trim() &&
+                     matchAuditType(l.audit_type, record.audit_type)
+                  );
+                  if (match) refNum = match.assigment_letter;
+              }
+
+              return {
+                  ...record,
+                  reference_number: refNum
+              };
+          });
+      const filteredLetters = letterRecords
+         .filter(record => isUserInAudit(record, profileData.full_name))
+         .map(l => ({
+            ...l,
+            reference_number: l.assigment_letter // Map assignment_letter to reference_number
+         }));
       
-      // Combine records from both sources (Checklist/AuditMaster + Surat Tugas/Letters)
-      // This ensures we count audits that are just assigned AND audits that are already in progress/done
-      const allRecords = [...filteredAudits, ...filteredLetters];
+      // Filter and Standardize Addendums
+      const filteredAddendums = addendumRecords
+         .filter(record => isUserInAuditOrAddendum(record, profileData.full_name))
+         .map(a => {
+             // Logic to determine reference number with fallback lookup
+             let refNum = a.assigment_letter || a.letter?.assigment_letter;
+             
+             if (!refNum && letterRecords.length > 0) {
+                 // Determine branch name to look up
+                 const targetBranch = a.branch_name || a.letter?.branch_name;
+                 const targetType = a.audit_type; // Raw type from DB
+
+                 if (targetBranch) {
+                     const match = letterRecords.find(l => 
+                         l.branch_name?.toLowerCase().trim() === targetBranch.toLowerCase().trim() &&
+                         (matchAuditType(l.audit_type, targetType) || !targetType)
+                     );
+                     if (match) refNum = match.assigment_letter;
+                 }
+             }
+
+             return {
+                ...a,
+                branch_name: a.branch_name || a.letter?.branch_name, // Fallback to letter's branch_name
+                audit_start_date: a.start_date,
+                audit_end_date: a.end_date,
+                // Append Addendum to type to ensure uniqueness and categorization
+                // User requested Addendum to be in 'Special/Fraud'
+                audit_type: `Addendum - ${a.addendum_type || a.audit_type || 'General'}`,
+                reference_number: refNum // Fallback to letter's number
+             };
+         });
+
+      // Combine records from all sources
+      const allRecords = [...filteredAudits, ...filteredLetters, ...filteredAddendums];
       
       console.log('Filtered total records:', allRecords.length);
       
@@ -366,7 +478,8 @@ const AccountSettingsPage = () => {
       
       // Helper functions for audit type check
       const isRegular = (type: string) => type?.toLowerCase().includes('regular') || type?.toLowerCase().includes('reguler');
-      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus');
+      // Updated to include 'addendum' as per user request to group with Special/Fraud
+      const isFraud = (type: string) => type?.toLowerCase().includes('fraud') || type?.toLowerCase().includes('investigasi') || type?.toLowerCase().includes('khusus') || type?.toLowerCase().includes('addendum');
       
       // Set audited branches
       setAuditedBranches(uniqueAudits);
@@ -440,11 +553,21 @@ const AccountSettingsPage = () => {
             const existingCount = countChecklistFilled(existing);
             const newCount = countChecklistFilled(a);
             
-            // If new record has more completed items, replace the existing one
-            if (newCount > existingCount) {
-               dedupMap.set(key, a);
-            } else if (newCount === existingCount) {
+            // Start with the existing reference number, or take the new one if available
+            const mergedRef = a.reference_number || existing.reference_number;
 
+            // If new record has more completed items, replace the existing one BUT preserve reference number if needed
+            if (newCount > existingCount) {
+               dedupMap.set(key, { ...a, reference_number: mergedRef });
+            } else if (newCount === existingCount) {
+               // If counts equal, prefer the one with reference number
+               if (!existing.reference_number && a.reference_number) {
+                  dedupMap.set(key, { ...a, reference_number: mergedRef });
+               } else {
+                  dedupMap.set(key, { ...existing, reference_number: mergedRef });
+               }
+            } else {
+               dedupMap.set(key, { ...existing, reference_number: mergedRef });
             }
          } else {
             dedupMap.set(key, a);
@@ -543,16 +666,17 @@ const AccountSettingsPage = () => {
                     <TableRow>
                       <TableHead className="w-12">NO</TableHead>
                       <TableHead>BRANCH NAME</TableHead>
+                      <TableHead>REFERENCE</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingBranches ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="text-center">Loading...</TableCell>
+                        <TableCell colSpan={3} className="text-center">Loading...</TableCell>
                       </TableRow>
                     ) : auditedBranches.filter(branch => branch.audit_type === 'regular').length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="text-center">No regular audits</TableCell>
+                        <TableCell colSpan={3} className="text-center">No regular audits</TableCell>
                       </TableRow>
                     ) : (
                       auditedBranches
@@ -566,6 +690,7 @@ const AccountSettingsPage = () => {
                           <TableRow key={idx}>
                             <TableCell>{idx + 1}</TableCell>
                             <TableCell>{row.branch_name}</TableCell>
+                            <TableCell className="text-xs text-gray-500 font-mono">{row.reference_number || '-'}</TableCell>
                           </TableRow>
                         ))
                     )}
@@ -581,27 +706,30 @@ const AccountSettingsPage = () => {
                     <TableRow>
                       <TableHead className="w-12">NO</TableHead>
                       <TableHead>BRANCH NAME</TableHead>
+                      <TableHead>REFERENCE</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingBranches ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="text-center">Loading...</TableCell>
+                        <TableCell colSpan={3} className="text-center">Loading...</TableCell>
                       </TableRow>
                     ) : auditedBranches.filter(branch => 
                         branch.audit_type?.toLowerCase().includes('fraud') || 
                         branch.audit_type?.toLowerCase().includes('investigasi') ||
-                        branch.audit_type?.toLowerCase().includes('khusus')
+                        branch.audit_type?.toLowerCase().includes('khusus') ||
+                        branch.audit_type?.toLowerCase().includes('addendum')
                       ).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="text-center">No fraud audits</TableCell>
+                        <TableCell colSpan={3} className="text-center">No fraud/addendum audits</TableCell>
                       </TableRow>
                     ) : (
                       auditedBranches
                         .filter(branch => 
                           branch.audit_type?.toLowerCase().includes('fraud') || 
                           branch.audit_type?.toLowerCase().includes('investigasi') ||
-                          branch.audit_type?.toLowerCase().includes('khusus')
+                          branch.audit_type?.toLowerCase().includes('khusus') ||
+                          branch.audit_type?.toLowerCase().includes('addendum')
                         )
                         .sort((a, b) => {
                           const dateA = a.audit_start_date ? new Date(a.audit_start_date).getTime() : 0;
@@ -612,6 +740,7 @@ const AccountSettingsPage = () => {
                           <TableRow key={idx}>
                             <TableCell>{idx + 1}</TableCell>
                             <TableCell>{row.branch_name}</TableCell>
+                            <TableCell className="text-xs text-gray-500 font-mono">{row.reference_number || '-'}</TableCell>
                           </TableRow>
                         ))
                     )}

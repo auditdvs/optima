@@ -14,11 +14,9 @@ interface RegularAudit {
   region: string;
   monitoring: string;
   dapa: boolean;
-  revised_dapa: boolean;
   dapa_supporting_data: boolean;
   assignment_letter: boolean;
   entrance_agenda: boolean;
-  entrance_attendance: boolean;
   audit_working_papers: boolean;
   exit_meeting_minutes: boolean;
   exit_attendance_list: boolean;
@@ -40,13 +38,14 @@ interface FraudAudit {
 }
 
 // Field name to display name mapping
+// Synced with Profile's Administration Issues rules:
+// - revised_dapa excluded (only needed if fraud found during regular audit)
+// - entrance_attendance excluded (not applicable)
 const regularAuditAliases: Record<string, string> = {
   dapa: "DAPA",
-  revised_dapa: "DAPA Perubahan",
   dapa_supporting_data: "Data Dukung DAPA",
   assignment_letter: "Surat Tugas",
   entrance_agenda: "Entrance Agenda",
-  entrance_attendance: "Absensi Entrance",
   audit_working_papers: "KK Pemeriksaan",
   exit_meeting_minutes: "BA Exit Meeting",
   exit_attendance_list: "Absensi Exit",
@@ -76,8 +75,7 @@ const AuditSummary = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'regular' | 'fraud'>('regular');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'branch_name', direction: 'asc' });
-  const [selectedRegionReport, setSelectedRegionReport] = useState<string>('ALL');
-  const [reportUndoneOnly, setReportUndoneOnly] = useState(false);
+
 
   // State Audit Rating Count
   const [auditRatingSummary, setAuditRatingSummary] = useState<{ high: number; medium: number; low: number }>({ high: 0, medium: 0, low: 0 });
@@ -169,11 +167,9 @@ const AuditSummary = () => {
              region: a.region,
              monitoring: a.monitoring_reg,
              dapa: a.dapa_reg,
-             revised_dapa: a.revised_dapa_reg,
              dapa_supporting_data: a.dapa_supporting_data_reg,
              assignment_letter: a.assignment_letter_reg,
              entrance_agenda: a.entrance_agenda_reg,
-             entrance_attendance: false, // Not in provided schema
              audit_working_papers: a.audit_wp_reg,
              exit_meeting_minutes: a.exit_meeting_minutes_reg,
              exit_attendance_list: a.exit_attendance_list_reg,
@@ -555,8 +551,11 @@ const AuditSummary = () => {
                         )
                         .map(([key]) => key);
 
-                      if (failedKeys.length === 0) return false;
-                      if (failedKeys.length === 1 && failedKeys[0] === 'revised_dapa') return false;
+                      // Also check monitoring status
+                      const monitoringValue = (audit.monitoring || '').toLowerCase().trim();
+                      const hasMonitoringIssue = monitoringValue !== 'adequate' && monitoringValue !== 'memadai';
+
+                      if (failedKeys.length === 0 && !hasMonitoringIssue) return false;
                       return true;
                     }
                     if (activeTab === 'fraud') {
@@ -584,11 +583,13 @@ const AuditSummary = () => {
                         <>
                           <td className="px-3 py-2 whitespace-nowrap text-xs">
                             <span className={`px-2 py-1 rounded-full text-[10px] font-medium max-w-[50px] ${
-                              audit.monitoring === 'Adequate' 
+                              audit.monitoring?.toLowerCase() === 'adequate' || audit.monitoring?.toLowerCase() === 'memadai'
                                 ? 'bg-lime-100 text-lime-800'
-                                : 'bg-rose-100 text-rose-800'
+                                : !audit.monitoring || audit.monitoring === ''
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-rose-100 text-rose-800'
                             }`}>
-                              {audit.monitoring}
+                              {audit.monitoring || 'not yet completed'}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-xs text-gray-900 whitespace-normal break-words max-w-[300px]">
@@ -613,106 +614,6 @@ const AuditSummary = () => {
                       )}
                     </tr>
                   ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Container Baru: Report */}
-      <Card className="mt-8">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-lg font-bold text-gray-900">Report Status</CardTitle>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={reportUndoneOnly}
-                onChange={e => setReportUndoneOnly(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <span className="text-sm text-gray-600 group-hover:text-gray-900 select-none">Show Undone Only</span>
-            </label>
-            
-            <div className="relative min-w-[180px]">
-              <select
-                value={selectedRegionReport}
-                onChange={(e) => setSelectedRegionReport(e.target.value)}
-                className="w-full appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 text-sm"
-              >
-                <option value="ALL">All Regions</option>
-                {Array.from({ length: 19 }, (_, i) => String.fromCharCode(65 + i)).map(region => (
-                  <option key={region} value={region}>Regional {region}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-hidden rounded-xl border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">No.</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Branch Name</th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">RTA</th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Report</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {regularAudits
-                  .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
-                  .filter(audit => {
-                    const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
-                    if (!reportUndoneOnly) return true;
-                    return rtaStatus === 'Undone' || reportStatus === 'Undone';
-                  })
-                  .map((audit, idx) => {
-                    const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
-                    return (
-                      <tr key={audit.branch_name + idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-3 text-sm text-gray-900">{idx + 1}</td>
-                        <td className="px-6 py-3 text-sm font-medium text-gray-900">{audit.branch_name}</td>
-                        <td className="px-6 py-3 text-center">
-                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                             audit.rta 
-                               ? 'bg-emerald-100 text-emerald-800' 
-                               : 'bg-rose-100 text-rose-800'
-                           }`}>
-                             {rtaStatus}
-                           </span>
-                        </td>
-                        <td className="px-6 py-3 text-center">
-                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                             reportStatus === 'Done' 
-                               ? 'bg-emerald-100 text-emerald-800' 
-                               : 'bg-rose-100 text-rose-800'
-                           }`}>
-                             {reportStatus}
-                           </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                {regularAudits
-                  .filter(audit => selectedRegionReport === 'ALL' || audit.region === selectedRegionReport)
-                  .filter(audit => {
-                    const rtaStatus = audit.rta ? 'Done' : 'Undone';
-                    const reportStatus = audit.audit_result_letter ? 'Done' : 'Undone';
-                    if (!reportUndoneOnly) return true;
-                    return rtaStatus === 'Undone' || reportStatus === 'Undone';
-                  }).length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-sm text-gray-500">
-                      No data available.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

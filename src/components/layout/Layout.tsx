@@ -1,6 +1,9 @@
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { ReactNode, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { db } from '../../lib/firebase';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
@@ -42,6 +45,9 @@ function Layout({ children }: LayoutProps) {
   const [showSurveyReminder, setShowSurveyReminder] = useState(false);
   const [incompleteSurveyBranches, setIncompleteSurveyBranches] = useState<{ branch_name: string; response_count: number }[]>([]);
   
+  // Chat Unread Count
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
 
@@ -521,6 +527,139 @@ function Layout({ children }: LayoutProps) {
     checkIncompleteSurveys();
   }, [user]);
 
+  // Listen to Unread Chat Messages (Global Badge)
+  useEffect(() => {
+    if (!user) return;
+
+    // Direct Messages Count Logic (Legacy - Consider merging with accurate ChatPage logic if needed)
+    // For Sidebar Badge specific
+    const q = query(
+      collection(db, 'direct_messages'),
+      where('receiverId', '==', user.id),
+      where('isRead', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadChatCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // NEW MESSAGE TOAST NOTIFICATIONS
+  useEffect(() => {
+    if (!user) return;
+
+    // Use a timestamp slightly in the past to account for clock skew
+    const startTime = new Date(Date.now() - 5000); 
+
+    // 1. Global Chat Listener
+    const globalQ = query(
+      collection(db, 'messages'), 
+      where('createdAt', '>', startTime)
+    );
+
+    const unsubGlobal = onSnapshot(globalQ, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          // Filter out if I sent it
+          if (data.uid && data.uid !== user.id && !location.pathname.startsWith('/chat')) {
+             toast.dismiss(change.doc.id);
+             toast.success(
+               <div onClick={() => navigate('/chat')} className="cursor-pointer">
+                 <div className="font-bold">{data.displayName || 'IA KOMIDA'} (Global)</div>
+                 <div className="text-sm truncate max-w-[200px]">{data.text || 'Sent an attachment'}</div>
+               </div>,
+               { 
+                 id: change.doc.id, 
+                 duration: 4000,
+                 position: 'top-right',
+                 style: { borderLeft: '4px solid #4f46e5' }
+               }
+             );
+          }
+        }
+      });
+    });
+
+    // 2. Direct Message Listener
+    // Note: We use 'isRead' == false to hopefully hit an existing index (or single-field + equality)
+    // We avoid sorting by createdAt because that requires a composite index which might differ from ChatPage's index.
+    const dmQ = query(
+      collection(db, 'direct_messages'),
+      where('receiverId', '==', user.id),
+      where('isRead', '==', false)
+    );
+
+    const unsubDM = onSnapshot(dmQ, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          
+          // Client-side filtering for time (to avoid stack of old unreads)
+          const msgTime = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || 0);
+          
+          if (msgTime > startTime && data.senderId && data.senderId !== user.id && !location.pathname.startsWith('/chat')) {
+             // Create an async wrapper to fetch name and show toast
+             const showToast = async () => {
+                let senderName = 'New Direct Message';
+                try {
+                  // 1. Try account table
+                  const { data: acc } = await supabase
+                    .from('account')
+                    .select('full_name, nickname')
+                    .eq('user_id', data.senderId)
+                    .single();
+                  
+                  if (acc) {
+                    senderName = acc.full_name || acc.nickname || senderName;
+                  } else {
+                    // 2. Fallback to profiles
+                    const { data: prof } = await supabase
+                      .from('profiles')
+                      .select('full_name')
+                      .eq('id', data.senderId)
+                      .single();
+                    if (prof && prof.full_name) {
+                      senderName = prof.full_name;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error fetching sender name', e);
+                }
+
+                toast.dismiss(change.doc.id);
+                toast.success(
+                  <div onClick={() => navigate('/chat')} className="cursor-pointer">
+                    <div className="font-bold">{senderName}</div>
+                    <div className="text-sm truncate max-w-[200px]">{data.text || 'Sent an attachment'}</div>
+                  </div>,
+                  { 
+                    id: change.doc.id, 
+                    duration: 4000,
+                    position: 'top-right',
+                    style: { borderLeft: '4px solid #10b981' }
+                  }
+                );
+             };
+             
+             showToast();
+          }
+        }
+      });
+    });
+
+    return () => {
+      unsubGlobal();
+      unsubDM();
+    };
+  }, [user, location.pathname]); // Re-run if location changes to update 'toast condition' (although effect closure captures location, re-running is safer or use ref)
+     // Actually, if location changes, we might miss messages during re-subscribe?
+     // Better: Use a ref for current location path, don't re-run effect.
+     // But simpler is to re-run. The gap is ms.
+
+
   const handleSurveyReminderOk = () => {
     setShowSurveyReminder(false);
     navigate('/survey-manager');
@@ -534,6 +673,7 @@ function Layout({ children }: LayoutProps) {
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggleCollapse={(collapsed: boolean) => setIsSidebarCollapsed(collapsed)}
+        unreadChatCount={unreadChatCount}
       />
       
       <div className="flex flex-col flex-1 overflow-hidden">
