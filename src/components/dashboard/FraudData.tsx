@@ -7,10 +7,10 @@ import { supabase } from '../../lib/supabaseClient';
 import LazyEChart from '../common/LazyEChart';
 import { Card, CardContent } from '../ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from "../ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 
@@ -102,7 +102,7 @@ const FraudData = () => {
           audit_end_date: (person.audit_master as any)?.audit_end_date,
           fraud_staff: person.fraud_staff || '',
           fraud_amount: person.fraud_amount || 0,
-          payment_fraud: person.payment_fraud || 0,
+          payment_fraud: person.payment_fraud ?? 0,
           notes: person.notes
         })) || [];
 
@@ -468,27 +468,43 @@ const FraudData = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-              activeTab === 'summary'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Summary
-          </button>
-          <button
-            onClick={() => setActiveTab('allData')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-              activeTab === 'allData'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            All Data
-          </button>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('summary')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                activeTab === 'summary'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Summary
+            </button>
+            <button
+              onClick={() => setActiveTab('allData')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                activeTab === 'allData'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              All Data
+            </button>
+          </div>
+
+          {/* Search — hanya tampil di tab All Data */}
+          {activeTab === 'allData' && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                value={fraudSearchTerm}
+                onChange={(e) => setFraudSearchTerm(e.target.value)}
+                placeholder="Search branch or staff..."
+                className="pl-9 pr-3 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* Summary Tab */}
@@ -562,18 +578,6 @@ const FraudData = () => {
         {/* All Data Tab */}
         {activeTab === 'allData' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  type="text"
-                  value={fraudSearchTerm}
-                  onChange={(e) => setFraudSearchTerm(e.target.value)}
-                  placeholder="Search branch or staff..."
-                  className="pl-9 pr-2 py-1.5 text-xs border rounded-md w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
             
             <div className="rounded-md border">
               <Table>
@@ -625,14 +629,16 @@ const FraudData = () => {
                         <ArrowUpDown className="ml-1 h-4 w-4" />
                       </div>
                     </TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Notes</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedFraudData.map((fraud, index) => {
+                    const outstanding = Math.max(0, fraud.fraud_amount - fraud.payment_fraud);
                     const isOverpaid = fraud.payment_fraud > fraud.fraud_amount;
-                    const isFullyPaid = fraud.payment_fraud === fraud.fraud_amount && fraud.fraud_amount > 0;
+                    const isFullyPaid = outstanding === 0 && (fraud.fraud_amount > 0 || fraud.payment_fraud >= 0);
                     const paymentColorClass = isOverpaid 
                       ? 'bg-red-100 text-red-800 font-semibold' 
                       : isFullyPaid 
@@ -653,8 +659,23 @@ const FraudData = () => {
                             ? formatCurrency(fraud.payment_fraud) 
                             : '-'}
                         </TableCell>
-                        <TableCell className="text-xs max-w-[300px] whitespace-pre-line break-words">
+                        <TableCell className="text-xs max-w-[200px] whitespace-pre-line break-words">
                           {fraud.notes || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {isFullyPaid ? (
+                            <span className="inline-flex items-center bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Lunas
+                            </span>
+                          ) : fraud.payment_fraud > 0 ? (
+                            <span className="inline-flex items-center bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Sebagian
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Belum
+                            </span>
+                          )}
                         </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
@@ -683,7 +704,7 @@ const FraudData = () => {
                   })}
                   {sortedFraudData.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-4 text-sm text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-4 text-sm text-gray-500">
                         No fraud data found
                       </TableCell>
                     </TableRow>

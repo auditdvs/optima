@@ -354,8 +354,8 @@ const DetailAnggota = () => {
 
       {/* SRSS Request Form */}
       {showSrssForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowSrssForm(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">Request Detail Anggota</h2>
             <form onSubmit={handleSrssSubmit}>
               <div className="mb-4">

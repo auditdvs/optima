@@ -27,6 +27,8 @@ import PullRequestPage from './pages/PullRequestPage';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
+import ShortlinkPage from './pages/ShortlinkPage';
+import ShortlinkRedirect from './pages/ShortlinkRedirect';
 import SupportTickets from './pages/SupportTickets';
 import SurveyTokenManager from './pages/SurveyTokenManager';
 import Tools from './pages/Tools';
@@ -185,7 +187,14 @@ function App() {
                   <SurveyTokenManager />
                 </PrivateRoute>
                 } />
+                <Route path="shortlink" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <ShortlinkPage />
+                </PrivateRoute>
+                } />
             </Route>
+            {/* Public Shortlink Redirect — tanpa auth */}
+            <Route path="/s/:slug" element={<ShortlinkRedirect />} />
             {/* Fullscreen Video Call Route */}
             <Route path="/video-call" element={
               <PrivateRoute>

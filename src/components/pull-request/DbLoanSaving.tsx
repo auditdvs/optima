@@ -86,7 +86,7 @@ const DbLoanSaving = () => {
         }
         
         // Create a user map for easy lookup
-        const userMap = {};
+        const userMap: { [key: string]: any } = {};
         if (profilesData) {
           profilesData.forEach(profile => {
             userMap[profile.id] = profile;
@@ -514,8 +514,8 @@ const DbLoanSaving = () => {
 
       {/* Request Form */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">Request Db Loan and Saving</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
@@ -569,8 +569,8 @@ const DbLoanSaving = () => {
 
       {/* Admin Response Form */}
       {isAdmin && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => { setSelectedRequest(null); setSelectedFiles([]); }}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">Respond to Request</h2>
             <form onSubmit={handleAdminResponse}>
               <div className="mb-4">

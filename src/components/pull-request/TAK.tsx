@@ -17,7 +17,6 @@ const TAK = () => {
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
-  const [adminResponse, setAdminResponse] = useState('');
   const [uploading, setUploading] = useState(false);
   const [loadingTAK, setLoadingTAK] = useState(true);
   const [takError, setTakError] = useState(false);
@@ -206,7 +205,6 @@ const TAK = () => {
 
       toast.success('Response submitted successfully');
       setSelectedRequest(null);
-      setAdminResponse('');
       setSelectedFiles([]);
       fetchTAKRequests();
     } catch (error) {
@@ -511,8 +509,8 @@ const TAK = () => {
 
       {/* Request Form */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">Request TAK</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
@@ -581,112 +579,80 @@ const TAK = () => {
 
       {/* Admin Response Form */}
       {isAdmin && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Respond to TAK Request</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => { setSelectedRequest(null); setSelectedFiles([]); }}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-2">Update Status TAK</h2>
+
+            {/* Request Summary */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Branch:</span>
+                <span className="font-medium">{selectedRequest.branch_id}</span>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-gray-500">Period:</span>
+                <span className="font-medium">
+                  {new Date(selectedRequest.start_date).toLocaleDateString('id-ID')} - {new Date(selectedRequest.end_date).toLocaleDateString('id-ID')}
+                </span>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-gray-500">Requester:</span>
+                <span className="font-medium">{selectedRequest.profiles?.full_name || '-'}</span>
+              </div>
+            </div>
+
             <form onSubmit={handleAdminResponse}>
               <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Requested By</label>
-                <input
-                  type="text"
-                  value={selectedRequest.profiles?.full_name || ''}
-                  disabled
-                  className="w-full p-2 border rounded bg-gray-100"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Branch Code</label>
-                <input
-                  type="text"
-                  value={selectedRequest.branch_id}
-                  disabled
-                  className="w-full p-2 border rounded bg-gray-100"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Period</label>
-                <input
-                  type="text"
-                  value={`${new Date(selectedRequest.start_date).toLocaleDateString('id-ID')} - ${new Date(selectedRequest.end_date).toLocaleDateString('id-ID')}`}
-                  disabled
-                  className="w-full p-2 border rounded bg-gray-100"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Status</label>
+                <label className="block text-gray-700 text-sm font-medium mb-2">Status</label>
                 <select
                   value={selectedRequest.status || 'queued'}
                   onChange={(e) => setSelectedRequest({...selectedRequest, status: e.target.value})}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="queued">Queued</option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
+                  <option value="failed">Failed</option>
                 </select>
               </div>
-              
+
               {selectedRequest.status === 'completed' && (
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Upload Result File</label>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          setSelectedFiles([e.target.files[0]]);
-                        }
-                      }}
-                      className={`w-full p-2 border rounded ${uploading ? 'opacity-50' : ''}`}
-                      disabled={uploading}
-                      accept=".csv,.xlsx,.xls"
-                    />
-                    {uploading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
-                        <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-                      </div>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Select TAK result file
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              {selectedFiles.length > 0 && (
-                <ul className="mb-2">
-                  {selectedFiles.map((file, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm">
-                      {file.name}
+                  <label className="block text-gray-700 text-sm font-medium mb-2">Upload Result File</label>
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setSelectedFiles([e.target.files[0]]);
+                      }
+                    }}
+                    className={`w-full p-2 border rounded text-sm ${uploading ? 'opacity-50' : ''}`}
+                    disabled={uploading}
+                    accept=".csv,.xlsx,.xls"
+                  />
+                  {selectedFiles.length > 0 && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                      <span>{selectedFiles[0].name}</span>
                       <button
                         type="button"
-                        className="text-red-500 hover:underline"
+                        className="text-red-500 hover:underline text-xs"
                         onClick={() => setSelectedFiles([])}
                       >
                         Remove
                       </button>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                </div>
               )}
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Admin Notes</label>
-                <textarea
-                  value={adminResponse}
-                  onChange={(e) => setAdminResponse(e.target.value)}
-                  className="w-full p-2 border rounded min-h-[100px]"
-                  placeholder="Provide notes about this request"
-                ></textarea>
-              </div>
-              
-              <div className="flex justify-end gap-2">
+
+              <div className="flex justify-end gap-2 mt-4">
                 <button
                   type="button"
-                  onClick={() => setSelectedRequest(null)}
-                  className="px-4 py-2 border text-gray-600 rounded hover:bg-gray-100"
+                  onClick={() => {
+                    setSelectedRequest(null);
+                    setSelectedFiles([]);
+                  }}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
                   disabled={uploading}
                 >
                   Cancel
@@ -694,14 +660,14 @@ const TAK = () => {
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 flex items-center gap-2"
+                  className="px-4 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 flex items-center gap-2"
                 >
                   {uploading ? (
                     <>
                       <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                       <span>Uploading...</span>
                     </>
-                  ) : 'Submit Response'}
+                  ) : 'Update Status'}
                 </button>
               </div>
             </form>

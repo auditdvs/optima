@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Search, UserCheck, UserPen, Users, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, RefreshCw, Search, ServerCrash, UserCheck, UserPen, Users, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import AuditorManagement from '../components/add-user/AuditorManagement';
@@ -57,7 +57,7 @@ const AddAuditorModal: React.FC<AddAuditorModalProps> = ({ isOpen, onClose, onSu
         if (profilesError) throw profilesError;
 
         const profileIds = profiles?.map(p => p.id) || [];
-        const usersNotInProfiles = users?.filter(user => !profileIds.includes(user.id)) || [];
+        const usersNotInProfiles = users?.filter((user: any) => !profileIds.includes(user.id)) || [];
         
         setAvailableUsers(usersNotInProfiles);
       } catch (error) {
@@ -364,7 +364,281 @@ const ManagePICModal: React.FC<ManagePICModalProps> = ({
   );
 };
 
+// ─── MSSQL Connection Log ────────────────────────────────────────────────────
+
+interface DbConnectionLog {
+  id: number;
+  checked_at: string;
+  status: 'success' | 'failed';
+  latency_ms: number | null;
+  error_message: string | null;
+  server_info: string | null;
+  mssql_server: string | null;
+  mssql_database: string | null;
+}
+
+const PAGE_SIZE = 20;
+
+const MSSQLConnectionLog: React.FC = () => {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'failed'>('all');
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<DbConnectionLog[]>([]);
+  const [total, setTotal] = useState(0);
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('db_connection_log')
+        .select('*', { count: 'exact' })
+        .order('checked_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      if (search.trim()) {
+        query = query.or(
+          `mssql_server.ilike.%${search.trim()}%,mssql_database.ilike.%${search.trim()}%,error_message.ilike.%${search.trim()}%,server_info.ilike.%${search.trim()}%`
+        );
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      setLogs(data as DbConnectionLog[]);
+      setTotal(count ?? 0);
+    } catch (err) {
+      console.error('Error fetching MSSQL logs:', err);
+      toast.error('Gagal memuat log koneksi MSSQL');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, statusFilter]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(0);
+    fetchLogs();
+  };
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString('id-ID', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZoneName: 'short',
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <Database className="w-5 h-5 text-emerald-500" />
+            MSSQL Connection Log
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Log hasil pengecekan koneksi harian ke MSSQL Server &mdash; <span className="font-medium">{total} record</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Status filter */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-gray-50 text-xs font-medium">
+            {(['all', 'success', 'failed'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => { setStatusFilter(s); setPage(0); }}
+                className={`px-3 py-1.5 transition-colors ${
+                  statusFilter === s
+                    ? s === 'success'
+                      ? 'bg-emerald-500 text-white'
+                      : s === 'failed'
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-indigo-500 text-white'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                {s === 'all' ? 'Semua' : s === 'success' ? 'Success' : 'Failed'}
+              </button>
+            ))}
+          </div>
+          {/* Refresh */}
+          <button
+            onClick={() => { setPage(0); fetchLogs(); }}
+            disabled={loading}
+            className="p-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-emerald-600 hover:border-emerald-300 transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cari server, database, error..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+          />
+        </div>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+        >
+          Cari
+        </button>
+      </form>
+
+      {/* Table */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Waktu Cek</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Latency (ms)</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Server</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Database</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Server Info / Error</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
+                      <span className="text-sm">Memuat log...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <Database className="w-8 h-8 text-gray-300" />
+                      <span className="text-sm">Tidak ada log ditemukan</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                logs.map(log => (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap font-mono">
+                      {formatDate(log.checked_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {log.status === 'success' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Success
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-700">
+                          <ServerCrash className="w-3 h-3" />
+                          Failed
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-mono">
+                      {log.latency_ms != null ? (
+                        <span className={`font-semibold ${log.latency_ms > 2000 ? 'text-amber-600' : 'text-gray-700'}`}>
+                          {log.latency_ms.toLocaleString('id-ID')}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 font-mono whitespace-nowrap">
+                      {log.mssql_server ?? <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 font-mono whitespace-nowrap">
+                      {log.mssql_database ?? <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs max-w-xs">
+                      {log.status === 'success' ? (
+                        <span className="text-gray-500 truncate block" title={log.server_info ?? ''}>
+                          {log.server_info ?? '—'}
+                        </span>
+                      ) : (
+                        <span className="text-rose-600 truncate block" title={log.error_message ?? ''}>
+                          {log.error_message ?? '—'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+            <span className="text-xs text-gray-500">
+              Halaman {page + 1} dari {totalPages} &nbsp;·&nbsp; {total} total record
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ← Prev
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const p = Math.max(0, Math.min(totalPages - 5, page - 2)) + i;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                      p === page
+                        ? 'bg-emerald-500 text-white border-emerald-500'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {p + 1}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function UserControlPanel() {
+
   const [showEditPICModal, setShowEditPICModal] = useState(false);
   const [showManagePICModal, setShowManagePICModal] = useState(false);
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
@@ -372,7 +646,7 @@ export default function UserControlPanel() {
   // Unused but kept for potential future use or consistency
   // const [showAddAuditorModal, setShowAddAuditorModal] = useState(false); 
 
-  const [activeTab, setActiveTab] = useState<'users' | 'auditors' | 'queue'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'auditors' | 'queue' | 'mssql_log'>('users');
   const queryClient = useQueryClient();
 
   // Reprocess State
@@ -575,6 +849,19 @@ export default function UserControlPanel() {
               <AlertTriangle className="w-4 h-4" />
               Reprocess Queue
             </button>
+
+            {/* MSSQL Log Tab */}
+            <button
+              onClick={() => setActiveTab('mssql_log')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === 'mssql_log'
+                  ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-gray-200'
+                  : 'text-gray-500 hover:text-emerald-600 hover:bg-emerald-50'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              MSSQL Log
+            </button>
         </div>
       </div>
 
@@ -593,6 +880,10 @@ export default function UserControlPanel() {
           isReprocessing={isReprocessing}
           reprocessItems={reprocessItems}
         />
+      )}
+
+      {activeTab === 'mssql_log' && (
+        <MSSQLConnectionLog />
       )}
 
       {/* PIC Modals */}

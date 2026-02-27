@@ -1,10 +1,10 @@
 import {
-    AlertTriangle,
-    ArrowUpDown,
-    ChevronDown,
-    ChevronUp,
-    Search,
-    Shield,
+  AlertTriangle,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Shield,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -61,7 +61,7 @@ const FraudStaffPage = () => {
           region: (p.audit_master as any)?.region || 'Unknown',
           branch_name: (p.audit_master as any)?.branch_name || 'Unknown',
           fraud_amount: p.fraud_amount || 0,
-          payment_fraud: p.payment_fraud || 0,
+          payment_fraud: p.payment_fraud ?? 0,
         }));
 
       setData(mapped);
@@ -232,7 +232,7 @@ const FraudStaffPage = () => {
                         row.fraud_amount - row.payment_fraud
                       );
                       const isFullyPaid =
-                        outstanding === 0 && row.fraud_amount > 0;
+                        outstanding === 0 && (row.fraud_amount > 0 || row.payment_fraud >= 0);
                       const pct =
                         row.fraud_amount > 0
                           ? Math.min(

@@ -44,7 +44,7 @@ export default function PendingApprovals({ onReprocess, isReprocessing, reproces
       const formattedLetters = (letters || []).map(l => ({
         id: l.id,
         type: 'letter',
-        number: l.letter_number,
+        number: l.assigment_letter,
         branch: l.branch_name,
         date: l.created_at,
         url: l.file_url

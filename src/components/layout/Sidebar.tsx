@@ -1,27 +1,28 @@
 import {
-  Blocks,
-  ChartPie,
-  ChevronDown,
-  ChevronsUpDown,
-  ClipboardCheck,
-  FileCheck,
-  FileText,
-  FileVideo,
-  GitPullRequest,
-  History,
-  KeyRound,
-  LayoutDashboard,
-  Library,
-  LogOut,
-  Megaphone,
-  ScanFace,
-  Table2,
-  Ticket,
-  UserRoundPen,
-  Users,
-  Wrench,
-  Slack,
-  X
+    Blocks,
+    ChartPie,
+    ChevronDown,
+    ChevronsUpDown,
+    ClipboardCheck,
+    FileCheck,
+    FileText,
+    FileVideo,
+    GitPullRequest,
+    History,
+    KeyRound,
+    LayoutDashboard,
+    Library,
+    Link2,
+    LogOut,
+    Megaphone,
+    ScanFace,
+    Slack,
+    Table2,
+    Ticket,
+    UserRoundPen,
+    Users,
+    Wrench,
+    X
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -259,6 +260,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/survey-manager', icon: ClipboardCheck, label: 'Survei Kepuasan' });
     auditItems.push({ path: '/tools', icon: Wrench, label: 'Tools' });
+    auditItems.push({ path: '/shortlink', icon: Link2, label: 'Shortlink' });
 
     if (auditItems.length > 0) {
       menuGroups.push({ title: "Audit Tools", key: "audittools", items: auditItems });
