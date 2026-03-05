@@ -20,7 +20,7 @@ interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'superadmin'| 'manager' |'dvs'| 'qa' | 'risk' | 'user';
+  role: 'superadmin'| 'manager' |'dvs'| 'qa' | 'risk' | 'user' | 'finance';
   last_sign_in_at: string | null;
   banned_until: string | null;
   status: 'ACTIVE' | 'OFFLINE';
@@ -108,12 +108,12 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
               onChange={(e) => setRole(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
-              <option value="user">User</option>
-              <option value="qa">QA</option>
-              <option value="risk">Risk</option>
-              <option value="manager">Manager</option>
               <option value="superadmin">Super Admin</option>
-              <option value="dvs">dvs</option>
+              <option value="manager">Manager</option>
+              <option value="dvs">DVS</option>
+              <option value="qa">QA</option>
+              <option value="user">User</option>
+              <option value="finance">Finance</option>
             </select>
           </div>
           <button
@@ -192,12 +192,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, on
               onChange={(e) => setRole(e.target.value as any)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
-              <option value="user">User</option>
-              <option value="qa">QA</option>
-              <option value="risk">Risk</option>
-              <option value="manager">Manager</option>
               <option value="superadmin">Super Admin</option>
+              <option value="manager">Manager</option>
               <option value="dvs">DVS</option>
+              <option value="qa">QA</option>
+              <option value="user">User</option>
+              <option value="finance">Finance</option>
             </select>
           </div>
           <button
@@ -514,7 +514,7 @@ export default function UserManagement() {
         </div>
         
         <div className="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-          <div className="max-h-[calc(100vh-400px)] overflow-y-auto relative custom-scrollbar">
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto relative custom-scrollbar">
             <Table>
               <TableHeader className="bg-gray-50/50 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                 <TableRow>
@@ -530,7 +530,7 @@ export default function UserManagement() {
               {filteredUsers
                 ?.slice()
                 .sort((a: any, b: any) => {
-                  const roleOrder = ['superadmin', 'manager', 'dvs', 'qa', 'risk', 'user'];
+                  const roleOrder = ['superadmin', 'manager', 'dvs', 'qa', 'risk', 'user', 'finance'];
                   const roleCompare = roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
                   if (roleCompare !== 0) return roleCompare;
                   if (a.role === 'user') {
@@ -562,6 +562,7 @@ export default function UserManagement() {
                               user.role === 'risk' ? 'bg-teal-50 text-teal-700 border-teal-100' :
                               user.role === 'superadmin' ? 'bg-sky-50 text-sky-700 border-sky-100' :
                               user.role === 'manager' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                              user.role === 'finance' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                               'bg-pink-50 text-pink-700 border-pink-100'
                         }`}
                       >

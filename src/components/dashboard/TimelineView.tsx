@@ -135,61 +135,22 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
     
     // First, create a map of letters by their assignment letter number for quick lookup
     const lettersByNo = new Map<string, any>();
+    const lettersById = new Map<number, any>();
     letters.forEach(letter => {
       if (letter.assigment_letter) {
         lettersByNo.set(letter.assigment_letter, letter);
       }
+      if (letter.id) {
+        lettersById.set(Number(letter.id), letter);
+      }
     });
     
-    // Helper to process items (letters or addendums)
-    const processItem = (item: any, isAddendum: boolean) => {
-      // Skip rejected items
-      if (item.status?.toLowerCase() === 'rejected') return;
-      
-      // Use audit_start_date/audit_end_date (Pelaksanaan Audit) as priority
-      let startStr: string | null = null;
-      let endStr: string | null = null;
-      
-      if (isAddendum) {
-        // Addendum uses start_date/end_date for the new period
-        endStr = item.end_date || item.new_audit_end_date || item.audit_end_date;
-        
-        // Find the original letter using assignment_letter_before field
-        const originalLetterNo = item.assignment_letter_before || item.assigment_letter;
-        const originalLetter = lettersByNo.get(originalLetterNo);
-        
-        if (originalLetter) {
-          const origEndStr = originalLetter.audit_end_date || originalLetter.audit_period_end;
-          if (origEndStr) {
-            // Addendum bar starts on the same day as original letter ends (for visual connection)
-            startStr = origEndStr;
-          }
-        }
-        
-        // If we couldn't find original letter, fall back to the full date range
-        if (!startStr) {
-          startStr = item.start_date || item.new_audit_start_date || item.audit_start_date;
-        }
-      } else {
-        startStr = item.audit_start_date || item.audit_period_start;
-        endStr = item.audit_end_date || item.audit_period_end;
-      }
-      
-      if (!startStr || !endStr) return;
-      
-      const start = new Date(startStr);
-      const end = new Date(endStr);
-      
-      // Skip if start is after end (can happen if addendum end date is same as original)
-      if (start > end) return;
-      
-      // Parse team
+    // Helper to parse team members from an item
+    const parseTeamMembers = (item: any, isAddendum: boolean): string[] => {
       let teamMembers: string[] = [];
       try {
-        // Handle new_team for addendums if it exists, otherwise use team
         const teamSource = (isAddendum && item.new_team) ? item.new_team : item.team;
         if (teamSource) {
-          // Check if it's JSON string or comma-separated string
           if (teamSource.startsWith('[') || teamSource.startsWith('{')) {
              const parsed = JSON.parse(teamSource);
              if (Array.isArray(parsed)) teamMembers = parsed;
@@ -203,56 +164,45 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
          if (teamSource) teamMembers = [teamSource];
       }
       
-      // Handle leader
       const leaderSource = (isAddendum && item.new_leader) ? item.new_leader : item.leader;
       if (leaderSource) teamMembers.push(leaderSource);
       
-      // Unique members only
-      teamMembers = [...new Set(teamMembers.filter(m => m))];
-      
+      return [...new Set(teamMembers.filter(m => m))];
+    };
+
+    const titlesToIgnore = [
+      'S.E', 'S.E.', 'SE', 
+      'S.Kom', 'S.Kom.', 'S.Ko', 
+      'S.H', 'S.H.', 'SH',
+      'S.Ak', 'S.Ak.', 'SAk',
+      'S.Tr.Akun', 'S.Tr.Akun.', 'S.Tr', 'S.Tr.',
+      'M.M', 'M.M.', 'MM', 'M.Ak', 'M.Ak.',
+      'Ak', 'Ak.', 'CA', 'CPA', 'BKP',
+      'S.T', 'S.T.', 'ST',
+      'S.Si', 'S.Si.', 'SSi',
+      'S.Pd', 'S.Pd.', 'SPd',
+      'S.Sos', 'S.Sos.', 'SSos',
+      'S.I.Kom', 'S.I.Kom.',
+      'A.Md', 'A.Md.', 'AMD', 'Amd',
+      'M.Si', 'M.Si.', 'MSi',
+      'M.Pd', 'M.Pd.', 'MPd',
+      'Dr', 'Dr.', 'Drs', 'Drs.', 'Dra', 'Dra.',
+      'Ir', 'Ir.', 'Prof', 'Prof.'
+    ];
+
+    const normalizeName = (name: string): string => {
+      return name.trim().replace(/\s+/g, ' ').toLowerCase();
+    };
+    
+    // Helper to add an assignment to the auditorsMap
+    const addToAuditorsMap = (teamMembers: string[], assignment: any) => {
       teamMembers.forEach(member => {
         let cleanName = member.trim();
-        
-        // Remove academic degrees if they were split incorrectly
-        // List of common Indonesian academic titles to ignore if they appear as standalone names
-        const titlesToIgnore = [
-          'S.E', 'S.E.', 'SE', 
-          'S.Kom', 'S.Kom.', 'S.Ko', 
-          'S.H', 'S.H.', 'SH',
-          'S.Ak', 'S.Ak.', 'SAk',
-          'S.Tr.Akun', 'S.Tr.Akun.', 'S.Tr', 'S.Tr.',
-          'M.M', 'M.M.', 'MM', 'M.Ak', 'M.Ak.',
-          'Ak', 'Ak.', 'CA', 'CPA', 'BKP',
-          'S.T', 'S.T.', 'ST',
-          'S.Si', 'S.Si.', 'SSi',
-          'S.Pd', 'S.Pd.', 'SPd',
-          'S.Sos', 'S.Sos.', 'SSos',
-          'S.I.Kom', 'S.I.Kom.',
-          'A.Md', 'A.Md.', 'AMD', 'Amd',
-          'M.Si', 'M.Si.', 'MSi',
-          'M.Pd', 'M.Pd.', 'MPd',
-          'Dr', 'Dr.', 'Drs', 'Drs.', 'Dra', 'Dra.',
-          'Ir', 'Ir.', 'Prof', 'Prof.'
-        ];
-
-        if (titlesToIgnore.includes(cleanName) || cleanName.length <= 2) {
-            return;
-        }
-
-        // Normalize name to handle variations (remove extra spaces, normalize case, etc.)
-        const normalizeName = (name: string): string => {
-          return name
-            .trim()
-            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-            .toLowerCase();
-        };
+        if (titlesToIgnore.includes(cleanName) || cleanName.length <= 2) return;
 
         const normalizedName = normalizeName(cleanName);
-        
-        // Check if auditor already exists with similar name
         let matchedKey: string | null = null;
         
-        // Try to find exact match first (normalized)
         for (const existingKey of auditorsMap.keys()) {
           if (normalizeName(existingKey) === normalizedName) {
             matchedKey = existingKey;
@@ -260,17 +210,11 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
           }
         }
         
-        // If no exact match, try fuzzy matching (for truncated names or slight variations)
         if (!matchedKey) {
           for (const existingKey of auditorsMap.keys()) {
             const normalizedExisting = normalizeName(existingKey);
-            
-            // Check if one name is a prefix of another (truncation case)
             if (normalizedExisting.startsWith(normalizedName) || normalizedName.startsWith(normalizedExisting)) {
-              // Use the longer name as the canonical one
               matchedKey = existingKey.length >= cleanName.length ? existingKey : cleanName;
-              
-              // If we're switching to a longer name, migrate the data
               if (matchedKey !== existingKey) {
                 const existingData = auditorsMap.get(existingKey) || [];
                 auditorsMap.delete(existingKey);
@@ -281,39 +225,122 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
           }
         }
         
-        // Use matched key or original cleaned name
         const finalKey = matchedKey || cleanName;
-        
         if (!auditorsMap.has(finalKey)) {
           auditorsMap.set(finalKey, []);
         }
-        
-        // Get letter number
-        const letterNo = isAddendum 
-          ? (item.addendum_letter_no || item.addendum_number || '-')
-          : (item.assigment_letter || item.letter_no || '-');
-        
-        // Add (Addendum) label to branch name for addendums
-        const branchLabel = isAddendum ? `${item.branch_name} (Addendum)` : item.branch_name;
-        
-        auditorsMap.get(finalKey)?.push({
-          id: item.id,
-          branch: branchLabel,
-          letterNo,
-          type: isAddendum ? `Addendum: ${item.addendum_type}` : item.audit_type,
-          start,
-          end,
-          status: item.status,
-          isAddendum
-        });
+        auditorsMap.get(finalKey)?.push(assignment);
       });
     };
 
-    // Process Letters first
-    letters.forEach(letter => processItem(letter, false));
+    // ===== Process Letters =====
+    letters.forEach(letter => {
+      if (letter.status?.toLowerCase() === 'rejected') return;
+      
+      const startStr = letter.audit_start_date || letter.audit_period_start;
+      const endStr = letter.audit_end_date || letter.audit_period_end;
+      if (!startStr || !endStr) return;
+      
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      if (start > end) return;
+      
+      const teamMembers = parseTeamMembers(letter, false);
+      addToAuditorsMap(teamMembers, {
+        id: letter.id,
+        branch: letter.branch_name,
+        letterNo: letter.assigment_letter || letter.letter_no || '-',
+        type: letter.audit_type,
+        start,
+        end,
+        status: letter.status,
+        isAddendum: false
+      });
+    });
     
-    // Process Addendums
-    addendums.forEach(addendum => processItem(addendum, true));
+    // ===== Process Addendums — chained per letter =====
+    // Group addendums by their parent letter
+    const addendumGroups = new Map<string, any[]>();
+    
+    addendums.forEach(addendum => {
+      if (addendum.status?.toLowerCase() === 'rejected') return;
+      
+      // Determine parent key (letter_id or assignment_letter_before)
+      const parentKey = addendum.letter_id 
+        ? String(addendum.letter_id) 
+        : (addendum.assignment_letter_before || addendum.assigment_letter || 'unknown');
+      
+      if (!addendumGroups.has(parentKey)) {
+        addendumGroups.set(parentKey, []);
+      }
+      addendumGroups.get(parentKey)!.push(addendum);
+    });
+    
+    // Process each group: sort by end_date, then chain start dates
+    addendumGroups.forEach((group, parentKey) => {
+      // Sort addendums by end_date ascending so they chain in order
+      group.sort((a, b) => {
+        const endA = new Date(a.end_date || a.start_date || 0).getTime();
+        const endB = new Date(b.end_date || b.start_date || 0).getTime();
+        return endA - endB;
+      });
+      
+      // Find the original letter's audit_end_date as the chain starting point
+      let chainStartStr: string | null = null;
+      
+      // Try letter_id lookup first
+      const letterId = Number(parentKey);
+      if (!isNaN(letterId)) {
+        const originalLetter = lettersById.get(letterId);
+        if (originalLetter) {
+          chainStartStr = originalLetter.audit_end_date || originalLetter.audit_period_end;
+        }
+      }
+      
+      // Fallback: try by letter number
+      if (!chainStartStr && group[0]) {
+        const letterNo = group[0].assignment_letter_before || group[0].assigment_letter;
+        if (letterNo) {
+          const originalLetter = lettersByNo.get(letterNo);
+          if (originalLetter) {
+            chainStartStr = originalLetter.audit_end_date || originalLetter.audit_period_end;
+          }
+        }
+      }
+      
+      // Process each addendum in the chain
+      let prevEndStr = chainStartStr;
+      
+      group.forEach((addendum) => {
+        const endStr = addendum.end_date || addendum.new_audit_end_date;
+        if (!endStr) return;
+        
+        // Start = previous item's end (letter end for first, prev addendum end for rest)
+        const startStr = prevEndStr || addendum.start_date;
+        if (!startStr) return;
+        
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        if (start > end) return;
+        
+        const teamMembers = parseTeamMembers(addendum, true);
+        const letterNo = addendum.assigment_letter || addendum.addendum_letter_no || '-';
+        
+        addToAuditorsMap(teamMembers, {
+          id: addendum.id,
+          branch: `${addendum.branch_name} (Addendum)`,
+          letterNo,
+          type: addendum.addendum_type ? `Addendum: ${addendum.addendum_type}` : (addendum.audit_type || 'Addendum'),
+          start,
+          end,
+          status: addendum.status,
+          isAddendum: true
+        });
+        
+        // Chain: next addendum starts from this one's end
+        prevEndStr = endStr;
+      });
+    });
     
     return Array.from(auditorsMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   };
@@ -459,11 +486,20 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
           
           {/* Legend */}
           <div className="flex items-center gap-4 text-xs">
+            <span className="text-gray-500 font-medium">Surat Tugas:</span>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div> <span>Reguler</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-500 rounded"></div> <span>Khusus/Fraud</span>
+            </div>
+            <span className="text-gray-300">|</span>
+            <span className="text-gray-500 font-medium">Addendum:</span>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-yellow-300 rounded"></div> <span>Reguler</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-amber-600 rounded"></div> <span>Khusus/Fraud</span>
             </div>
           </div>
         </div>
@@ -627,12 +663,21 @@ const TimelineView = ({ letters, addendums }: TimelineViewProps) => {
 
                          if (displayWidth <= 0) return null;
 
-                         const colorClass = assignment.type?.toLowerCase().includes('fraud') || 
+                         const isFraudType = assignment.type?.toLowerCase().includes('fraud') || 
                            assignment.type?.toLowerCase().includes('special') || 
                             assignment.type?.toLowerCase().includes('investigasi') ||
-                            assignment.type?.toLowerCase().includes('khusus')
-                           ? 'bg-gradient-to-r from-red-500 to-red-600 border border-red-600' 
-                           : 'bg-gradient-to-r from-blue-500 to-blue-600 border border-blue-600';
+                            assignment.type?.toLowerCase().includes('khusus');
+                         
+                         let colorClass: string;
+                         if (assignment.isAddendum) {
+                           colorClass = isFraudType
+                             ? 'bg-gradient-to-r from-amber-500 to-amber-600 border border-amber-600'
+                             : 'bg-gradient-to-r from-yellow-200 to-yellow-300 border border-yellow-400';
+                         } else {
+                           colorClass = isFraudType
+                             ? 'bg-gradient-to-r from-red-500 to-red-600 border border-red-600'
+                             : 'bg-gradient-to-r from-blue-500 to-blue-600 border border-blue-600';
+                         }
                          
                          // Calculate vertical position based on row
                          const topPosition = 4 + assignment.row * (rowHeight + 4); // 4px initial padding, 4px gap between rows

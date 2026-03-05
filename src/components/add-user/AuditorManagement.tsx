@@ -164,7 +164,7 @@ export default function AuditorManagement() {
         </div>
         
         <div className="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-          <div className="max-h-[calc(100vh-400px)] overflow-y-auto relative custom-scrollbar">
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto relative custom-scrollbar">
             <Table>
               <TableHeader className="bg-gray-50/50 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                 <TableRow>

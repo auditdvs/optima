@@ -62,7 +62,7 @@ function Login() {
   const [showAdminContact, setShowAdminContact] = useState(false);
 
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const { signIn, user, userRole, isLoading } = useAuth();
 
   const adminContacts = [
     {
@@ -80,7 +80,13 @@ function Login() {
   ];
 
   useEffect(() => {
-    if (user) {
+    if (user && !isLoading) {
+      // Finance role: redirect to dedicated LPJ page
+      if (userRole === 'finance') {
+        navigate('/finance-lpj');
+        return;
+      }
+
       navigate('/dashboard');
       setTimeout(() => {
         toast.custom(
@@ -122,7 +128,7 @@ function Login() {
         );
       }, 1000);
     }
-  }, [user, navigate]);
+  }, [user, navigate, userRole, isLoading]);
 
   // Auto-dismiss error after 3 seconds
   useEffect(() => {
@@ -138,21 +144,24 @@ function Login() {
     e.preventDefault();
     try {
       setLoading(true);
-      await signIn(email, password);
-      toast.success('Login Successful, Have a great day!', {
-        style: {
-          background: '#059669',
-          color: '#fff',
-          padding: '16px',
-          borderRadius: '16px',
-          fontWeight: '500',
-        },
-        iconTheme: {
-          primary: '#fff',
-          secondary: '#059669',
-        },
-        duration: 3000,
-      });
+      const role = await signIn(email, password);
+      
+      if (role !== 'finance') {
+        toast.success('Login Successful, Have a great day!', {
+          style: {
+            background: '#059669',
+            color: '#fff',
+            padding: '16px',
+            borderRadius: '16px',
+            fontWeight: '500',
+          },
+          iconTheme: {
+            primary: '#fff',
+            secondary: '#059669',
+          },
+          duration: 3000,
+        });
+      }
     } catch (err: any) {
       // Handle specific Supabase auth errors
       if (err?.message?.includes('Invalid login credentials')) {
@@ -162,7 +171,7 @@ function Login() {
       } else if (err?.message?.includes('banned') || err?.message?.includes('user_banned')) {
         setError('BANNED:Anda sudah tidak memiliki akses lagi ke dalam platform.');
       } else {
-        setError('Gagal masuk. Silakan coba lagi.');
+        setError('Gagal login karena server sedang gangguan. Silakan tunggu beberapa saat lagi.');
       }
       console.error(err);
       setLoading(false);

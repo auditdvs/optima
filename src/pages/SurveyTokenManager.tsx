@@ -1,28 +1,28 @@
 import {
-  Calendar,
-  CheckCircle,
-  ClipboardCopy,
-  Clock,
-  Download,
-  Eye,
-  Plus,
-  QrCode,
-  RefreshCw,
-  Search,
-  Ticket,
-  Trash2,
-  Users,
-  X
+    Calendar,
+    CheckCircle,
+    ClipboardCopy,
+    Clock,
+    Download,
+    Eye,
+    Plus,
+    QrCode,
+    RefreshCw,
+    Search,
+    Ticket,
+    Trash2,
+    Users,
+    X
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
 } from '../components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -339,7 +339,14 @@ function SurveyTokenManager() {
     return { label: 'Nonaktif', color: 'bg-gray-100 text-gray-600', icon: Clock };
   };
 
-  // Filter tokens
+  // Helper to get sort priority: Active=0, Inactive=1, Closed(full)=2
+  const getStatusPriority = (token: SurveyToken) => {
+    if (token.response_count >= 5) return 2; // Closed
+    if (token.is_active) return 0; // Active
+    return 1; // Inactive
+  };
+
+  // Filter and sort tokens
   const filteredTokens = tokens.filter((token) => {
     // Search filter
     const matchesSearch = token.branch_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -356,6 +363,12 @@ function SurveyTokenManager() {
     }
     
     return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    // 1. Sort by status priority: Active → Inactive → Closed
+    const priorityDiff = getStatusPriority(a) - getStatusPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
+    // 2. Within same status, sort by response_count ascending (fewest first)
+    return a.response_count - b.response_count;
   });
 
   // View token details

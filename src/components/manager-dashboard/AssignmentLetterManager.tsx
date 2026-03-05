@@ -410,7 +410,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
       hour12: false 
     });
     
-    return `${day}, ${month} ${year} | ${time}`;
+    return `${day} ${month} ${year} | ${time}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -1887,116 +1887,116 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
 
       {/* Detail Modal */}
       {showDetailModal && selectedLetter && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Detail Assignment Letter</h3>
-              </div>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl shadow-lg rounded-lg bg-white flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+              <h3 className="text-base font-semibold text-gray-900">Detail Assignment Letter</h3>
+            </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="overflow-y-auto px-5 py-3 space-y-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Nomor Surat</label>
-                    <p className="text-sm text-gray-900">{selectedLetter.assigment_letter}</p>
+                    <label className="block text-sm font-medium text-gray-500">Nomor Surat</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedLetter.assigment_letter}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <label className="block text-sm font-medium text-gray-500">Status</label>
                     <div className="mt-1">{getStatusBadge(selectedLetter.status)}</div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Cabang</label>
-                    <p className="text-sm text-gray-900">{selectedLetter.branch_name}</p>
+                    <label className="block text-sm font-medium text-gray-500">Cabang</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedLetter.branch_name}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Regional</label>
-                    <p className="text-sm text-gray-900">{selectedLetter.region}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tipe Audit</label>
-                    <p className="text-sm text-gray-900">{selectedLetter.audit_type}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Ketua Tim</label>
-                    <p className="text-sm text-gray-900">{selectedLetter.leader || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tim Auditor</label>
-                    <p className="text-sm text-gray-900">{formatTeam(selectedLetter.team)}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Periode Audit</label>
-                    <p className="text-sm text-gray-900">{formatAuditPeriod(selectedLetter)}</p>
+                    <label className="block text-sm font-medium text-gray-500">Regional</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedLetter.region}</p>
                   </div>
                 </div>
 
-                {/* Status Information */}
+                {/* Highlighted fields for review */}
+                <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Perlu Diperhatikan</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="border-l-4 border-blue-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Tipe Audit</label>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">{selectedLetter.audit_type}</p>
+                    </div>
+                    <div className="border-l-4 border-amber-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Periode Audit</label>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">{formatAuditPeriod(selectedLetter)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="border-l-4 border-indigo-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Tim Audit</label>
+                    <div className="mt-1 flex flex-col sm:flex-row sm:gap-6 gap-1">
+                      <p className="text-sm text-gray-900"><span className="text-gray-500">Ketua:</span> <span className="font-bold">{selectedLetter.leader || '-'}</span></p>
+                      <p className="text-sm text-gray-900"><span className="text-gray-500">Anggota:</span> <span className="font-bold">{formatTeam(selectedLetter.team)}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="border-l-4 border-emerald-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Anggaran</label>
+                    <div className="mt-1.5 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Transportasi</span>
+                        <span className="text-gray-900">Rp {selectedLetter.transport?.toLocaleString('id-ID') || '0'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Konsumsi</span>
+                        <span className="text-gray-900">Rp {selectedLetter.konsumsi?.toLocaleString('id-ID') || '0'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Lain-lain</span>
+                        <span className="text-gray-900">Rp {selectedLetter.etc?.toLocaleString('id-ID') || '0'}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5">
+                        <span className="text-sm font-bold text-gray-900">Total</span>
+                        <span className="text-sm font-bold text-emerald-700">
+                          Rp {((selectedLetter.transport || 0) + (selectedLetter.konsumsi || 0) + (selectedLetter.etc || 0)).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Informasi Status */}
                 <div className="border-t pt-4 mt-4">
-                  <h4 className="text-base font-semibold text-gray-900 mb-3">Informasi Status</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Informasi Status</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Dibuat oleh</label>
-                      <p className="text-sm text-gray-900">{getCreatorName(selectedLetter.created_by)}</p>
+                      <label className="block text-sm font-medium text-gray-500">Dibuat oleh</label>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{getCreatorName(selectedLetter.created_by)}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Tanggal Dibuat</label>
-                      <p className="text-sm text-gray-900">{formatDateTime(selectedLetter.tanggal_input)}</p>
+                      <label className="block text-sm font-medium text-gray-500">Tanggal Dibuat</label>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatDateTime(selectedLetter.tanggal_input)}</p>
                     </div>
                     {(selectedLetter.status === 'approved' || selectedLetter.status === 'rejected') && (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             {selectedLetter.status === 'approved' ? 'Disetujui oleh' : 'Ditolak oleh'}
                           </label>
-                          <p className="text-sm text-gray-900">{getApproverName(selectedLetter.approved_by)}</p>
+                          <p className="text-sm font-semibold text-gray-900 mt-0.5">{getApproverName(selectedLetter.approved_by)}</p>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Tanggal {selectedLetter.status === 'approved' ? 'Disetujui' : 'Ditolak'}
                           </label>
-                          <p className="text-sm text-gray-900">{formatDateTime(selectedLetter.approved_at)}</p>
+                          <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatDateTime(selectedLetter.approved_at)}</p>
                         </div>
                       </>
                     )}
                   </div>
                   
                   {selectedLetter.status === 'rejected' && selectedLetter.rejection_reason && (
-                    <div className="mt-4 p-3 bg-red-50 rounded-md">
-                      <label className="block text-sm font-medium text-red-700">Alasan Penolakan</label>
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <label className="block text-xs font-medium text-red-600 uppercase tracking-wider">Alasan Penolakan</label>
                       <p className="text-sm text-red-900 mt-1">{selectedLetter.rejection_reason}</p>
                     </div>
                   )}
-                </div>
-
-                {/* Budget Section */}
-                <div className="mt-6 border-t pt-4">
-                  <h4 className="text-base font-semibold text-gray-900 mb-3">Anggaran</h4>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-700">Transportasi</span>
-                      <span className="text-sm text-gray-900 font-medium">
-                        Rp {selectedLetter.transport?.toLocaleString('id-ID') || '0'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-700">Konsumsi</span>
-                      <span className="text-sm text-gray-900 font-medium">
-                        Rp {selectedLetter.konsumsi?.toLocaleString('id-ID') || '0'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-700">Lain-lain</span>
-                      <span className="text-sm text-gray-900 font-medium">
-                        Rp {selectedLetter.etc?.toLocaleString('id-ID') || '0'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                      <span className="text-sm font-bold text-gray-900">Total</span>
-                      <span className="text-sm font-bold text-indigo-700">
-                        Rp {((selectedLetter.transport || 0) + (selectedLetter.konsumsi || 0) + (selectedLetter.etc || 0)).toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex justify-end mt-6 space-x-3">
@@ -2054,7 +2054,6 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                     Tutup
                   </button>
                 </div>
-              </div>
             </div>
           </div>
         </div>
@@ -2128,39 +2127,117 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
 
       {/* Addendum Detail Modal */}
       {showAddendumDetailModal && selectedAddendum && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Detail Addendum</h3>
-              </div>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl shadow-lg rounded-lg bg-white flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+              <h3 className="text-base font-semibold text-gray-900">Detail Addendum</h3>
+            </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="overflow-y-auto px-5 py-3 space-y-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Nomor Addendum</label>
-                    <p className="text-sm text-gray-900">{selectedAddendum.assigment_letter}</p>
+                    <label className="block text-sm font-medium text-gray-500">Nomor Addendum</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedAddendum.assigment_letter}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Nomor ST Sebelumnya</label>
-                    <p className="text-sm text-gray-900">{selectedAddendum.assignment_letter_before}</p>
+                    <label className="block text-sm font-medium text-gray-500">Nomor ST Sebelumnya</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedAddendum.assignment_letter_before}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <label className="block text-sm font-medium text-gray-500">Status</label>
                     <div className="mt-1">{getStatusBadge(selectedAddendum.status)}</div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Tipe Addendum</label>
-                    <p className="text-sm text-gray-900">{selectedAddendum.addendum_type || '-'}</p>
+                    <label className="block text-sm font-medium text-gray-500">Cabang</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedAddendum.branch_name}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Cabang</label>
-                    <p className="text-sm text-gray-900">{selectedAddendum.branch_name}</p>
+                    <label className="block text-sm font-medium text-gray-500">Regional</label>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{selectedAddendum.region}</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Regional</label>
-                    <p className="text-sm text-gray-900">{selectedAddendum.region}</p>
+                </div>
+
+                {/* Highlighted fields for review */}
+                <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Perlu Diperhatikan</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="border-l-4 border-purple-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Tipe Addendum</label>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">{selectedAddendum.addendum_type || '-'}</p>
+                    </div>
+                    <div className="border-l-4 border-blue-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Tipe Audit</label>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">{selectedAddendum.audit_type || '-'}</p>
+                    </div>
                   </div>
+
+                  {/* Tanggal Perpanjangan */}
+                  {(selectedAddendum.start_date || selectedAddendum.end_date) && (
+                    <div className="border-l-4 border-amber-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Tanggal Perpanjangan</label>
+                      <div className="mt-1 flex flex-col sm:flex-row sm:gap-6 gap-1">
+                        <p className="text-sm text-gray-900">
+                          <span className="text-gray-500">Mulai:</span>{' '}
+                          <span className="font-bold">{selectedAddendum.start_date ? new Date(selectedAddendum.start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          <span className="text-gray-500">Sampai:</span>{' '}
+                          <span className="font-bold">{selectedAddendum.end_date ? new Date(selectedAddendum.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tim Audit changes */}
+                  {(selectedAddendum.new_leader || selectedAddendum.new_team) && (
+                    <div className="border-l-4 border-indigo-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Perubahan Tim</label>
+                      <div className="mt-1.5 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-gray-400">Ketua Sebelumnya → Baru</p>
+                          <p className="text-sm text-gray-900">
+                            <span className="text-red-500 line-through">{selectedAddendum.leader || '-'}</span>
+                            {' → '}
+                            <span className="font-bold text-green-700">{selectedAddendum.new_leader || '-'}</span>
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Anggota Baru</p>
+                          <p className="text-sm font-bold text-green-700">
+                            {selectedAddendum.new_team ? selectedAddendum.new_team.split(',').filter((m: string) => m.trim()).join(', ') : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Anggaran */}
+                  {(selectedAddendum.transport != null || selectedAddendum.konsumsi != null || selectedAddendum.etc != null) && (
+                    <div className="border-l-4 border-emerald-400 bg-white rounded-r-lg px-3 py-2.5 shadow-sm">
+                      <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Anggaran</label>
+                      <div className="mt-1.5 space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Transportasi</span>
+                          <span className="text-gray-900">Rp {selectedAddendum.transport?.toLocaleString('id-ID') || '0'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Konsumsi</span>
+                          <span className="text-gray-900">Rp {selectedAddendum.konsumsi?.toLocaleString('id-ID') || '0'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Lain-lain</span>
+                          <span className="text-gray-900">Rp {selectedAddendum.etc?.toLocaleString('id-ID') || '0'}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5">
+                          <span className="text-sm font-bold text-gray-900">Total</span>
+                          <span className="text-sm font-bold text-emerald-700">
+                            Rp {((selectedAddendum.transport || 0) + (selectedAddendum.konsumsi || 0) + (selectedAddendum.etc || 0)).toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Keterangan Section */}
@@ -2416,7 +2493,6 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                     Tutup
                   </button>
                 </div>
-              </div>
             </div>
           </div>
         </div>

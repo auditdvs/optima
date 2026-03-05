@@ -1,0 +1,171 @@
+MATRIKS RISK ISSUE,,,,,,,,Aktivitas Unit Kerja,,,Contoh Temuan
+NO,MEGA,No,MAJOR,No,SUB MAJOR,CODE,RISK ISSUE,KC,KR,KP,
+1,STRATEGIS,1.1,Perencanaan Strategis,1.1.1,Penyusunan & Distribusi Perencanaan Strategis,PDP1,Rencana Kerja/ Target Unit Kerja tidak sesuai dengan kondisi bisnis dan atau potensi wilayah,√,√,,Tidak tercapainya target anggota pada posisi tahun kemarin dan bulan berjalan berdasarkan cashflow terbaru
+,,,,,,PDP2,Breakdown Target atau Rencana Kerja terlambat,,√,√,Breakdown target ke unit kerja di bawah supervisi Regional/Divisi tidak merata atau tidak tercapai
+,,,,1.1.2,Evaluasi Rencana Strategis,ERS1,Realisasi Cashflow tidak sesuai dengan target yang telah ditetapkan/tidak tercapai,√,√,,Realisasi biaya pengeluaran cabang melebihi target cashflow
+,,,,,,ERS2,Tidak optimalnya kinerja tenaga pemasaran (Field Officer),√,√,√,FO tidak mencapai target individual maupun target Kantor Cabang
+,,1.2,Kebijakan dan Prosedur,1.2.1,Penyusunan Kebijakan & Prosedur,PKP1,SOP/manual/ketentuan lain terlambat/tidak memadai/tidak lengkap/tidak ada,,,√,Pembuat kebijakan belum membuat ketentuan ataupun belum melakukan update terhadap ketentuan yang sudah ada
+,,,,,,PKP2,Kebijakan dan prosedur tidak comply dengan ketentuan internal/regulasi eksternal,,,√,Kebijakan yang di keluarkan oleh lembaga tidak sesuai dengan ketentuan Eksternal (KemenkopUKM maupun ketentuan perundang-undangan)
+,,,,1.2.2,Pengkinian Kebijakan & Prosedur,KKP1,"Kebijakan dan prosedur tidak/belum dapat diimplementasikan, kadaluarsa, atau tidak sesuai dengan perkembangan bisnis",,,√,"Kebijakan telah kadaluarsa, bertentangan dengan ketentuan lain, atau tidak sesuai dengan perkembangan bisnis"
+,,1.3,Pengembangan Produk & Aktivitas,1.3.1,Perancangan Produk / Aktivitas,RPA1,Penerbitan produk dan pelaksanaan aktivitas/jasa baru tidak sesuai dengan ketentuan,,,√,Adanya produk/aktivitas baru belum memiliki ketentuan
+,,,,1.3.2,"Uji Coba, Test Market dan Evaluasi",UTE1,Kegagalan uji coba dan tes market penerbitan produk atau pelaksanaan aktivitas jasa,,,√,Atas aktivitas baru mengalami kegagalan uji coba
+2,OPERASIONAL,2.1,Proses Transaksi,2.1.1,Pelaksanaan Transaksi,PTI1,"Profil anggota tidak akurat, tidak lengkap & tidak diupdate pada sistem",√,,,"Anggota tidak memenuhi syarat pada saat perekrutan anggota baru
+Inputan pada sistem tidak sesuai pada Formulir Pengajuan/UK Data (Uji Kelayakan)
+Data pada UK masih terdapat field yang kosong
+Tidak ada dokumen capres
+Jumlah anggota dalam satu kelompok melebihi ketentuan (8 anggota)"
+,,,,,,PTI2,"Pelaksanaan transaksi tidak memenuhi ketentuan/regulasi yang berlaku (Pajak, Ketentuan Regulator, dll)",√,√,√,Pembayaran pajak fixed asset (kendaraan bermotor) terlambat
+,,,,,,PTI3,Pelaksanaan transaksi finansial tidak benar/ tidak absah / tidak sesuai ketentuan,√,√,√,"Manipulasi dokumen sumber (kuitansi, voucher, slip)
+Pemalsuan Tanda Tangan Pada Slip, Kwitansi, Nota
+Penarikan Sihara tidak sesuai jadwal (bukan dari strategi meminimalisir PAR)"
+,,,,,,PTI4,Pemungutan atau pembukuan biaya tidak sesuai kewenangan & ketentuan yang berlaku,√,√,√,"Ada biaya yang tidak dipungut (misal: pembelian buku simpanan oleh anggota namun tidak dipungut)
+Bukti pembelian BBM tidak ada
+Pembelian diluar ketentuan COA
+Pengeluaran BBM dan biaya lain melebihi ketentuan
+Selisih bukti dengan transaksi pengeluaran (BBM atau transaksi biaya)
+Nominal pada slip penarikan dan BTC berbeda
+Selisih pencatatan antara voucher dan buku kas cabang
+Pembelian sumbangan anggota melebihi budget yang ditentukan
+Pungutan biaya UPK namun tidak ditransaksikan"
+,,,,,,PTI5,Pembatalan transaksi dilakukan tidak sesuai ketentuan yang berlaku,√,√,√,"Proses error correction/koreksi jurnal tidak benar
+Penyalahgunaan transaksi Un-Approve"
+,,,,,,PTI6,"Penundaan pembukuan, pemberitahuan atau penyelesaian transaksi",√,√,√,"Anggota bermasalah, penarikan di hari lain tidak langsung dibukukan
+Keterlambatan penginputan pembelian asset ke akun fixed asset
+Pembelian barang tidak dibuatkan voucher atau dibukukan pada hari yang sama"
+,,,,,,PTI7,"Dokumen sumber, bukti pembukuan & report tidak lengkap atau tidak ditatakerjakan sesuai ketentuan",√,√,√,"Tidak ada bukti transaksi (Slip penarikan, slip dana resiko, kwitansi disburse, dll)
+Bukti transaksi (Slip Anggota Keluar, BM & BK) tidak ada
+Voucher transaksi salah urut, tidak ada
+Kesalahan pencatatan voucher tidak sesuai dengan bukti transaksi"
+,,,,,,PTI8,Penutupan akun anggota tidak dilakukan sesuai ketentuan,√,,,"Anggota meninggal tetapi belum diajukan pengeluaran anggota
+Pengembalian simpanan anggota karena aggota keluar tidak diberikan sebagian atau sepenuhnya
+Manipulasi kartu kuning (anggota & suami anggota meninggal) untuk penutupan rekening/akun"
+,,,,2.1.2,Infrastruktur & Pengamanan Proses Transaksi,IPT1,"Pengelolaan User ID, password dan kewenangan limit tidak sesuai ketentuan",√,√,√,Approval tidak dilakukan pihak yang berwenang dengan akun mdis yang bukan miliknya (approval oleh staf selain manajer dengan akun manajer)
+,,,,,,IPT2,Pengelolaan dokumen berharga tidak tertib/tidak memadai,√,√,√,"Penyimpanan dokumen lembaga tidak memadai (Stok Buku Simpanan, Kartu Pinjaman Anggota, Formulir Anggota)"
+,,,,,,IPT3,Pengelolaan Infrastruktur pengamanan transaksi (CCTV) tidak memadai,√,√,√,Backup data CCTV tidak dilakukan secara memadai
+,,2.2,Pengelolaan Kantor,2.2.1,Pembukaan / Penempatan / Relokasi Kantor ,JKC1,Pembukaan Kantor tidak didukung analis kelayakan yang memadai,,√,√,Pembukaan kantor tidak disertai dengan kajian/Feasibility Study yang memadai
+,,,,,,JKC2,Pembukaan/relokasi kantor terlambat atau tidak sesuai jadwal,,√,√,Keterlambatan pembukaan/opening kantor cabang baru
+,,,,,,JKC3,Pembukaan Kantor tidak didukung dengan SDM dan infrastruktur yang memadai,,√,√,Kantor Cabang belum diisi oleh posisi yang ideal akibat terbatasnya SDM & Infrastruktur
+,,2.3,Proses Manajemen Risiko,2.3.1,"Identifikasi, Pengukuran, Pemantauan dan Pengendalian Risiko",PPR1,Proses penetapan definisi & kategori risiko tidak sesuai dengan proses bisnis,,,√,Identifikasi risiko tidak sejalan dengan proses bisnis Lembaga
+,,,,,,PPR2,Risk issue yang dibreakdown ke Unit Kerja tidak relevan dengan risiko yang dihadapi ,,,√,RCSA tidak sesuai dengan identifikasi pada Kantor Cabang
+,,,,,,PPR3,Kegagalan manajemen krisis,,,√,
+,,2.4,"Pengelolaan Aset, Logistik & Penunjang",2.4.1,Pelaksanaan Pengadaan Barang & Jasa,PBJ1,"Proses pengadaan barang/jasa IT, non IT, dan jasa konsultan tidak sesuai ketentuan",√,√,√,"Proses pembelian barang tidak ditatakerjakan dengan baik (kuitansi tidak ada, hilang, dll)"
+,,,,,,PBJ2,Pengadaan/sewa barang/jasa atau jasa konsultan tidak mendapat harga yang terbaik (terjadi markup),√,√,√,Adanya MarkUp pembelian barang/pembayaran jasa (Sewa Gedung)
+,,,,,,PBJ3,Persetujuan biaya pengadaan barang dan jasa tidak sesuai dengan kewenangan/ketentuan,√,√,√,Pembelian atas barang dengan yang tidak sesuai dengan limit kewenangannya
+,,,,,,PBJ4,"Dokumentasi proses pengadaan, sewa barang/ jasa tidak lengkap",√,√,√,Dokumen pembelian asset tidak lengkap
+,,,,2.4.2,Distribusi Barang & Jasa,DBJ1,"Distribusi barang dan jasa tidak efektif dan efisien (skala prioritas, tepat waktu, tempat tujuan/peruntukan, jumlah dan jenis barang, kualitas barang)",√,√,√,"Pendistribusian dokumen/ kebutuhan kantor cabang tidak dapat dipenuhi dengan tepat waktu, tidak sesuai dengan kebutuhan."
+,,,,2.4.3,Pemeliharaan Aktiva,PAT1,"Pencatatan aktiva tetap atau barang inventaris tidak tertib atau tidak akurat (penambahan,  penghapusbukuan, mutasi/relokasi)",√,√,√,"Kondisi aset tetap rusak tidak dapat digunakan
+Perpindahan aset tidak dilakukan mutasi di data fixed aset
+Aset baru belum ditambahkan
+Tagging aset belum dilakukan"
+,,,,,,PAT2,Bukti kepemilikan aktiva tetap/barang inventaris tidak sah/tidak ditatakerjakan sesuai dengan ketentuan,√,√,√,Sertifikat rumah/kantor tidak ditatakerjakan dengan baik
+,,,,,,PAT3,Aktiva tetap tidak diasuransikan sesuai ketentuan,√,√,√,Aset belum diasuransikan (kendaraan bermotor)
+,,,,,,PAT4,Penghapusbukuan aktiva tidak sesuai dengan ketentuan,√,,√,Penjualan asset tanpa permohonan terlebih dahulu
+,,,,,,PAT5,Pelaksanaan lelang aktiva tetap tidak sesuai dengan ketentuan,√,√,√,Penjualan Aset/Inventaris yang dilakukan tidak sesuai dengan ketentuan
+,,,,,,PAT6,"Pengelolaan inventaris, peralatan & perlengkapan kantor tidak memadai",√,√,√,"Kartu stock di cabang tidak ada/ tidak update
+Inventaris kantor tidak dilakukan service atau maintenance
+Pengambilan/pencurian/penggelapan barang fixed asset/non fixed asset untuk kepentingan pribadi"
+,,,,2.4.4,Pengelolaan Penyedia Jasa,PPJ1,Tidak tersedia data profil rekanan/penyedia jasa yang akurat ,,,√,
+,,,,,,PPJ2,Pengembalian aktiva tetap (IT dan Non IT) oleh pekerja pihak ketiga yang sudah tidak berwenang tidak dilakukan dengan tertib,,,√,
+,,2.5,Manajemen SDM,2.5.1,Rekrutmen dan Penempatan,RKT1,Proses pemenuhan SDM tidak sesuai dengan ketentuan dan standar kompetensi yang ditetapkan,,√,√,
+,,,,,,RKT2,Pemenuhan SDM tidak sesuai dengan formasi,,√,√,
+,,,,,,RKT3,Pemenuhan SDM tidak sesuai jadwal (terlambat),,√,√,
+,,,,2.5.2,Pelatihan / Pengembangan / Pembinaan SDM,PLT1,Pengembangan karir pekerja (rotasi dan promosi) tidak sesuai pola pendekatan kompetensi,,√,√,
+,,,,,,PLT2,Pelaksanaan training tidak sesuai training need assessments (TNA) atau kebutuhan lembaga,,√,√,
+,,,,,,PLT3,Evaluasi penilaian kinerja pekerja tidak obyektif,√,√,√,
+,,,,,,PLT4,Pegawai tidak melakukan kode etik KOMIDA sesuai ketentuan,√,√,√,"Karyawan yang melakukan pelanggaran kode etik KOMIDA (misal. Pelanggaran terhadap prinsip perlindungan anggota, pinjam meminjam uang diantara karyawan yang menyebabkan keresahan maupun ketidakharmonisan, benturan kepentingan akibat persaudaraan maupun pertemanan, bekerja dengan tidak menjunjung etika profesi, membocorkan rahasia lembaga, dll)
+Menerima Gratifikasi (Meminta Fee dalam bentuk barang/uang kepada anggota atau pihak ketiga)
+Atasan mempergunakan jabatannya dalam rangka mempermudah approval pinjaman karyawan dengan tujuan untuk memperoleh keuntungan (Misal Share-disbursement Pinjaman KOPKADA)"
+,,,,,,PLT5,"Pelanggaran Kode Etik, peraturan tata tertib dan kedisiplinan pegawai tidak ditindaklanjuti dengan memadai",√,√,√,Staf yang melakukan tindakan fraud / kesalahan lainnya tidak diberikan punishment sesuai dengan ketentuan
+,,,,2.5.3,Administrasi Kepegawaian,AMK1,Pembayaran upah/hak-hak (benefit) pekerja tidak sesuai ketentuan,,,√,
+,,,,,,AMK2,Pengelolaan administrasi & berkas (fisik dokumen) kepegawaian tidak tertib,,,√,
+,,,,,,AMK3,Data sistem SDM tidak akurat,,,√,
+,,,,,,AMK4,Pelaksanaan cuti tidak sesuai ketentuan,√,√,√,Cuti karyawan tidak disertakan dengan ijin dari atasan
+,,,,,,AMK5,Pencurian aset informasi Lembaga oleh pekerja yang sudah dimutasi ke unit kerja lain/pekerja yang sudah di PHK,√,√,√,"Bocornya data anggota, ketentuan internal, atau informasi berharga lainnya milik lembaga kepada pihak eksternal KOMIDA"
+,,,,,,AMK6,Terjadinya akses ilegal oleh pekerja yang sudah dimutasi ke unit kerja lain/pekerja yang sudah di PHK,√,√,√,
+,,,,,,AMK7,Pengembalian aktiva tetap (IT dan Non IT) oleh pekerja yang dimutasi ke unit kerja lain/pekerja yang sudah di PHK tidak dilakukan dengan tertib,√,√,√,
+,,,,2.5.4,"Penghentian Hubungan Kerja (Pensiun, Pengunduran Diri, PHK)",PHK1,Proses penghentian hubungan kerja tidak sesuai dengan ketentuan,,√,√,
+,,,,,,PHK2,Pemenuhan hak dan kewajiban pekerja yang dikenakan PHK tidak sesuai ketentuan,,√,√,
+,,2.6,"Akuntansi, Pelaporan, Informasi & Komunikasi",2.6.1,Monitoring Kelengkapan & Kewajaran Informasi Keuangan,KKI1,"Biaya pengeluaran tidak terselesaikan (Biaya dibayar dimuka, dll.)",,,√,UM & LPJ Perdin
+,,,,,,KKI2,Pencatatan transaksi tidak sesuai dengan tujuan penggunaan rekening/ akun,√,√,√,Kesalahan input akun transaksi pengeluaran biaya
+,,,,,,KKI3,Perhitungan atau pencatatan pencadangan kerugian tidak sesuai ketentuan,,,√,
+,,,,2.6.2,Rekonsiliasi & Tindak Lanjut,RTL1,Rekonsiliasi tidak dilaksanakan secara memadai,,,√,
+,,,,2.6.3,Penyusunan & Pendistribusian Laporan,PDL1,"Laporan kepada lembaga eksternal/internal tidak sesuai dengan ketentuan yang berlaku (waktu, content & format)",,,√,Tidak/Belum dilakukannya pengarsipan laporan keuangan dan perkembangan cabang
+,,2.7,Pengamanan Sistem Informasi,2.7.1,Pengelolaan Aset Informasi,PAI1,Perlindungan aset informasi Lembaga tidak memadai,√,√,√,
+,,,,,,PAI2,Kelemahan pengamanan data/informasi akibat kurangnya pemahaman pekerja (security awarenes),√,√,√,
+,,,,2.7.2,Pengamanan Fisik & Lingkungan,FSL1,"Terganggunya operasional IPF (Information Processing Facility, contoh : Ruang Server) karena ganguan eksternal (force majeure)",,,√,
+,,,,,,FSL2,"Terjadinya gangguan operasional, pencurian/penyebaran informasi, atau fraud karena adanya akses di ruang data center atau ruang kerja oleh pihak yang tidak berwenang",,,√,
+,,,,,,FSL3,Terjadinya pencurian dan penyebaran data/informasi dalam proses distribusi media penyimpanan informasi,,,√,
+,,,,2.7.3,Pengamanan Operasi & Komunikasi,POK1,"Perangkat IT rentan terhadap serangan program jahat (contoh : virus, malware, dll)",√,√,√,
+,,,,,,POK2,Jaringan menjadi rentan terhadap akses dan serangan pihak yang tidak berwenang,,√,√,
+,,,,,,POK3,Pemanfaatan informasi sensitif pada media (hard dan soft) oleh pihak yang tidak berwenang,√,√,√,
+,,,,,,POK4,Bocornya aset informasi dan terjadinya modifikasi informasi yang tidak sah melalui transmisi online atau pertukaran informasi dengan pihak eksternal,√,√,√,
+,,,,2.7.4,Pengendalian Akses,AKS1,Integritas aplikasi tidak terjamin akibat adanya perubahan source program oleh pihak yang tidak berwenang,,,√,
+,,,,,,AKS2,Pengelolaan User ID dan password tidak sesuai ketentuan,,√,√,Tidak adanya pengajuan penghapusan username untuk staf keluar
+,,,,2.7.5,Monitoring Kepatuhan,KPT1,"Adanya kerugian atau tuntutan dari pihak ketiga/regulator atas pelanggaran lisensi, peraturan perundangan, kontrak, atau ketentuan yang berlaku",,,√,
+,,2.8,Operasional IT ,2.8.1,Proses,PIT1,Kegagalan operasional Unit Kerja karena kesalahan setting parameter terkait aplikasi,,,√,
+,,,,,,PIT2,Respond time aplikasi lambat dikarenakan object yang tidak diperlukan,,,√,
+,,,,,,PIT3,Hilangnya data kritis akibat Application Error,,,√,
+,,,,2.8.2,Output,OIT1,Output aplikasi tidak tersedia / tidak akurat / tidak lengkap / tidak konsisten,,,√,
+,,,,,,OIT2,Informasi yg dihasilkan tidak sesuai kebutuhan (kelebihan atau kekurangan),,,√,
+3,Keuangan,3.1,Manajemen Proses Pinjaman/ Pembiayaan,3.1.1,Permohonan & Analisa Pinjaman/ Pembiayaan,PAP1,Administrasi anggota atau calon anggota tidak lengkap atau tidak ditindaklanjuti sesuai ketentuan,√,,,"Kredit Fiktif/Topengan/Atas Nama
+Kredit Tempilan/Share Disbursement
+Anggota dengan ID Ganda , (Pinjaman Ganda/Double Financing & Fiktif)"
+,,,,,,PAP2,Perhitungan kebutuhan pinjaman/ pembiayaan tidak akurat,√,,,Pencairan melebihi rincian kebutuhan anggota
+,,,,,,PAP3,Penetapan produk pinjaman/ pembiayaan tidak sesuai hasil analisis kredit/tidak sesuai ketentuan,√,,,"Kesalahan analisa produk pembiayaan yang dilakukan staf lapang ketika pengajuan pinjaman (Cth:  Syarat Pengajuan Top Up belum terpenuhi) - Inisiatif Manajer, Koorcab & RGM yang melanggar ketentuan utama
+Penetapan Grace Period untuk sanitasi dan renovasi rumah terjadi kesalahan sehingga muncul arrear
+Realisasi program sudah tidak berlaku
+Adanya kebijakan bersifat lokal yang melanggar ketentuan utama (SK, SOP, dsb)"
+,,,,3.1.2,Pemberian Putusan Pinjaman/ Pembiayaan,PTP1,"Putusan pinjaman/ pembiayaan tidak sesuai dengan hasil analisis, diputus oleh pejabat yang tidak berwenang atau tidak sesuai ketentuan yang berlaku",√,√,,"Pemberian pinjaman melebihi ketentuan plafon maksimal
+Tidak adanya tandatangan Manajer Cabang dan/atau Koordinator Cabang pada form pengajuan akad dan pencairan pinjaman (belum mendapat approval pada sistem MDIS) 
+Pembiayaan Micro Bisnis dan Pembiayaan Renovasi Rumah belum/tidak ada persetujuan korcab dan manajer cabang
+Persetujuan pencairan antara manajer, staf lapang dan proses pencairan berbeda (yang digunakan rekomendasi staf lapang)"
+,,,,3.1.3,Realisasi & Pencairan Pinjaman/ Pembiayaan,RPP1,Realisasi dan pencairan pinjaman/ pembiayaan dilaksanakan sebelum syarat dan ketentuan pemberian pinjaman dipenuhi,√,,,"Tandatangan anggota berbeda antara form pengajuan dan form pencairan serta akad (prinsip syariah)
+Tandatangan anggota tidak ada di akad
+Pemotongan Biaya Pencairan diluar ketentuan
+Disburse tidak diberikan (penundaan/pengalihan) kepada anggota
+Dokumen persayaratan pada saat akad tidak terpenuhi (misal. Invoice Pembelian Laptop pada pinjaman talangan pendidikan tidak ada/dipalsukan)"
+,,,,3.1.4,Dokumentasi & Administrasi Pinjaman/ Pembiayaan,DAP1,Berkas pinjaman anggota tidak lengkap atau tidak ditatakerjakan sesuai ketentuan,√,,,"Kartu Pinjaman Anggota tidak ada
+Selisih saldo pada kartu pinjaman anggota (Saldo tidak sesuai dengan sistem MDIS)
+Dokumen pinjaman anggota tidak lengkap
+Saldo Kartu Pinjaman Anggota (KPA) tidak update
+Berkas Pinjaman (UK, Identitas, PPI, P3) tidak lengkap/ tidak ada
+Berkas Pinjaman tidak diarsip sesuai ketentuan
+Tidak adanya rincian biaya ketika pengajuan (RAB pada PSA dan PRR)
+Berkas anggota keluar masih diarsip di odner"
+,,,,3.1.5,Pembinaan & Monitoring Anggota,PMA1,Pembinaan & monitoring kepada anggota secara off site dan on site tidak dilakukan sesuai ketentuan,√,,,"Monitoring belum dilakukan lebih dari 14 hari atau belum melengkapi form monitoring
+Nota Pembelian (umum, mikrobisnis, sanitasi & renovasi) tidak sesuai/tidak ada/tidak lengkap-> Prinsip Syariah
+Pencairan tidak sesuai rincian yang diberikan ketika pengajuan"
+,,,,3.1.6,Pelaksanaan Proses Angsuran (Aktifitas Pembiayaan Anggota),PAA1,Proses penyetoran angsuran/ iuran yang berkaitan dengan pinjaman/ pembiayaan tidak dilakukan sesuai ketentuan,√,,,"Angsuran anggota tidak di transaksikan ke kantor/Sistem MDIS
+Transfer anggota ke rekening pribadi staf/asmen/manajer (rekening bank, e-wallet dan sejenisnya yang bersifat pribadi)
+"
+,,,,,,PAA2,Proses Penagihan Angsuran Pinjaman tidak dilakukan,,,,Tidak dilakukannya proses penagihan/pengambilan angsuran ke lapang
+,,,,3.1.7,Pengelolaan Pinjaman/ Pembiayaan yang Bermasalah,PPB1,Penanganan pinjaman/ pembiayaan bermasalah tidak dilakukan sesuai ketentuan,√,,,"Apabila anggota bermasalah, tidak dilakukan monitoring berkala (tidak tahu center, tidak pernah dikunjungi, dll)
+Pengambilan simpanan anggota untuk pembayaran angsuran anggota maupun pihak lain tanpa sepengetahuan anggota ybs 
+Melakukan restrukturisasi pinjaman tanpa adanya ketentuan dan tanpa sepengetahuan anggota"
+,,,,3.1.8,Pelunasan Pinjaman/ Pembiayaan ,PLP1,Pelunasan pinjaman/ pembiayaan tidak sesuai ketentuan,√,,,"Penundaan pelunasan client, proses penutupan rekening yang tertunda akibat tindak lanjut yang terlambat
+Dokumen anggota keluar tidak lengkap
+Penundaan claim dana resiko menyebabkan proses pemotongan sisa angsuran anggota selisih
+Penyetoran dari anggota WO tidak disetorkan"
+,,,,3.1.9,Penetapan Tunggakan Pinjaman/ Pembiayaan,TGP1,Proses pengelolaan tunggakan pinjaman/ pembiayaan tidak sesuai ketentuan,√,,,"Pelunasan tanpa margin yang dilakukan tanpa adanya persetujuan dari Kantor Pusat
+Tanggung Renteng tidak efektif (tidak ada catatan Cth: histori nominal dan tanggal, digunakan kepada center lain, pengembalian tidak disampaikan ke anggota penanggung renteng, tanpa konfirmasi ke anggota pemberi uang & sisa uang tanggung renteng tidak dikembalikan ke anggota)"
+,,3.2,Manajemen Proses Simpanan,3.2.1,Dokumentasi & Administrasi Simpanan,DAS1,Berkas simpanan anggota tidak lengkap atau tidak ditatakerjakan sesuai ketentuan,√,,,"Buku Simpanan anggota tidak ada
+Selisih saldo pada buku simpanan anggota (Saldo tidak sesuai dengan sistem MDIS)
+Form simpanan sihara (pembukaan, perubahan paket dan penutupan, keanggotaan) tidak ada/tidak lengkap/tidak update saldo pada kartu sihara
+Saldo pada Buku Simpanan anggota tidak update
+Form simpanan qurban (pembukaan perubahan dan penutupan) tidak ada/tidak lengkap/tidak update saldo pada kartu simpanan qurban"
+,,,,3.2.2,Pelaksanaan Proses Setoran/Penarikan (Aktifitas Simpanan Anggota),PAS1,Proses penyetoran iuran yang berkaitan dengan simpanan tidak dilakukan sesuai ketentuan,√,,,Setoran simpanan (Sukarela dan Hari Raya) tidak ditransaksikan
+,,,,,,PAS2,Proses penarikan simpanan anggota tidak dilakukan sesuai ketentuan,,,,Penarikan simpanan anggota tidak diserahkan kepada anggota
+,,3.3,Manajemen Kas,3.3.1,Pengelolaan Uang Kas ,PUK1,Proses setoran kas tidak sesuai ketentuan,√,√,√,Uang Kas/Tunai/Bank tidak balance
+,,,,,,PUK2,Pengelolaan maksimum kas tidak optimal,√,√,√,Saldo kas harian cabang melebihi limit kas
+,,,,,,PUK3,Proses rekonsiliasi uang kas tidak sesuai ketentuan,√,√,√,"Selisih lebih/kurang uang kas,
+Ditemukannya uang tak bertuan yang tidak terselesaikan"
+,,,,,,PUK4,Proses cash opname tidak sesuai ketentuan,√,√,√,"Tidak dilakukannya/tidak konsistennya proses opname kas
+Form mutasi kas tidak ada tandatangan para pihak
+Form mutasi kas tidak ada"
+4,Eksternalitas ,4.1,Hukum & Litigasi,4.1.1,Memberikan Legal Advise dan Bantuan Hukum,LAH1,Pemberian bantuan hukum tidak melindungi kepentingan Lembaga,,,√,
+,,,,4.1.2,"Legalitas, Litigasi dan Penanganan Perkara",LIT1,Penatakerjaan dokumen hukum tidak terjamin keamanannya,√,,√,Tidak adanya dokumen legalitas cabang
+,,,,4.1.3,Aspek Hukum Perjanjian Dengan Pihak Ketiga,HKT1,Kontrak/perjanjian dengan pihak ketiga tidak sesuai dengan kaidah hukum dan/atau memperlemah posisi lembaga/ Lembaga/ KOMIDA,√,√,√,Adanya klausul yang melemahkan lembaga di dalam PKS
+,,,,,,HKT2,Kerjasama dengan pihak ketiga tidak dilandasi dengan kontrak/perjanjian,√,√,√,Tidak adanya Perjanjian Kerja Sama (PKS) dengan pihak ketiga
+,,4.2,Interaksi Pelayanan ,4.2.1,Pelayanan Kepada Anggota,PLA1,Standar pelayanan kepada anggota tidak dijalankan sesuai ketentuan,√,,,"Disiplin center tidak dijalankan sebagaimana mestinya
+Dalam hal anggota cuti namun anggota/suami meninggal tidak mendapatkan santunan"
+,,4.3,Pengelolaan Pengaduan,4.3.1,"Penanganan Pengaduan, Pemantauan & Pelaporan",PPL1,Laporan pengaduan nasabah/customer tidak ditindaklanjuti sesuai ketentuan,√,√,√,

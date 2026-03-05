@@ -80,6 +80,18 @@ const AuditorPerforma = () => {
         .lte('audit_end_date', yearEnd);
       
       if (error) throw error;
+
+      // Also fetch approved addendums for the selected year
+      const { data: addendumData, error: addendumError } = await supabase
+        .from('addendum')
+        .select('team, leader, new_team, new_leader, audit_type, branch_name, end_date, status, addendum_type')
+        .eq('status', 'approved')
+        .gte('end_date', yearStart)
+        .lte('end_date', yearEnd);
+      
+      if (addendumError) {
+        console.error('Error fetching addendums for auditor counts:', addendumError);
+      }
       
       // Initialize monthly data for all auditors
       const auditorData: Record<string, AuditorMonthlyData> = {};
@@ -119,130 +131,155 @@ const AuditorPerforma = () => {
         return trimmed;
       };
 
-      // Process audits data
-      audits?.forEach(record => {
-        let teamMembers: string[] = [];
+      // Fuzzy matching logic (extracted for reuse with addendums)
+      const normalize = (str: string) => str.toLowerCase().replace(/[.,]/g, '').trim();
+      
+      const isMatch = (profileName: string, dbName: string) => {
+        if (!dbName || !profileName) return false;
+        const normDbName = normalize(dbName);
+        const normProfileName = normalize(profileName);
         
-        // Parse team
-        try {
-            if (record.team) {
-                if (record.team.startsWith('[') || record.team.startsWith('{')) {
-                    const parsed = JSON.parse(record.team);
-                    if (Array.isArray(parsed)) teamMembers = parsed;
-                    else teamMembers = [record.team];
-                } else {
-                    teamMembers = record.team.split(',').map((t: string) => t.trim());
-                }
-            }
-        } catch {
-            if (record.team) teamMembers = [record.team];
+        // 0. Exact match
+        if (normDbName === normProfileName) return true;
+        
+        // Filter out short tokens (titles like SE, MM, etc) - only keep meaningful words
+        const filterShortTokens = (tokens: string[]) => tokens.filter(t => t.length > 3);
+        
+        const dbTokens = normDbName.split(/\s+/);
+        const profileTokens = normProfileName.split(/\s+/);
+        const dbTokensFiltered = filterShortTokens(dbTokens);
+        const profileTokensFiltered = filterShortTokens(profileTokens);
+        
+        // 1. Contains match (min 2 meaningful words)
+        if (profileTokensFiltered.length >= 2 && dbTokensFiltered.length >= 2) {
+          const profileJoined = profileTokensFiltered.join(' ');
+          const dbJoined = dbTokensFiltered.join(' ');
+          if (dbJoined.includes(profileJoined) || profileJoined.includes(dbJoined)) return true;
         }
+        
+        // 2. Initials match (only for meaningful tokens)
+        if (dbTokensFiltered.length >= 3 && profileTokensFiltered.length >= 3) {
+          const dbInitials = dbTokensFiltered.map(t => t[0]).join('');
+          const profileInitials = profileTokensFiltered.map(t => t[0]).join('');
+          if (profileInitials === dbInitials) return true;
+        }
+        
+        // 3. Token intersection - only for meaningful tokens
+        let exactMatchCount = 0;
+        profileTokensFiltered.forEach(pToken => {
+          if (dbTokensFiltered.some(dToken => dToken === pToken)) {
+            exactMatchCount++;
+          }
+        });
+        if (exactMatchCount >= 2) return true;
+        
+        return false;
+      };
 
-        // Add leader
+      // Helper to parse team string into array
+      const parseTeam = (teamStr: string | null | undefined): string[] => {
+        if (!teamStr) return [];
+        try {
+          if (teamStr.startsWith('[') || teamStr.startsWith('{')) {
+            const parsed = JSON.parse(teamStr);
+            if (Array.isArray(parsed)) return parsed;
+            return [teamStr];
+          }
+          return teamStr.split(',').map((t: string) => t.trim());
+        } catch {
+          return [teamStr];
+        }
+      };
+
+      // Helper to count a team member for an auditor
+      const countAuditorAssignment = (
+        rawName: string, 
+        monthIndex: number, 
+        uniqueKey: string, 
+        auditType: string
+      ) => {
+        const singleAuditorName = cleanName(rawName);
+        if (!singleAuditorName) return;
+
+        const matchedAuditorName = Object.keys(auditorData).find(profileName => 
+          isMatch(profileName, singleAuditorName)
+        );
+        
+        if (matchedAuditorName) {
+          if (!uniqueAudits[matchedAuditorName]) {
+            uniqueAudits[matchedAuditorName] = {};
+          }
+          if (!uniqueAudits[matchedAuditorName][monthIndex]) {
+            uniqueAudits[matchedAuditorName][monthIndex] = new Set();
+          }
+          
+          if (!uniqueAudits[matchedAuditorName][monthIndex].has(uniqueKey)) {
+            uniqueAudits[matchedAuditorName][monthIndex].add(uniqueKey);
+            
+            const type = auditType?.toLowerCase().trim() || '';
+            const isRegularType = type.includes('reguler') || type.includes('regular') || type.includes('general');
+            const isFraudType = type.includes('fraud') || type.includes('khusus') || type.includes('special') || type.includes('investigasi');
+            
+            if (isRegularType) {
+              auditorData[matchedAuditorName].months[monthIndex].regular += 1;
+              auditorData[matchedAuditorName].total_regular += 1;
+            } else if (isFraudType) {
+              auditorData[matchedAuditorName].months[monthIndex].fraud += 1;
+              auditorData[matchedAuditorName].total_fraud += 1;
+            }
+            
+            auditorData[matchedAuditorName].total = 
+              auditorData[matchedAuditorName].total_regular + 
+              auditorData[matchedAuditorName].total_fraud;
+          }
+        }
+      };
+
+      // Process letter audits data
+      audits?.forEach(record => {
+        let teamMembers = parseTeam(record.team);
         if (record.leader) teamMembers.push(record.leader);
-
-        // Deduplicate
         teamMembers = [...new Set(teamMembers)];
 
-        // Get month from audit_end_date
         const auditEndDate = record.audit_end_date;
         if (!auditEndDate) return;
         
-        const monthIndex = new Date(auditEndDate).getMonth(); // 0-11
+        const monthIndex = new Date(auditEndDate).getMonth();
+        const uniqueKey = `letter|${record.branch_name}|${record.audit_type}`;
 
         teamMembers.forEach((rawName: string) => {
-          const singleAuditorName = cleanName(rawName);
-          if (!singleAuditorName) return;
+          countAuditorAssignment(rawName, monthIndex, uniqueKey, record.audit_type);
+        });
+      });
 
-          // Fuzzy matching logic
-          const normalize = (str: string) => str.toLowerCase().replace(/[.,]/g, '').trim();
-          
-          const isMatch = (profileName: string, dbName: string) => {
-            if (!dbName || !profileName) return false;
-            const normDbName = normalize(dbName);
-            const normProfileName = normalize(profileName);
-            
-            // 0. Exact match
-            if (normDbName === normProfileName) return true;
-            
-            // Filter out short tokens (titles like SE, MM, etc) - only keep meaningful words
-            const filterShortTokens = (tokens: string[]) => tokens.filter(t => t.length > 3);
-            
-            const dbTokens = normDbName.split(/\s+/);
-            const profileTokens = normProfileName.split(/\s+/);
-            const dbTokensFiltered = filterShortTokens(dbTokens);
-            const profileTokensFiltered = filterShortTokens(profileTokens);
-            
-            // 1. Contains match (min 2 meaningful words)
-            if (profileTokensFiltered.length >= 2 && dbTokensFiltered.length >= 2) {
-              // Check if all meaningful tokens from one name are in the other
-              const profileJoined = profileTokensFiltered.join(' ');
-              const dbJoined = dbTokensFiltered.join(' ');
-              if (dbJoined.includes(profileJoined) || profileJoined.includes(dbJoined)) return true;
-            }
-            
-            // 2. Initials match (only for meaningful tokens)
-            if (dbTokensFiltered.length >= 3 && profileTokensFiltered.length >= 3) {
-              const dbInitials = dbTokensFiltered.map(t => t[0]).join('');
-              const profileInitials = profileTokensFiltered.map(t => t[0]).join('');
-              if (profileInitials === dbInitials) return true;
-            }
-            
-            // 3. Token intersection - only for meaningful tokens
-            // Tokens must match EXACTLY (no prefix matching to avoid "achmad" matching "achmadani")
-            let exactMatchCount = 0;
-            profileTokensFiltered.forEach(pToken => {
-              if (dbTokensFiltered.some(dToken => dToken === pToken)) {
-                exactMatchCount++;
-              }
-            });
-            // Need at least 2 exact matching meaningful tokens
-            if (exactMatchCount >= 2) return true;
-            
-            return false;
-          };
+      // Process addendum data
+      addendumData?.forEach(record => {
+        const endDate = record.end_date;
+        if (!endDate) return;
+        
+        const monthIndex = new Date(endDate).getMonth();
+        const uniqueKey = `addendum|${record.branch_name}|${record.audit_type}|${record.addendum_type}`;
 
-          // Find matching auditor
-          const matchedAuditorName = Object.keys(auditorData).find(profileName => 
-            isMatch(profileName, singleAuditorName)
-          );
-          
-          if (matchedAuditorName) {
-            // Create unique key
-            const uniqueKey = `${record.branch_name}|${record.audit_type}`;
-            
-            // Initialize tracking structure
-            if (!uniqueAudits[matchedAuditorName]) {
-              uniqueAudits[matchedAuditorName] = {};
-            }
-            if (!uniqueAudits[matchedAuditorName][monthIndex]) {
-              uniqueAudits[matchedAuditorName][monthIndex] = new Set();
-            }
-            
-            // Only count if not already counted for this month
-            if (!uniqueAudits[matchedAuditorName][monthIndex].has(uniqueKey)) {
-              uniqueAudits[matchedAuditorName][monthIndex].add(uniqueKey);
-              
-              const type = record.audit_type?.toLowerCase().trim() || '';
-              
-              // Check for regular/reguler type
-              const isRegularType = type.includes('reguler') || type.includes('regular') || type.includes('general');
-              // Check for fraud/khusus/special type
-              const isFraudType = type.includes('fraud') || type.includes('khusus') || type.includes('special') || type.includes('investigasi');
-              
-              if (isRegularType) {
-                auditorData[matchedAuditorName].months[monthIndex].regular += 1;
-                auditorData[matchedAuditorName].total_regular += 1;
-              } else if (isFraudType) {
-                auditorData[matchedAuditorName].months[monthIndex].fraud += 1;
-                auditorData[matchedAuditorName].total_fraud += 1;
-              }
-              
-              auditorData[matchedAuditorName].total = 
-                auditorData[matchedAuditorName].total_regular + 
-                auditorData[matchedAuditorName].total_fraud;
-            }
-          }
+        // Determine which team to use based on addendum type
+        const hasTeamChange = record.addendum_type && 
+          (record.addendum_type.includes('Perubahan Tim') || record.addendum_type.toLowerCase().includes('perubahan tim'));
+
+        let teamMembers: string[] = [];
+        
+        if (hasTeamChange) {
+          // For team changes, count the NEW team members
+          teamMembers = parseTeam(record.new_team);
+          if (record.new_leader) teamMembers.push(record.new_leader);
+        } else {
+          // For other addendum types (Perpanjangan Waktu, etc), count original team
+          teamMembers = parseTeam(record.team);
+          if (record.leader) teamMembers.push(record.leader);
+        }
+        
+        teamMembers = [...new Set(teamMembers)];
+
+        teamMembers.forEach((rawName: string) => {
+          countAuditorAssignment(rawName, monthIndex, uniqueKey, record.audit_type);
         });
       });
       
@@ -278,7 +315,7 @@ const AuditorPerforma = () => {
         .from('addendum')
         .select('*')
         .eq('status', 'approved')
-        .order('created_at', { ascending: false });
+        .order('tanggal_input', { ascending: false });
       if (error) throw error;
       setAddendums(data || []);
     } catch (error) {

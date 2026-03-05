@@ -201,6 +201,25 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
     return formData.leader && formData.team.includes(formData.leader);
   };
 
+  // Check if audit date range exceeds 1 month (31 days)
+  const getAuditDateRangeWarning = () => {
+    if (!formData.audit_start_date || !formData.audit_end_date) return null;
+    const start = new Date(formData.audit_start_date);
+    const end = new Date(formData.audit_end_date);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+    const diffMs = end.getTime() - start.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 31) {
+      return diffDays;
+    }
+    if (diffDays < 0) {
+      return 'invalid';
+    }
+    return null;
+  };
+
+  const auditDateWarning = getAuditDateRangeWarning();
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
@@ -649,6 +668,31 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
               />
             </div>
           </div>
+          {/* Warning jika range tanggal audit lebih dari 1 bulan */}
+          {auditDateWarning === 'invalid' && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-300 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-700">Tanggal tidak valid</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Tanggal selesai tidak boleh lebih awal dari tanggal mulai. Mohon periksa kembali input tanggal.
+                </p>
+              </div>
+            </div>
+          )}
+          {typeof auditDateWarning === 'number' && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-500 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-700">
+                  Range tanggal audit melebihi 1 bulan ({auditDateWarning} hari)
+                </p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Pastikan tanggal mulai dan selesai sudah benar. Periksa kembali tahun yang diinput.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Row 5: Risiko | Prioritas */}

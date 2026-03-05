@@ -17,6 +17,7 @@ import {
     Megaphone,
     ScanFace,
     Slack,
+    Sparkles,
     Table2,
     Ticket,
     UserRoundPen,
@@ -260,6 +261,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/survey-manager', icon: ClipboardCheck, label: 'Survei Kepuasan' });
     auditItems.push({ path: '/tools', icon: Wrench, label: 'Tools' });
+    auditItems.push({ path: '/audit-assistant', icon: Sparkles, label: 'AI Assistant' });
     auditItems.push({ path: '/shortlink', icon: Link2, label: 'Shortlink' });
 
     if (auditItems.length > 0) {

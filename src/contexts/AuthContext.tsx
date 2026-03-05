@@ -7,7 +7,7 @@ interface AuthContextType {
   userRole: string;
   auditor: { id: string; name: string } | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<string | undefined>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   resetInactivityTimer: () => void; // Tambahkan fungsi reset timer
@@ -172,17 +172,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .maybeSingle(); // Use maybeSingle instead of single to handle null case
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // Ignore "No rows returned" error
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user role:', error);
-        return;
+        return 'user';
       }
 
-      setUserRole(data?.role || 'user'); // Default to 'user' if no role found
+      const role = data?.role || 'user';
+      setUserRole(role);
+      return role;
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
-      setUserRole('user'); // Default to 'user' on error
+      setUserRole('user');
+      return 'user';
     }
   }
 
@@ -222,19 +225,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       
-      // Immediately set the user to avoid double login
       setUser(data.user);
       
-      // Fetch the user role and auditor info
+      let finalRole = 'user';
       if (data.user) {
-        await Promise.all([
+        const [fetchedRole] = await Promise.all([
           fetchUserRole(data.user.id),
           fetchAuditor(data.user.id)
         ]);
+        if (fetchedRole) finalRole = fetchedRole;
       }
       
-      // Then update loading state
       setIsLoading(false);
+      return finalRole;
     } catch (error) {
       setIsLoading(false); // Reset loading on error
       throw error;

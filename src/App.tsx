@@ -11,6 +11,7 @@ import { PresenceProvider } from './contexts/PresenceContext';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AddUser from './pages/AddUser';
 import AssignmentLetter from './pages/AssignmentLetter';
+import AuditAssistant from './pages/AuditAssistant';
 import AuditeeSurvey from './pages/AuditeeSurvey';
 import AuditorWorkpapers from './pages/AuditorWorkpapers';
 import BranchDirectory from './pages/BranchDirectory';
@@ -19,6 +20,7 @@ import ChatPage from './pages/ChatPage';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
+import FinanceLPJ from './pages/FinanceLPJ';
 import FraudStaffPage from './pages/FraudStaffPage';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
@@ -64,6 +66,11 @@ function PrivateRoute({ children, requiredRoles = ['user', 'qa', 'superadmin','d
     // For protected sub-routes, show restricted access page
     return <UnauthorizedPage />;
   }
+
+  // Finance role: always redirect to finance-lpj (no access to other menus)
+  if (userRole === 'finance' && location.pathname !== '/finance-lpj') {
+    return <Navigate to="/finance-lpj" replace />;
+  }
   
   if (!requiredRoles.includes(userRole)) {
     return <Navigate to="/dashboard" />;
@@ -89,6 +96,8 @@ function App() {
                 </PrivateRoute>
               }>
               <Route index element={<Navigate to="/dashboard" replace />} />
+
+              {/* Finance LPJ route (inside layout block but finance users get redirected to standalone) */}
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="/pull-request" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
@@ -192,7 +201,20 @@ function App() {
                   <ShortlinkPage />
                 </PrivateRoute>
                 } />
+                <Route path="audit-assistant" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <AuditAssistant />
+                </PrivateRoute>
+                } />
             </Route>
+
+            {/* Finance LPJ Route — standalone without Layout/Sidebar */}
+            <Route path="/finance-lpj" element={
+              <PrivateRoute requiredRoles={['finance', 'superadmin']}>
+                <FinanceLPJ />
+              </PrivateRoute>
+            } />
+
             {/* Public Shortlink Redirect — tanpa auth */}
             <Route path="/s/:slug" element={<ShortlinkRedirect />} />
             {/* Fullscreen Video Call Route */}
