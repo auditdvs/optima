@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { MatriksData, MatriksTable } from '../components/qa-management/MatriksSection';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { getActiveAuditors } from '../lib/auditorService';
 import { supabase } from '../lib/supabaseClient';
 
 // --- Interfaces ---
@@ -228,12 +229,7 @@ const QAManagement: React.FC = () => {
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name, auditor_id')
-        .order('name');
-      
-      if (error) throw error;
+      const data = await getActiveAuditors();
       setAuditors(data || []);
     } catch (error) {
       console.error('Error fetching auditors:', error);

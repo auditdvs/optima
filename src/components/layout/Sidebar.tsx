@@ -1,29 +1,29 @@
 import {
-    Blocks,
-    ChartPie,
-    ChevronDown,
-    ChevronsUpDown,
-    ClipboardCheck,
-    FileCheck,
-    FileText,
-    FileVideo,
-    GitPullRequest,
-    History,
-    KeyRound,
-    LayoutDashboard,
-    Library,
-    Link2,
-    LogOut,
-    Megaphone,
-    ScanFace,
-    Slack,
-    Sparkles,
-    Table2,
-    Ticket,
-    UserRoundPen,
-    Users,
-    Wrench,
-    X
+  Blocks,
+  ChartPie,
+  ChevronDown,
+  ChevronsUpDown,
+  ClipboardCheck,
+  FileCheck,
+  FileText,
+  FileVideo,
+  GitPullRequest,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  Library,
+  Link2,
+  LogOut,
+  Megaphone,
+  ScanFace,
+  Slack,
+  Sparkles,
+  Table2,
+  Ticket,
+  UserRoundPen,
+  Users,
+  Wrench,
+  X
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -335,7 +335,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
           fixed lg:relative inset-y-0 left-0
           ${isCollapsed 
             ? '-translate-x-full lg:translate-x-0 lg:w-20' 
-            : 'translate-x-0 w-[280px]'
+            : 'translate-x-0 w-[240px]'
           }
         `}
       >

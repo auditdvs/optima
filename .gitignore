@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 .bolt
+.xlsx
+.xls
+.csv
 
 # Environment variables
 .env

@@ -12,6 +12,7 @@ import { ArrowUpDown, Download, MessageSquare, Plus, Search } from 'lucide-react
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabaseClient';
 import { CustomCheckbox } from './CustomCheckbox';
 
@@ -290,13 +291,8 @@ const AuditTable: React.FC<AuditTableProps> = ({ data, onDataChange, regionFilte
 
   const fetchAuditors = async () => {
     try {
-      const { data: auditorData, error } = await supabase
-        .from('auditors')
-        .select('id, auditor_id, name')
-        .order('name');
-      
-      if (error) throw error;
-      setAuditors(auditorData || []);
+      const data = await getActiveAuditors();
+      setAuditors(data || []);
     } catch (error) {
       console.error('Error fetching auditors:', error);
       toast.error('Failed to fetch auditors');

@@ -2,6 +2,7 @@ import { Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabaseClient';
 
 interface AssignmentLetter {
@@ -88,12 +89,8 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name')
-        .order('name');
+      const data = await getActiveAuditors();
 
-      if (error) throw error;
       console.log('Auditors fetched:', data); // Debug log
       
       // Filter di frontend untuk memastikan name tidak null/kosong

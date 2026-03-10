@@ -1,4 +1,4 @@
-import { Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, Plus, Search, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -110,6 +110,7 @@ const QASection: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'regular' | 'fraud'>('regular');
   const [activeWorkpaperTab, setActiveWorkpaperTab] = useState<'audit' | 'thc'>('audit');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isUpcomingOpen, setIsUpcomingOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -456,6 +457,26 @@ const QASection: React.FC = () => {
     return matchesSearch && matchesDate && matchesRegion && isPastEndDate && matchesSubTab && matchesMainTab;
   });
 
+  // Upcoming Tasks: audits where end_date is between H-3 (3 days from now) and H+3 (3 days ago)
+  // i.e. audits that have NOT yet passed the H+3 threshold but are within a 6-day window around today
+  const upcomingTasks = auditMasters.filter(audit => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(audit.audit_end_date);
+    endDate.setHours(0, 0, 0, 0);
+
+    // H+3 threshold (3 days after end date) - same as main table cutoff
+    const hPlus3 = new Date(endDate);
+    hPlus3.setDate(hPlus3.getDate() + 3);
+
+    // H-3 threshold (3 days before end date)
+    const hMinus3 = new Date(endDate);
+    hMinus3.setDate(hMinus3.getDate() - 3);
+
+    // Show if today is between H-3 and H+3 (exclusive of H+3 since those go to main table)
+    return today >= hMinus3 && today < hPlus3;
+  });
+
   const availableYears = Array.from(new Set(
     auditMasters.flatMap(audit => [
       new Date(audit.audit_start_date).getFullYear(),
@@ -525,6 +546,91 @@ const QASection: React.FC = () => {
            </button>
          </div>
       </div>
+
+      {/* Upcoming Task Section - Collapsible */}
+      {upcomingTasks.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm overflow-hidden transition-all">
+          <button
+            onClick={() => setIsUpcomingOpen(!isUpcomingOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-100/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-amber-600" />
+              <h3 className="text-sm font-semibold text-amber-800">Upcoming Task</h3>
+              <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                {upcomingTasks.length}
+              </span>
+            </div>
+            {isUpcomingOpen ? (
+              <ChevronUp size={18} className="text-amber-600" />
+            ) : (
+              <ChevronDown size={18} className="text-amber-600" />
+            )}
+          </button>
+
+          {isUpcomingOpen && (
+            <div className="border-t border-amber-200">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-amber-100/60 text-left border-b border-amber-200">
+                      <th className="p-3 font-medium text-amber-700 w-12">No</th>
+                      <th className="p-3 font-medium text-amber-700">Branch</th>
+                      <th className="p-3 font-medium text-amber-700">Region</th>
+                      <th className="p-3 font-medium text-amber-700">Start - End</th>
+                      <th className="p-3 font-medium text-amber-700">Type</th>
+                      <th className="p-3 font-medium text-amber-700">Auditors</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {upcomingTasks.map((audit, index) => (
+                      <tr key={audit.id} className="hover:bg-amber-50/80 bg-white/60">
+                        <td className="p-3 text-gray-700">{index + 1}</td>
+                        <td className="p-3 text-gray-700 font-medium">{audit.branch_name}</td>
+                        <td className="p-3 text-gray-700">{audit.region || '-'}</td>
+                        <td className="p-3 text-gray-700 whitespace-nowrap">
+                          {formatDate(audit.audit_start_date)} - {formatDate(audit.audit_end_date)}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            audit.audit_type === 'fraud'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {audit.audit_type}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-700">
+                          {audit.leader || audit.team ? (
+                            <div className="text-xs flex flex-wrap gap-1">
+                              {audit.leader && (
+                                <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
+                                  {audit.leader} (Leader)
+                                </span>
+                              )}
+                              {audit.team && audit.team.split(',').map((member, i) => {
+                                const trimmed = member.trim();
+                                if (!trimmed) return null;
+                                return (
+                                  <span key={i} className="inline-block bg-gray-100 px-2 py-0.5 rounded">
+                                    {trimmed}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* THC Task Section */}
       {activeWorkpaperTab === 'thc' && <THCTable />}

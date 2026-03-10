@@ -682,7 +682,7 @@ function Layout({ children }: LayoutProps) {
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
         <main className="flex-1 overflow-auto p-6 bg-gray-50">
-          {children || <Outlet />}
+          {children || <Outlet context={{ isSidebarCollapsed }} />}
         </main>
       </div>
 

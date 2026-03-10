@@ -1,7 +1,9 @@
-import { CalendarIcon, ClipboardCheck, Eye, Search, Star, UsersIcon } from "lucide-react";
+import { CalendarIcon, ClipboardCheck, Eye, History as HistoryIcon, Search, Star, UsersIcon } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { supabaseService } from '../../lib/supabaseService';
 import { Card, CardContent } from '../ui/card';
+import ManagerChangelogView from './ManagerChangelogView';
 import TimelineView from './TimelineView';
 
 // Interface for monthly breakdown - each cell has regular and fraud count
@@ -40,7 +42,7 @@ interface FeedbackDetail {
 
 const AuditorPerforma = () => {
   // Tab state
-  const [activeTab, setActiveTab] = useState<'auditor_counts' | 'timeline' | 'survey'>('auditor_counts');
+  const [activeTab, setActiveTab] = useState<'auditor_counts' | 'timeline' | 'survey' | 'updates'>('auditor_counts');
   
   // State variables for Auditor Counts
   const [auditorMonthlyData, setAuditorMonthlyData] = useState<AuditorMonthlyData[]>([]);
@@ -67,6 +69,27 @@ const AuditorPerforma = () => {
         .select('id, name, auditor_id');
       
       if (auditorsError) throw auditorsError;
+
+      // IDENTIFY BANNED USERS TO HIDE FROM UI
+      let bannedNames = new Set<string>();
+      try {
+        const { data: { users }, error: userError } = await supabaseService.auth.admin.listUsers();
+        if (!userError && users) {
+          const bannedUsers = users.filter((u: any) => u.banned_until && new Date(u.banned_until) > new Date());
+          if (bannedUsers.length > 0) {
+            const bannedIds = bannedUsers.map((u: any) => u.id);
+            // Get their profiles to map ids -> full_names
+            const { data: profiles } = await supabase.from('profiles').select('full_name').in('id', bannedIds);
+            if (profiles) {
+              profiles.forEach(p => {
+                if (p.full_name) bannedNames.add(p.full_name.toLowerCase().trim());
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching banned users for exclusion:', err);
+      }
       
       // Fetch from letter table for selected year (NO status filter for now - testing)
       const yearStart = `${selectedYear}-01-01`;
@@ -99,6 +122,10 @@ const AuditorPerforma = () => {
       auditors?.forEach(auditor => {
         if (auditor.name?.trim()) {
           const fullName = auditor.name.trim();
+
+          // SKIP / HIDE auditor if they are banned
+          if (bannedNames.has(fullName.toLowerCase())) return;
+
           auditorData[fullName] = {
             auditor_id: auditor.auditor_id || fullName.toLowerCase().replace(/\s+/g, '_'),
             name: fullName,
@@ -473,49 +500,62 @@ const AuditorPerforma = () => {
   return (
     <>
       {/* Header with Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <div className="sm:flex sm:items-baseline">
-          <h2 className="text-xl font-semibold text-gray-900 mr-8">Audit Dashboard</h2>
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('auditor_counts')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'auditor_counts'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } mr-8`}
-            >
-              <UsersIcon className="w-4 h-4 inline mr-2" />
-              Auditor Performa
-            </button>
-            <button
-              onClick={() => setActiveTab('timeline')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'timeline'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } mr-8`}
-            >
-              <CalendarIcon className="w-4 h-4 inline mr-2" />
-              Timeline
-            </button>
-            <button
-              onClick={() => setActiveTab('survey')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'survey'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <ClipboardCheck className="w-4 h-4 inline mr-2" />
-              Survei Kepuasan
-            </button>
-          </nav>
+      <div className="mb-6 w-full overflow-x-auto scrollbar-hide pb-1">
+        <div className="inline-flex bg-gray-100/80 p-1.5 rounded-xl gap-1 border border-gray-200/60 shadow-sm shrink-0">
+          <button
+            onClick={() => setActiveTab('auditor_counts')}
+            className={`flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+              activeTab === 'auditor_counts'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50 ring-1 ring-black/5'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
+            }`}
+          >
+            <UsersIcon className={`w-4 h-4 mr-2 ${activeTab === 'auditor_counts' ? 'text-indigo-600' : 'text-gray-400'}`} />
+            Auditor Performa
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('timeline')}
+            className={`flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+              activeTab === 'timeline'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50 ring-1 ring-black/5'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
+            }`}
+          >
+            <CalendarIcon className={`w-4 h-4 mr-2 ${activeTab === 'timeline' ? 'text-indigo-600' : 'text-gray-400'}`} />
+            Timeline
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('survey')}
+            className={`flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+              activeTab === 'survey'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50 ring-1 ring-black/5'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
+            }`}
+          >
+            <ClipboardCheck className={`w-4 h-4 mr-2 ${activeTab === 'survey' ? 'text-indigo-600' : 'text-gray-400'}`} />
+            Survei Kepuasan
+          </button>
+
+          <button
+            onClick={() => setActiveTab('updates')}
+            className={`flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+              activeTab === 'updates'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50 ring-1 ring-black/5'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
+            }`}
+          >
+            <HistoryIcon className={`w-4 h-4 mr-2 ${activeTab === 'updates' ? 'text-indigo-600' : 'text-gray-400'}`} />
+            System Updates
+          </button>
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'auditor_counts' ? (
+      {activeTab === 'updates' ? (
+        <ManagerChangelogView />
+      ) : activeTab === 'auditor_counts' ? (
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-4">

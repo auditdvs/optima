@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Branch {
@@ -83,12 +84,8 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name')
-        .order('name');
+      const data = await getActiveAuditors();
 
-      if (error) throw error;
       console.log('Auditors fetched:', data); // Debug log
       console.log('Total auditors:', data?.length); // Debug count
       

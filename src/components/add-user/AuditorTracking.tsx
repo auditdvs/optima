@@ -1,6 +1,7 @@
 import { MapPin, RefreshCw, Search } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabase';
 import { Card, CardContent } from '../ui/card';
 import {
@@ -119,15 +120,8 @@ const AuditorTracking: React.FC = () => {
   const fetchTrackingData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch all auditors
-      const { data: auditors, error: auditorError } = await supabase
-        .from('auditors')
-        .select('id, name')
-        .order('name');
-
-      if (auditorError) throw auditorError;
-
-      const validAuditors = (auditors || []).filter(a => a.name);
+      // 1. Fetch all active auditors
+      const validAuditors = await getActiveAuditors();
 
       // 2. Fetch all approved letters
       const { data: letters, error: letterError } = await supabase

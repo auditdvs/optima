@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Database, MapPin, Search, UserCheck, Users } from 'lucide-react';
+import { AlertTriangle, Database, FileText, MapPin, Search, UserCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import AuditorManagement from '../components/add-user/AuditorManagement';
 import AuditorTracking from '../components/add-user/AuditorTracking';
+import Changelog from '../components/add-user/Changelog';
 import MSSQLConnectionLog from '../components/add-user/MSSQLConnectionLog';
 import { AddAuditorModal, EditPICModal, ManagePICModal, PIC } from '../components/add-user/PICModals';
 import PendingApprovals, { ReprocessItem } from '../components/add-user/PendingApprovals';
@@ -16,7 +17,7 @@ export default function UserControlPanel() {
   const [showManagePICModal, setShowManagePICModal] = useState(false);
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'users' | 'auditors' | 'queue' | 'tracking' | 'mssql_log'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'auditors' | 'queue' | 'tracking' | 'mssql_log' | 'changelog'>('users');
   const queryClient = useQueryClient();
 
   // Reprocess State
@@ -232,6 +233,17 @@ export default function UserControlPanel() {
             <Database className="w-3.5 h-3.5" />
             MSSQL
           </button>
+          <button
+            onClick={() => setActiveTab('changelog')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
+              activeTab === 'changelog'
+                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-gray-200'
+                : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Changelog
+          </button>
         </div>
       </div>
 
@@ -258,6 +270,10 @@ export default function UserControlPanel() {
 
       {activeTab === 'mssql_log' && (
         <MSSQLConnectionLog />
+      )}
+
+      {activeTab === 'changelog' && (
+        <Changelog />
       )}
 
       {/* PIC Modals */}

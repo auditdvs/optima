@@ -239,14 +239,16 @@ const AuditSchedule = () => {
                 .map((schedule, idx) => {
                   let rowColorClass = '';
                   
-                  // Logic pewarnaan baris berdasarkan status dan prioritas
-                  const regionSchedules = auditScheduleData.filter(s => s.region === selectedRegion).sort((a, b) => (a.no || 0) - (b.no || 0));
-                  const isTopPriority = regionSchedules.findIndex(s => s.branch_name === schedule.branch_name) < 3; // Top 3
+                  // Logic pewarnaan baris:
+                  // Hijau: Sudah diaudit & PRIO === EXE ORDER
+                  // Kuning: Sudah diaudit & PRIO !== EXE ORDER
+                  // Merah: Belum diaudit
+                  const isMismatch = schedule.isAudited && schedule.execution_order != null && schedule.priority != null && schedule.execution_order !== schedule.priority;
                   
-                  if (schedule.isAudited) {
-                    rowColorClass = 'bg-green-50 hover:bg-green-100 text-green-900'; // Hijau: Sudah diaudit
-                  } else if (isTopPriority) {
-                    rowColorClass = 'bg-orange-50 hover:bg-orange-100 text-orange-900 font-medium'; // Orange: Belum + Prioritas Tinggi
+                  if (schedule.isAudited && !isMismatch) {
+                    rowColorClass = 'bg-green-50 hover:bg-green-100 text-green-900'; // Hijau: Sesuai
+                  } else if (schedule.isAudited && isMismatch) {
+                    rowColorClass = 'bg-yellow-50 hover:bg-yellow-100 text-yellow-900'; // Kuning: Tidak sesuai
                   } else {
                     rowColorClass = 'bg-red-50 hover:bg-red-100 text-red-900'; // Merah: Belum audit
                   }
@@ -273,10 +275,10 @@ const AuditSchedule = () => {
                       <TableCell className="text-center">
                         <span className={`px-2 py-1 rounded text-xs font-semibold
                           ${schedule.isAudited 
-                            ? 'bg-green-200 text-green-800' 
-                            : isTopPriority
-                              ? 'bg-orange-200 text-orange-800'
-                              : 'bg-red-200 text-red-800'
+                            ? isMismatch
+                              ? 'bg-yellow-200 text-yellow-800'
+                              : 'bg-green-200 text-green-800'
+                            : 'bg-red-200 text-red-800'
                           }`}>
                           {schedule.isAudited ? 'DONE' : 'PENDING'}
                         </span>
@@ -289,20 +291,7 @@ const AuditSchedule = () => {
         </Table>
         
         {/* Legend / Keterangan Warna */}
-        <div className="mt-4 flex gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 bg-green-200 border border-green-300 rounded"></span>
-            <span>Sudah Diaudit (Done)</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 bg-orange-200 border border-orange-300 rounded"></span>
-            <span>Prioritas Tinggi (Pending - Top 3)</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 bg-red-200 border border-red-300 rounded"></span>
-            <span>Belum Diaudit (Pending)</span>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

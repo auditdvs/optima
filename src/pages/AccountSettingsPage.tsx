@@ -1,4 +1,7 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            import { useEffect, useState } from 'react';
+import { eachDayOfInterval, format } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityCalendar } from 'react-activity-calendar';
+import { useOutletContext } from 'react-router-dom';
 import AuditStats from '../components/account-settings/AuditStats';
 import TotalStatsContainer from '../components/account-settings/TotalStatsContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -29,6 +32,9 @@ interface AdminIssue {
 
 const AccountSettingsPage = () => {
   const { user } = useAuth();
+  const context = useOutletContext<{ isSidebarCollapsed: boolean }>();
+  const isSidebarCollapsed = context?.isSidebarCollapsed ?? false;
+  
   // State for audited branches
   const [auditedBranches, setAuditedBranches] = useState<AuditedBranch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(true);
@@ -50,6 +56,54 @@ const AccountSettingsPage = () => {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'performance' | 'issues'>('performance');
+
+  const calendarData = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const startOfCurrentYear = new Date(currentYear, 0, 1);
+    const endOfCurrentYear = new Date(currentYear, 11, 31);
+    const counts = new Map();
+    
+    // auditedBranches already contains both regular, fraud, and addendums
+    auditedBranches.forEach(a => {
+       if (a.audit_start_date) {
+         try {
+            const startDateStr = a.audit_start_date.split('T')[0];
+            const startDate = new Date(startDateStr);
+            
+            let endDate = startDate;
+            if (a.audit_end_date) {
+               const endDateStr = a.audit_end_date.split('T')[0];
+               endDate = new Date(endDateStr);
+            }
+            
+            // Validate dates
+            if (startDate <= endDate) {
+               const auditDays = eachDayOfInterval({ start: startDate, end: endDate });
+               
+               auditDays.forEach(d => {
+                  if (d >= startOfCurrentYear && d <= endOfCurrentYear) {
+                     const dStr = format(d, 'yyyy-MM-dd');
+                     counts.set(dStr, (counts.get(dStr) || 0) + 1);
+                  }
+               });
+            }
+         } catch(e) {
+            console.error("Error processing calendar dates:", e);
+         }
+       }
+    });
+
+    const allDays = eachDayOfInterval({ start: startOfCurrentYear, end: endOfCurrentYear });
+    return allDays.map(day => {
+       const dStr = format(day, 'yyyy-MM-dd');
+       const count = counts.get(dStr) || 0;
+       return {
+          date: dStr,
+          count,
+          level: count > 4 ? 4 : count
+       };
+    });
+  }, [auditedBranches]);
 
   useEffect(() => {
 
@@ -638,16 +692,49 @@ const AccountSettingsPage = () => {
       {/* User Performance Tab */}
       {activeTab === 'performance' && showAuditSections && (
         <>
-          {/* Total Statistics - Paling Atas */}
-          <TotalStatsContainer
-            totalRegular={totalRegular}
-            totalFraud={totalFraud}
-            totalAudits={totalAudits}
-            sisaTarget={sisaTarget}
-            targetColor={targetColor}
-            loading={loadingStats}
-            adminIssuesCount={adminIssues.filter(i => i.missing_documents !== "Semua dokumen sudah lengkap").length}
-          />
+          {/* Total Statistics & Heatmap Row */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 mb-6">
+            {/* Kiri: Total Statistics */}
+            <div className="w-full">
+              <TotalStatsContainer
+                totalRegular={totalRegular}
+                totalFraud={totalFraud}
+                totalAudits={totalAudits}
+                sisaTarget={sisaTarget}
+                targetColor={targetColor}
+                loading={loadingStats}
+                adminIssuesCount={adminIssues.filter(i => i.missing_documents !== "Semua dokumen sudah lengkap").length}
+              />
+            </div>
+            
+            {/* Kanan: Calendar Heatmap */}
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 h-full flex flex-col overflow-hidden">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">Audit Activity Heatmap</h3>
+              <div className="w-full flex-1 flex items-center justify-center overflow-x-auto pb-2 scroller-hide-scrollbars">
+                <div className="min-w-fit px-2 xl:px-0">
+                  <ActivityCalendar 
+                    data={calendarData} 
+                    blockSize={isSidebarCollapsed ? 10 : 9}
+                    blockRadius={2}
+                    blockMargin={isSidebarCollapsed ? 4 : 3}
+                    fontSize={isSidebarCollapsed ? 14 : 12}
+                    theme={{
+                      light: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39']
+                    }}
+                    colorScheme="light"
+                    labels={{
+                      legend: {
+                        less: 'Less',
+                        more: 'More'
+                      },
+                      months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                      totalCount: `{{count}} Audit Days in ${new Date().getFullYear()}`
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Statistik Audit */}
           <div className="mb-6">

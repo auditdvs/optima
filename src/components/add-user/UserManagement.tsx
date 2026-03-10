@@ -587,15 +587,23 @@ export default function UserManagement() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center">
-                      <div className={`h-2 w-2 rounded-full mr-2 ${onlineUserIds.has(user.id) ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300'}`} />
-                      <span className="text-xs text-gray-500 font-medium">
-                        {onlineUserIds.has(user.id) ? 'Online' : 
-                          user.last_sign_in_at ? 
-                            formatDistanceToNow(new Date(user.last_sign_in_at), { addSuffix: true }) : 
-                            'Never logged in'}
-                      </span>
-                    </div>
+                    {(() => {
+                      const isOnlineByPresence = onlineUserIds.has(user.id);
+                      const isRecentLogin = user.last_sign_in_at && (Date.now() - new Date(user.last_sign_in_at).getTime()) < 1 * 60 * 1000;
+                      const isOnline = isOnlineByPresence || isRecentLogin;
+                      
+                      return (
+                        <div className="flex items-center">
+                          <div className={`h-2 w-2 rounded-full mr-2 ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-gray-300'}`} />
+                          <span className="text-xs text-gray-500 font-medium">
+                            {isOnline ? 'Online' : 
+                              user.last_sign_in_at ? 
+                                formatDistanceToNow(new Date(user.last_sign_in_at), { addSuffix: true }) : 
+                                'Never logged in'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex items-center justify-end space-x-2">

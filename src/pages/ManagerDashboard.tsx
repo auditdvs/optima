@@ -374,7 +374,7 @@ const ManagerDashboard = () => {
               : 'text-gray-700 hover:bg-gray-50'
           }`}
         >
-          Auditor Performa
+          Key Performance Indicators
         </button>
         <button
           onClick={() => setActiveSection('auditSummary')}

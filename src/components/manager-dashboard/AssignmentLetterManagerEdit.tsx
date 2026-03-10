@@ -1,6 +1,7 @@
 import { AlertTriangle, Calendar, FileText, MapPin, Upload, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Branch {
@@ -87,12 +88,7 @@ export default function AssignmentLetterManagerEdit({ letter, onSuccess, onCance
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
+      const data = await getActiveAuditors();
       const filteredAuditors = data?.filter(auditor => auditor.name) || [];
       setAuditors(filteredAuditors);
     } catch (error) {

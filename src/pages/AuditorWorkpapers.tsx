@@ -2,6 +2,7 @@ import { Check, Save, Search, User, Users, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import RPMRegistrationComponent from '../components/assignment/RPMRegistration';
+import { getActiveAuditors } from '../lib/auditorService';
 import { supabase } from '../lib/supabaseClient';
 
 // --- Interfaces ---
@@ -206,12 +207,7 @@ const AuditorWorkpapers: React.FC = () => {
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name, auditor_id')
-        .order('name');
-      
-      if (error) throw error;
+      const data = await getActiveAuditors();
       setAuditors(data || []);
     } catch (error) {
       console.error('Error fetching auditors:', error);

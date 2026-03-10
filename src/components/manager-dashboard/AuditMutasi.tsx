@@ -1,6 +1,7 @@
 import { Edit2, FileDown, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { getActiveAuditors } from '../../lib/auditorService';
 import { supabase } from '../../lib/supabaseClient';
 
 interface AuditMutasi {
@@ -104,12 +105,7 @@ export default function AuditMutasi() {
 
   const fetchAuditors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auditors')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
+      const data = await getActiveAuditors();
       setAuditors(data?.filter(a => a.name) || []);
     } catch (error) {
       console.error('Error fetching auditors:', error);
