@@ -38,6 +38,11 @@ interface FeedbackDetail {
   harapan: string;
   kritik_saran: string;
   submitted_at: string;
+  // Section 1 scores (1-5 scale)
+  a1?: number; a2?: number; a3?: number; a4?: number; a5?: number; a6?: number;
+  b1?: number; b2?: number; b3?: number;
+  c1?: number; c2?: number; c3?: number; c4?: number; c5?: number; c6?: number; c7?: number;
+  d1?: number; d2?: number; d3?: number;
 }
 
 const AuditorPerforma = () => {
@@ -425,12 +430,19 @@ const AuditorPerforma = () => {
             branchSummary[token.branch_name].total_responses++;
             branchSummary[token.branch_name].avg_score += avgScore;
             
-            // Add feedback if exists
+            // Add feedback (always include scoring data even if no text)
             if (response.harapan || response.kritik_saran) {
               branchSummary[token.branch_name].feedbacks.push({
                 harapan: response.harapan || '-',
                 kritik_saran: response.kritik_saran || '-',
-                submitted_at: response.created_at
+                submitted_at: response.created_at,
+                // Section 1 scores
+                a1: response.a1, a2: response.a2, a3: response.a3,
+                a4: response.a4, a5: response.a5, a6: response.a6,
+                b1: response.b1, b2: response.b2, b3: response.b3,
+                c1: response.c1, c2: response.c2, c3: response.c3,
+                c4: response.c4, c5: response.c5, c6: response.c6, c7: response.c7,
+                d1: response.d1, d2: response.d2, d3: response.d3,
               });
             }
             
@@ -472,6 +484,94 @@ const AuditorPerforma = () => {
       fetchSurveySummary();
     }
   }, [activeTab]);
+
+  // ─────────────────────────────────────────────────
+  // Generate survey conclusion from scoring data
+  // ─────────────────────────────────────────────────
+  const generateSurveyConclusion = (feedbacks: FeedbackDetail[]) => {
+    if (!feedbacks || feedbacks.length === 0) return null;
+
+    // Aggregate scores per section across all respondents
+    const sectionA = ['a1','a2','a3','a4','a5','a6'];
+    const sectionB = ['b1','b2','b3'];
+    const sectionC = ['c1','c2','c3','c4','c5','c6','c7'];
+    const sectionD = ['d1','d2','d3'];
+
+    const avg = (keys: string[]) => {
+      let total = 0, count = 0;
+      feedbacks.forEach(fb => {
+        keys.forEach(k => {
+          const val = (fb as any)[k];
+          if (val !== undefined && val !== null) { total += Number(val); count++; }
+        });
+      });
+      return count > 0 ? total / count : null;
+    };
+
+    const avgA = avg(sectionA);
+    const avgB = avg(sectionB);
+    const avgC = avg(sectionC);
+    const avgD = avg(sectionD);
+    const allAvg = avg([...sectionA, ...sectionB, ...sectionC, ...sectionD]);
+
+    if (allAvg === null) return null;
+
+    const label = (score: number | null) => {
+      if (score === null) return { text: 'N/A', color: 'text-gray-400' };
+      if (score >= 4.5) return { text: 'Sangat Baik', color: 'text-emerald-600' };
+      if (score >= 3.5) return { text: 'Baik', color: 'text-green-600' };
+      if (score >= 2.5) return { text: 'Cukup', color: 'text-yellow-600' };
+      if (score >= 1.5) return { text: 'Kurang', color: 'text-orange-600' };
+      return { text: 'Sangat Kurang', color: 'text-red-600' };
+    };
+
+    const overallLabel = label(allAvg);
+
+    // Generate textual conclusion per dimension
+    const dimensionInsights: string[] = [];
+
+    // Section A: Atribut Profesional
+    if (avgA !== null) {
+      if (avgA >= 4.0)
+        dimensionInsights.push('Auditor dinilai memiliki <strong>profesionalisme yang tinggi</strong> — objektif, komunikatif, dan dapat dipercaya dalam menangani informasi.');
+      else if (avgA >= 3.0)
+        dimensionInsights.push('Profesionalisme auditor dinilai <strong>cukup baik</strong>, namun masih ada ruang untuk meningkatkan komunikasi dan keterbukaan kepada auditee.');
+      else
+        dimensionInsights.push('Terdapat <strong>kelemahan signifikan</strong> pada atribut profesional auditor — perlu peningkatan dalam sikap, komunikasi, dan objektivitas.');
+    }
+
+    // Section B: Ruang Lingkup
+    if (avgB !== null) {
+      if (avgB >= 4.0)
+        dimensionInsights.push('Tujuan dan ruang lingkup audit <strong>dikomunikasikan dengan jelas</strong> dan konsisten dengan target kerja cabang.');
+      else if (avgB >= 3.0)
+        dimensionInsights.push('Ruang lingkup audit <strong>cukup dipahami</strong> auditee, meski komunikasi awal masih bisa lebih ditingkatkan.');
+      else
+        dimensionInsights.push('Ruang lingkup audit <strong>belum dikomunikasikan dengan baik</strong> — auditee merasa tujuan audit kurang jelas.');
+    }
+
+    // Section C: Kinerja Pelaksanaan
+    if (avgC !== null) {
+      if (avgC >= 4.0)
+        dimensionInsights.push('Pelaksanaan audit berjalan <strong>efektif dan profesional</strong> — temuan didiskusikan, didukung bukti kuat, dan laporan ditulis dengan baik.');
+      else if (avgC >= 3.0)
+        dimensionInsights.push('Kinerja pelaksanaan audit <strong>dinilai memadai</strong>, namun kualitas laporan dan kedalaman temuan masih dapat ditingkatkan.');
+      else
+        dimensionInsights.push('Kinerja pelaksanaan audit <strong>perlu perbaikan</strong> — temuan kurang didiskusikan, bukti kurang akurat, atau laporan sulit dipahami.');
+    }
+
+    // Section D: Keseluruhan
+    if (avgD !== null) {
+      if (avgD >= 4.0)
+        dimensionInsights.push('Secara keseluruhan, auditee <strong>sangat puas</strong> dan audit dinilai memberikan nilai tambah nyata bagi operasional cabang.');
+      else if (avgD >= 3.0)
+        dimensionInsights.push('Secara keseluruhan, auditee <strong>cukup puas</strong> dengan pelaksanaan audit, meski beberapa aspek masih perlu pembenahan.');
+      else
+        dimensionInsights.push('Kepuasan keseluruhan auditee <strong>rendah</strong> — audit belum dirasakan memberikan manfaat yang signifikan.');
+    }
+
+    return { avgA, avgB, avgC, avgD, allAvg, overallLabel, dimensionInsights, label };
+  };
 
   // Render month cell with regular/fraud breakdown
   const renderMonthCell = (monthData: MonthlyCount) => {
@@ -967,6 +1067,86 @@ const AuditorPerforma = () => {
                       </div>
                     </div>
                   ))}
+
+                  {/* ── AI-style Scoring Conclusion ── */}
+                  {(() => {
+                    const conclusion = generateSurveyConclusion(selectedBranch.feedbacks);
+                    if (!conclusion) return null;
+                    const { avgA, avgB, avgC, avgD, allAvg, overallLabel, dimensionInsights, label } = conclusion;
+                    return (
+                      <div className="mt-6 border-t-2 border-indigo-100 pt-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.346A3.49 3.49 0 0015 18.58V19a2 2 0 01-2 2H11a2 2 0 01-2-2v-.42c0-.893-.356-1.73-.983-2.357l-.347-.345z" />
+                            </svg>
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-800">Kesimpulan Berdasarkan Scoring</h4>
+                          <span className={`ml-auto text-xs font-bold px-2.5 py-1 rounded-full ${
+                            allAvg >= 4.5 ? 'bg-emerald-100 text-emerald-700' :
+                            allAvg >= 3.5 ? 'bg-green-100 text-green-700' :
+                            allAvg >= 2.5 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {overallLabel.text} · {allAvg.toFixed(2)}/5.00
+                          </span>
+                        </div>
+
+                        {/* Score per Section */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                          {([
+                            { key: 'A', title: 'Atribut Profesional', avg: avgA, sub: 'a1–a6' },
+                            { key: 'B', title: 'Ruang Lingkup', avg: avgB, sub: 'b1–b3' },
+                            { key: 'C', title: 'Kinerja Pelaksanaan', avg: avgC, sub: 'c1–c7' },
+                            { key: 'D', title: 'Keseluruhan', avg: avgD, sub: 'd1–d3' },
+                          ] as const).map(sec => {
+                            const l = label(sec.avg);
+                            const pct = sec.avg !== null ? (sec.avg / 5) * 100 : 0;
+                            return (
+                              <div key={sec.key} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Bagian {sec.key}</span>
+                                  <span className={`text-[10px] font-bold ${l.color}`}>{l.text}</span>
+                                </div>
+                                <p className="text-xs text-gray-600 mb-2">{sec.title}</p>
+                                <div className="flex items-baseline gap-1">
+                                  <span className={`text-xl font-bold ${l.color}`}>
+                                    {sec.avg !== null ? sec.avg.toFixed(2) : '-'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">/5.00</span>
+                                </div>
+                                <div className="mt-1.5 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      pct >= 80 ? 'bg-emerald-500' :
+                                      pct >= 60 ? 'bg-green-500' :
+                                      pct >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">{sec.sub}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Textual Insights */}
+                        <div className="space-y-2">
+                          {dimensionInsights.map((insight, i) => (
+                            <div key={i} className="flex items-start gap-2.5 text-sm text-gray-700 bg-indigo-50/60 rounded-lg px-3 py-2.5">
+                              <span className="mt-0.5 w-4 h-4 rounded-full bg-indigo-200 text-indigo-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                              <p dangerouslySetInnerHTML={{ __html: insight }} />
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="mt-3 text-[10px] text-gray-400 italic">
+                          * Kesimpulan dibuat secara otomatis berdasarkan rata-rata skor {selectedBranch.feedbacks.length} responden per dimensi Section 1 (skala 1–5).
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

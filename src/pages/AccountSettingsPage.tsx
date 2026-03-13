@@ -299,10 +299,11 @@ const AccountSettingsPage = () => {
     }
 
     // Get assignment letters (Surat Tugas)
+    // NOTE: status must be lowercase 'approved' — matches DB value and AuditorPerforma
     const { data: letters, error: letterError } = await supabase
       .from('letter')
       .select('id, branch_name, audit_type, audit_start_date, audit_end_date, team, leader, status, assigment_letter')
-      .eq('status', 'Approved')
+      .eq('status', 'approved')
       .order('id', { ascending: false });
 
     if (letterError) {
@@ -323,6 +324,22 @@ const AccountSettingsPage = () => {
     console.log('Profile full_name:', profileData.full_name);
     console.log('Found audit_master records:', auditMaster?.length || 0);
 
+    // Helper: Levenshtein edit distance for catching 1-char typos (e.g. "Widiya" vs "Widya")
+    const editDistance = (a: string, b: string): number => {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          dp[i][j] = a[i - 1] === b[j - 1]
+            ? dp[i - 1][j - 1]
+            : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+      }
+      return dp[m][n];
+    };
+
     // Helper to check if user is in audit team or is leader with Fuzzy Matching
     const isUserInAudit = (record: any, fullName: string) => {
       if (!fullName) return false;
@@ -336,7 +353,7 @@ const AccountSettingsPage = () => {
         const normDbName = normalize(dbName);
         const normFullName = normalize(fullName);
         
-        // 0. Exact match (case insensitive) - handles single-word names like "Ahmad"
+        // 0. Exact match (case insensitive)
         if (normDbName === normFullName) return true;
         
         // Filter out short tokens (titles like SE, MM, etc) - only keep meaningful words
@@ -353,24 +370,31 @@ const AccountSettingsPage = () => {
           if (dbJoined.includes(userJoined) || userJoined.includes(dbJoined)) return true;
         }
         
-        // 2. Initials match (only for meaningful tokens)
+        // 2. Initials match (only for meaningful tokens, min 3)
         if (dbTokensFiltered.length >= 3 && userTokensFiltered.length >= 3) {
           const dbInitials = dbTokensFiltered.map(t => t[0]).join('');
           const userInitialsFiltered = userTokensFiltered.map(t => t[0]).join('');
           if (userInitialsFiltered === dbInitials) return true;
         }
         
-        // 3. Token Intersection - only for meaningful tokens
-        // Tokens must match EXACTLY (no prefix matching to avoid "achmad" matching "achmadani")
-        let exactMatchCount = 0;
+        // 3. Token intersection — exact match OR near-match via edit distance
+        // Near-match: tokens with length >= 5 can differ by at most 1 char
+        // (catches "Widiya" vs "Widya", "Muhamad" vs "Muhammad", etc.)
+        let matchCount = 0;
         userTokensFiltered.forEach(uToken => {
-          if (dbTokensFiltered.some(dToken => dToken === uToken)) {
-            exactMatchCount++;
-          }
+          const matched = dbTokensFiltered.some(dToken => {
+            if (dToken === uToken) return true;
+            // Near-match: edit distance ≤ 1 for tokens long enough to avoid false positives
+            if (uToken.length >= 5 && dToken.length >= 4) {
+              return editDistance(uToken, dToken) <= 1;
+            }
+            return false;
+          });
+          if (matched) matchCount++;
         });
         
-        // Need at least 2 exact matching meaningful tokens
-        if (exactMatchCount >= 2) return true;
+        // Need at least 2 matching meaningful tokens (exact or near-match)
+        if (matchCount >= 2) return true;
         
         return false;
       };
@@ -448,7 +472,7 @@ const AccountSettingsPage = () => {
       const auditMasterRecords = auditMaster || [];
       const letterRecords = letters || [];
       const addendumRecords = addendums || [];
-      
+
       const filteredAudits = auditMasterRecords
           .filter(record => isUserInAudit(record, profileData.full_name))
           .map(record => {
@@ -515,15 +539,32 @@ const AccountSettingsPage = () => {
              };
          });
 
-      // Combine records from all sources
-      const allRecords = [...filteredAudits, ...filteredLetters, ...filteredAddendums];
+       // Combine records from all sources
+      // Priority: letter records take precedence over audit_master (avoid duplicates)
+      // Put filteredLetters first so they win in case of key collision
+      const allRecords = [...filteredLetters, ...filteredAudits, ...filteredAddendums];
       
       console.log('Filtered total records:', allRecords.length);
       
-      // Unique by branch_name + audit_type + audit_start_date + audit_end_date
+      // Deduplicate using normalized key:
+      // - branch_name: lowercase + trimmed
+      // - audit_type category: 'regular' | 'fraud' | raw (to treat 'reguler' == 'regular')
+      // - month: YYYY-MM only (avoids date-format mismatch like "2026-01-05T00:00:00" vs "2026-01-05")
+      const normalizeAuditType = (t: string) => {
+        const s = (t || '').toLowerCase();
+        if (s.includes('regular') || s.includes('reguler')) return 'regular';
+        if (s.includes('fraud') || s.includes('investigasi') || s.includes('khusus')) return 'fraud';
+        return s.trim();
+      };
+      const toYearMonth = (d?: string | null) => (d ? d.substring(0, 7) : '');
+
       const uniqueMap = new Map();
       allRecords.forEach(a => {
-        const key = `${a.branch_name}|${a.audit_type}|${a.audit_start_date}|${a.audit_end_date}`;
+        const key = [
+          (a.branch_name || '').toLowerCase().trim(),
+          normalizeAuditType(a.audit_type),
+          toYearMonth(a.audit_start_date),
+        ].join('|');
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, a);
         }
@@ -761,7 +802,7 @@ const AccountSettingsPage = () => {
                       <TableRow>
                         <TableCell colSpan={3} className="text-center">Loading...</TableCell>
                       </TableRow>
-                    ) : auditedBranches.filter(branch => branch.audit_type === 'regular').length === 0 ? (
+                    ) : auditedBranches.filter(branch => branch.audit_type?.toLowerCase().includes('regular') || branch.audit_type?.toLowerCase().includes('reguler')).length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center">No regular audits</TableCell>
                       </TableRow>

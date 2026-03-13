@@ -111,8 +111,8 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
   // Fetch all dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Fetch branches
-      const { data: branchesData } = await supabase.from('branches').select('*');
+      // Fetch branches from branches_info (source of truth managed via Branch Directory)
+      const { data: branchesData } = await supabase.from('branches_info').select('*');
       if (branchesData) {
         setBranches(branchesData);
       }
@@ -261,6 +261,7 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
 
     // Cache to sessionStorage
     const cacheData = {
+      version: 'v2_branches_info',
       branches,
       workPapers,
       monthlyData,
@@ -293,7 +294,10 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes for dashboard data
+    // Version key: bump this string whenever the data source/schema changes
+    // (e.g. switched from 'branches' → 'branches_info') to auto-invalidate old cache
+    const CACHE_VERSION = 'v2_branches_info';
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes — branches can change frequently
 
     // Try to load from cache
     const cached = sessionStorage.getItem('dashboardCache');
@@ -302,7 +306,8 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
         const cacheData = JSON.parse(cached);
         const cacheAge = Date.now() - cacheData.timestamp;
 
-        if (cacheAge < CACHE_DURATION) {
+        // Invalidate cache if version mismatch OR expired
+        if (cacheData.version === CACHE_VERSION && cacheAge < CACHE_DURATION) {
           setBranches(cacheData.branches || []);
           setWorkPapers(cacheData.workPapers || []);
           setMonthlyData(cacheData.monthlyData || []);
@@ -310,16 +315,21 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
           setDashboardStats(cacheData.dashboardStats || defaultStats);
           setLastUpdated(new Date(cacheData.timestamp));
           setIsLoaded(true);
-          console.log('📊 Dashboard data loaded from cache');
+          console.log('📊 Dashboard data loaded from cache (branches_info)');
           return;
+        } else {
+          // Clear stale/old-version cache
+          sessionStorage.removeItem('dashboardCache');
+          console.log('📊 Old cache cleared — fetching fresh data from branches_info');
         }
       } catch (e) {
         console.error('Error parsing cached dashboard data:', e);
+        sessionStorage.removeItem('dashboardCache');
       }
     }
 
     // Fetch fresh data
-    console.log('📊 Fetching fresh dashboard data...');
+    console.log('📊 Fetching fresh dashboard data from branches_info...');
     const initData = async () => {
       setIsLoading(true);
       await Promise.all([
@@ -338,6 +348,7 @@ export function DashboardCacheProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (isLoaded && branches.length > 0) {
       const cacheData = {
+        version: 'v2_branches_info',
         branches,
         workPapers,
         monthlyData,
