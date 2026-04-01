@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
 import { approveAddendumFallback, approveAddendumWithProtection, approveLetterFallback, approveLetterWithProtection } from '../../services/letterService';
+import FinanceReview from './FinanceReview';
 
 interface AssignmentLetter {
   id: string;
@@ -39,7 +40,7 @@ interface Account {
 
 interface AssignmentLetterManagerProps {
   refreshTrigger?: number;
-  initialTab?: 'letter' | 'addendum' | 'lpj' | 'mutasi';
+  initialTab?: 'letter' | 'addendum' | 'lpj' | 'mutasi' | 'finance';
 }
 
 interface LpjSubmission {
@@ -68,7 +69,7 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj' | 'mutasi'>(initialTab || 'letter');
+  const [activeTab, setActiveTab] = useState<'letter' | 'addendum' | 'lpj' | 'mutasi' | 'finance'>(initialTab || 'letter');
   const [lpjSubmissions, setLpjSubmissions] = useState<LpjSubmission[]>([]);
   const [lpjFilter, setLpjFilter] = useState<'all' | 'submitted' | 'pending'>('all');
   const [lpjSortField, setLpjSortField] = useState<'letter_number' | 'type' | null>(null);
@@ -1031,11 +1032,27 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
             >
               Audit Mutasi
             </button>
+            <button
+              onClick={() => setActiveTab('finance')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'finance'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Finance Review
+            </button>
           </nav>
         </div>
       </div>
 
       {/* Content based on active tab */}
+
+      {/* Finance Review Tab */}
+      {activeTab === 'finance' && (
+        <FinanceReview />
+      )}
+
       {activeTab === 'lpj' ? (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-4 md:p-6">
@@ -1628,18 +1645,22 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dari</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ke</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">LPJ</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {mutasiList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     Belum ada data audit mutasi
                   </td>
                 </tr>
               ) : (
-                mutasiList.map((mutasi, index) => (
+                [...mutasiList].sort((a, b) => {
+                  const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+                  return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+                }).map((mutasi, index) => (
                   <tr key={mutasi.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{mutasi.auditor_name}</td>
@@ -1653,6 +1674,26 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+                      )}
+                    </td>
+                    {/* LPJ Column */}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {(mutasi as any).lpj_file_url ? (
+                        <a
+                          href={(mutasi as any).lpj_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                        >
+                          <FileDown className="w-3 h-3 mr-1" />
+                          Download
+                        </a>
+                      ) : (
+                        <span className={`text-xs font-semibold ${
+                          mutasi.status === 'approved' ? 'text-red-500' : 'text-gray-400'
+                        }`}>
+                          {mutasi.status === 'approved' ? 'Belum' : '-'}
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -1760,24 +1801,36 @@ export default function AssignmentLetterManager({ refreshTrigger, initialTab = '
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons - only for pending */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => setShowMutasiRejectModal(true)}
-                  disabled={processingId === String(selectedMutasi.id)}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center"
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Reject
-                </button>
-                <button
-                  onClick={() => setShowMutasiApproveConfirm(true)}
-                  disabled={processingId === String(selectedMutasi.id)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  {processingId === String(selectedMutasi.id) ? 'Processing...' : 'Accept'}
-                </button>
+                {selectedMutasi.status === 'pending' ? (
+                  <>
+                    <button
+                      onClick={() => setShowMutasiRejectModal(true)}
+                      disabled={processingId === String(selectedMutasi.id)}
+                      className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => setShowMutasiApproveConfirm(true)}
+                      disabled={processingId === String(selectedMutasi.id)}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      {processingId === String(selectedMutasi.id) ? 'Processing...' : 'Accept'}
+                    </button>
+                  </>
+                ) : (
+                  <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                    selectedMutasi.status === 'approved'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedMutasi.status === 'approved' ? '✓ Sudah Disetujui' : '✗ Ditolak'}
+                  </span>
+                )}
               </div>
             </div>
           </div>

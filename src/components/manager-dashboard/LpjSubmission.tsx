@@ -1,7 +1,8 @@
-import { FileText, PlusIcon, Save, Upload } from 'lucide-react';
+import { ArrowLeftRight, FileText, PlusIcon, Save, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
+import LpjAuditMutasi from './LpjAuditMutasi';
 
 interface PendingDocument {
   id: string;
@@ -22,6 +23,7 @@ interface LpjHistoryItem {
   doc_created_at: string;
   lpj_created_at?: string;
   file_url?: string;
+  finance_comment?: string | null;
 }
 
 export default function LpjSubmission() {
@@ -33,6 +35,7 @@ export default function LpjSubmission() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [lpjSubTab, setLpjSubTab] = useState<'surat' | 'mutasi'>('surat');
 
   useEffect(() => {
     fetchData();
@@ -148,6 +151,25 @@ export default function LpjSubmission() {
         return dateB - dateA;
       });
 
+      // 5. Fetch finance comments from finance_lpj_review
+      const letterDocIds = (letters?.map(l => String(l.id)) || []);
+      const addendumDocIds = (myAddendums?.map(a => String(a.id)) || []);
+
+      let financeReviews: { ref_type: string; ref_id: string; comment: string | null }[] = [];
+      if (letterDocIds.length > 0 || addendumDocIds.length > 0) {
+        const { data: reviewData } = await supabase
+          .from('finance_lpj_review')
+          .select('ref_type, ref_id, comment');
+        if (reviewData) financeReviews = reviewData;
+      }
+
+      // Map comments into history items
+      newHistory.forEach(item => {
+        const refType = item.type === 'Surat Tugas' ? 'letter' : 'addendum';
+        const match = financeReviews.find(r => r.ref_type === refType && r.ref_id === item.doc_id);
+        if (match) item.finance_comment = match.comment;
+      });
+
       setHistoryList(newHistory);
       setPendingDocs(newPending);
 
@@ -228,6 +250,36 @@ export default function LpjSubmission() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-Tab Navigation */}
+      <div className="flex items-center gap-2 bg-gray-100 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setLpjSubTab('surat')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            lpjSubTab === 'surat'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Upload className="w-4 h-4" />
+          LPJ Surat Tugas / Addendum
+        </button>
+        <button
+          onClick={() => setLpjSubTab('mutasi')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            lpjSubTab === 'mutasi'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <ArrowLeftRight className="w-4 h-4" />
+          LPJ Audit Mutasi
+        </button>
+      </div>
+
+      {lpjSubTab === 'mutasi' ? (
+        <LpjAuditMutasi />
+      ) : (
+      <>
       {/* Header with Upload Button */}
       <div className="flex items-center justify-between">
         <div>
@@ -271,16 +323,17 @@ export default function LpjSubmission() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tgl Surat</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tgl LPJ</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider">Catatan Finance</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                  <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">Loading data...</td>
+                  <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">Loading data...</td>
                 </tr>
               ) : historyList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">Belum ada data surat tugas/addendum</td>
+                  <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">Belum ada data surat tugas/addendum</td>
                 </tr>
               ) : (
                 historyList.map((item, index) => (
@@ -329,6 +382,16 @@ export default function LpjSubmission() {
                       {item.lpj_created_at ? new Date(item.lpj_created_at).toLocaleDateString('id-ID', {
                          day: 'numeric', month: 'short', year: 'numeric'
                       }) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm max-w-[200px]">
+                      {item.finance_comment ? (
+                        <div className="flex items-start gap-1.5">
+                          <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                          <span className="text-indigo-700 break-words leading-relaxed">{item.finance_comment}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -451,6 +514,8 @@ export default function LpjSubmission() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

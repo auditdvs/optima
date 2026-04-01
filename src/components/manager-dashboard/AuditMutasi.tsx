@@ -21,6 +21,11 @@ interface AuditMutasi {
   reject_reason?: string;
   created_by?: string;
   created_at?: string;
+  // LPJ fields
+  lpj_file_url?: string;
+  lpj_file_name?: string;
+  lpj_description?: string;
+  lpj_submitted_at?: string;
 }
 
 interface Auditor {
@@ -603,6 +608,7 @@ export default function AuditMutasi() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Ke</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Jumlah</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">LPJ</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Lampiran</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
@@ -610,12 +616,15 @@ export default function AuditMutasi() {
             <tbody className="bg-white divide-y divide-gray-100">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     Belum ada data audit mutasi
                   </td>
                 </tr>
               ) : (
-                data.map((item, idx) => (
+                [...data].sort((a, b) => {
+                  const order = { pending: 0, approved: 1, rejected: 2 };
+                  return (order[a.status] ?? 1) - (order[b.status] ?? 1);
+                }).map((item, idx) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.auditor_name}</td>
@@ -633,6 +642,27 @@ export default function AuditMutasi() {
                     </td>
                     <td className="px-4 py-3 text-sm text-center">
                       {getStatusBadge(item)}
+                    </td>
+                    {/* LPJ Column */}
+                    <td className="px-4 py-3 text-sm text-center">
+                      {item.lpj_file_url ? (
+                        <a
+                          href={item.lpj_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                          title={item.lpj_file_name || 'Download LPJ'}
+                        >
+                          <FileDown className="w-3 h-3 mr-1" />
+                          Download
+                        </a>
+                      ) : (
+                        <span className={`text-xs font-semibold ${
+                          item.status === 'approved' ? 'text-red-500' : 'text-gray-400'
+                        }`}>
+                          {item.status === 'approved' ? 'Belum' : '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-center">
                       {/* Only show file to creator or manager */}

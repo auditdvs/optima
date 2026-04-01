@@ -41,6 +41,8 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
   const [excelUploadProgress, setExcelUploadProgress] = useState(0);
   const [showNewTeamDropdown, setShowNewTeamDropdown] = useState(false);
+  const [showNewLeaderDropdown, setShowNewLeaderDropdown] = useState(false);
+  const [showLetterDropdown, setShowLetterDropdown] = useState(false);
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     letter_id: '',
@@ -388,31 +390,57 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Tambah Addendum</h2>
-      </div>
-
+    <div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Pilih Assignment Letter */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 relative z-[60]">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Pilih Surat Tugas *
             </label>
-            <select
-              required
-              value={formData.letter_id}
-              onChange={(e) => handleLetterChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Pilih Surat Tugas</option>
-              {letters.map((letter) => (
-                <option key={letter.id} value={letter.id}>
-                  {letter.assigment_letter} - {letter.branch_name} ({letter.audit_type})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <div
+                onClick={() => setShowLetterDropdown(!showLetterDropdown)}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-h-[42px] flex items-center justify-between"
+              >
+                <span className={formData.letter_id ? 'text-gray-900' : 'text-gray-500 line-clamp-1 text-left'}>
+                  {formData.letter_id && letters.find(l => l.id.toString() === formData.letter_id.toString()) 
+                    ? `${letters.find(l => l.id.toString() === formData.letter_id.toString())?.assigment_letter} - ${letters.find(l => l.id.toString() === formData.letter_id.toString())?.branch_name} (${letters.find(l => l.id.toString() === formData.letter_id.toString())?.audit_type})`
+                    : 'Pilih Surat Tugas'}
+                </span>
+                <svg className="h-4 w-4 text-gray-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+              
+              {showLetterDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {letters.length === 0 ? (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Tidak ada surat tugas yang tersedia
+                    </div>
+                  ) : (
+                    letters.map((letter) => (
+                      <div
+                        key={`letter-${letter.id}`}
+                        onClick={() => {
+                          handleLetterChange(letter.id.toString());
+                          setShowLetterDropdown(false);
+                        }}
+                        className={`px-3 py-3 cursor-pointer hover:bg-gray-100 border-b border-gray-50 last:border-0 ${
+                          formData.letter_id === letter.id.toString()
+                            ? 'bg-indigo-50 text-indigo-900'
+                            : 'text-gray-900'
+                        }`}
+                      >
+                        <div className="font-medium">{letter.assigment_letter}</div>
+                        <div className="text-xs mt-1 text-gray-500">{letter.branch_name} ({letter.audit_type})</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Preview Assignment Letter Before - Tampilkan di atas form */}
@@ -715,19 +743,46 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ketua Tim (Baru) *
                 </label>
-                <select
-                  value={formData.new_leader}
-                  onChange={(e) => setFormData(prev => ({ ...prev, new_leader: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
-                >
-                  <option value="">Pilih Ketua Tim Baru</option>
-                  {auditors.map((auditor) => (
-                    <option key={auditor.id} value={auditor.name}>
-                      {auditor.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowNewLeaderDropdown(!showNewLeaderDropdown)}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-h-[42px] flex items-center justify-between"
+                  >
+                    <span className={formData.new_leader ? 'text-gray-900' : 'text-gray-500'}>
+                      {formData.new_leader || 'Pilih Ketua Tim Baru'}
+                    </span>
+                    <svg className="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  
+                  {showNewLeaderDropdown && (
+                    <div className="absolute z-10 w-full mb-1 bottom-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto overflow-x-hidden">
+                      {auditors.length === 0 ? (
+                        <div className="px-3 py-2 text-gray-500 text-sm">
+                          Tidak ada data auditor
+                        </div>
+                      ) : (
+                        auditors.map((auditor) => (
+                          <div
+                            key={`leader-${auditor.id}`}
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, new_leader: auditor.name }));
+                              setShowNewLeaderDropdown(false);
+                            }}
+                            className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${
+                              formData.new_leader === auditor.name
+                                ? 'bg-indigo-50 text-indigo-900'
+                                : 'text-gray-900'
+                            }`}
+                          >
+                            {auditor.name}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 {!formData.new_leader && (
                   <p className="text-xs text-red-500 mt-1">Ketua Tim baru wajib dipilih</p>
                 )}
@@ -767,7 +822,7 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
                   </div>
                   
                   {showNewTeamDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-10 w-full mb-1 bottom-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto overflow-x-hidden">
                       {auditors.length === 0 ? (
                         <div className="px-3 py-2 text-gray-500 text-sm">
                           Tidak ada data auditor
@@ -892,11 +947,15 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
         )}
       </form>
 
-      {/* Click outside to close dropdown */}
-      {showNewTeamDropdown && (
+      {/* Click outside to close dropdowns */}
+      {(showNewTeamDropdown || showNewLeaderDropdown || showLetterDropdown) && (
         <div 
           className="fixed inset-0 z-[5]" 
-          onClick={() => setShowNewTeamDropdown(false)}
+          onClick={() => {
+            setShowNewTeamDropdown(false);
+            setShowNewLeaderDropdown(false);
+            setShowLetterDropdown(false);
+          }}
         />
       )}
     </div>

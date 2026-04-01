@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileText, LogOut, RefreshCw, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, FileText, LogOut, MessageSquare, RefreshCw, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,25 +18,219 @@ interface LpjRecord {
   audit_end_date?: string;
 }
 
+interface MutasiLpjRecord {
+  id: number;
+  auditor_name: string;
+  from_branch: string;
+  to_branch: string;
+  departure_date: string;
+  total: number;
+  lpj_file_url?: string;
+  lpj_file_name?: string;
+  lpj_description?: string;
+  lpj_submitted_at?: string;
+}
+
+interface FinanceReview {
+  ref_type: string;
+  ref_id: string;
+  checklist: boolean;
+  comment: string | null;
+}
+
+// Modal untuk edit comment
+function CommentModal({
+  open,
+  initialComment,
+  refType,
+  refId,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  initialComment: string;
+  refType: string;
+  refId: string;
+  onClose: () => void;
+  onSaved: (refType: string, refId: string, comment: string) => void;
+}) {
+  const [value, setValue] = useState(initialComment);
+  const [saving, setSaving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setValue(initialComment);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [open, initialComment]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('finance_lpj_review')
+        .upsert(
+          { ref_type: refType, ref_id: refId, comment: value, updated_by: user?.id, updated_at: new Date().toISOString() },
+          { onConflict: 'ref_type,ref_id' }
+        );
+      if (error) throw error;
+      toast.success('Comment disimpan');
+      onSaved(refType, refId, value);
+      onClose();
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal menyimpan comment');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20 animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-base font-bold text-gray-900">Catatan Finance</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-6">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            placeholder="Tulis catatan untuk dokumen ini..."
+            rows={5}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all resize-none bg-gray-50 focus:bg-white"
+          />
+          <p className="text-xs text-gray-400 mt-2">{value.length} karakter</p>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 flex items-center gap-3 border-t border-slate-100">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-sm active:scale-[0.98]"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-sm hover:shadow disabled:opacity-60 active:scale-[0.98]"
+          >
+            {saving ? 'Menyimpan...' : 'Simpan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FinanceLPJ() {
+  const [activeTab, setActiveTab] = useState<'surat' | 'mutasi'>('surat');
   const [records, setRecords] = useState<LpjRecord[]>([]);
+  const [mutasiRecords, setMutasiRecords] = useState<MutasiLpjRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mutasiLoading, setMutasiLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState<string>('');  
+  const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // Finance review state
+  const [reviews, setReviews] = useState<Map<string, FinanceReview>>(new Map());
+  const [savingChecklist, setSavingChecklist] = useState<string | null>(null);
+
+  // Comment modal state
+  const [commentModal, setCommentModal] = useState<{
+    open: boolean;
+    refType: string;
+    refId: string;
+    initialComment: string;
+  }>({ open: false, refType: '', refId: '', initialComment: '' });
+
   useEffect(() => {
     fetchLPJData();
+    fetchMutasiLPJData();
+    fetchReviews();
   }, []);
+
+  // Fetch finance review dari tabel terpisah
+  const fetchReviews = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('finance_lpj_review')
+        .select('ref_type, ref_id, checklist, comment');
+      if (error) throw error;
+      const map = new Map<string, FinanceReview>();
+      data?.forEach(r => {
+        map.set(`${r.ref_type}:${r.ref_id}`, r);
+      });
+      setReviews(map);
+    } catch (e) {
+      console.error('Error fetching reviews:', e);
+    }
+  };
+
+  const getReview = (refType: string, refId: string): FinanceReview => {
+    return reviews.get(`${refType}:${refId}`) ?? { ref_type: refType, ref_id: refId, checklist: false, comment: null };
+  };
+
+  // Toggle checklist
+  const handleChecklistToggle = async (refType: string, refId: string) => {
+    const key = `${refType}:${refId}`;
+    const current = getReview(refType, refId);
+    const newVal = !current.checklist;
+    setSavingChecklist(key);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('finance_lpj_review')
+        .upsert(
+          { ref_type: refType, ref_id: refId, checklist: newVal, comment: current.comment, updated_by: authUser?.id, updated_at: new Date().toISOString() },
+          { onConflict: 'ref_type,ref_id' }
+        );
+      if (error) throw error;
+      setReviews(prev => {
+        const next = new Map(prev);
+        next.set(key, { ...current, checklist: newVal });
+        return next;
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal menyimpan checklist');
+    } finally {
+      setSavingChecklist(null);
+    }
+  };
+
+  // After comment saved
+  const handleCommentSaved = (refType: string, refId: string, comment: string) => {
+    const key = `${refType}:${refId}`;
+    const current = getReview(refType, refId);
+    setReviews(prev => {
+      const next = new Map(prev);
+      next.set(key, { ...current, comment });
+      return next;
+    });
+  };
+
+  const openCommentModal = (refType: string, refId: string) => {
+    const current = getReview(refType, refId);
+    setCommentModal({ open: true, refType, refId, initialComment: current.comment ?? '' });
+  };
 
   const fetchLPJData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch ALL approved letters
       const { data: letters, error: lettersError } = await supabase
         .from('letter')
         .select('id, assigment_letter, branch_name, created_by, tanggal_input, audit_end_date')
@@ -45,7 +239,6 @@ export default function FinanceLPJ() {
 
       if (lettersError) throw lettersError;
 
-      // 2. Fetch ALL approved addendums
       const { data: addendums, error: addendumsError } = await supabase
         .from('addendum')
         .select('id, assigment_letter, branch_name, created_by, tanggal_input, end_date')
@@ -54,12 +247,10 @@ export default function FinanceLPJ() {
 
       if (addendumsError) throw addendumsError;
 
-      // 3. Get all user IDs for inputter name lookup
       const allUserIds = new Set<string>();
       letters?.forEach(l => { if (l.created_by) allUserIds.add(l.created_by); });
       addendums?.forEach(a => { if (a.created_by) allUserIds.add(a.created_by); });
 
-      // 4. Fetch names from auditor_aliases
       const userIdArray = Array.from(allUserIds);
       let accountMap = new Map<string, string>();
 
@@ -69,47 +260,32 @@ export default function FinanceLPJ() {
           .select('profile_id, full_name')
           .in('profile_id', userIdArray);
 
-        aliases?.forEach(a => {
-          accountMap.set(a.profile_id, a.full_name);
-        });
+        aliases?.forEach(a => { accountMap.set(a.profile_id, a.full_name); });
 
-        // Fallback to profiles table for missing names
         const missingIds = userIdArray.filter(id => !accountMap.has(id));
         if (missingIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name')
             .in('id', missingIds);
-
-          profiles?.forEach(p => {
-            accountMap.set(p.id, p.full_name);
-          });
+          profiles?.forEach(p => { accountMap.set(p.id, p.full_name); });
         }
       }
 
-      // 5. Fetch all LPJ submissions
       const letterIds = letters?.map(l => l.id) || [];
       const addendumIds = addendums?.map(a => a.id) || [];
 
       let submissions: any[] = [];
 
       if (letterIds.length > 0) {
-        const { data: s1 } = await supabase
-          .from('lpj_submissions')
-          .select('*')
-          .in('letter_id', letterIds);
+        const { data: s1 } = await supabase.from('lpj_submissions').select('*').in('letter_id', letterIds);
         if (s1) submissions = [...submissions, ...s1];
       }
-
       if (addendumIds.length > 0) {
-        const { data: s2 } = await supabase
-          .from('lpj_submissions')
-          .select('*')
-          .in('addendum_id', addendumIds);
+        const { data: s2 } = await supabase.from('lpj_submissions').select('*').in('addendum_id', addendumIds);
         if (s2) submissions = [...submissions, ...s2];
       }
 
-      // 6. Build the records
       const allRecords: LpjRecord[] = [];
 
       letters?.forEach((l: any) => {
@@ -148,7 +324,6 @@ export default function FinanceLPJ() {
         });
       });
 
-      // Sort by date descending
       allRecords.sort((a, b) => {
         const dateA = a.doc_created_at ? new Date(a.doc_created_at).getTime() : 0;
         const dateB = b.doc_created_at ? new Date(b.doc_created_at).getTime() : 0;
@@ -164,9 +339,26 @@ export default function FinanceLPJ() {
     }
   };
 
-  const handleLogout = () => {
-    setShowLogoutModal(true);
+  const fetchMutasiLPJData = async () => {
+    setMutasiLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('audit_mutasi')
+        .select('*')
+        .eq('status', 'approved')
+        .order('departure_date', { ascending: false });
+
+      if (error) throw error;
+      setMutasiRecords(data || []);
+    } catch (error) {
+      console.error('Error fetching mutasi LPJ data:', error);
+      toast.error('Gagal mengambil data LPJ Mutasi');
+    } finally {
+      setMutasiLoading(false);
+    }
   };
+
+  const handleLogout = () => setShowLogoutModal(true);
 
   const confirmLogout = async () => {
     await signOut();
@@ -184,12 +376,11 @@ export default function FinanceLPJ() {
 
   const getSortIcon = (column: string) => {
     if (sortColumn !== column) return <ArrowUpDown className="w-3 h-3 text-gray-400" />;
-    return sortDirection === 'asc' 
+    return sortDirection === 'asc'
       ? <ArrowUp className="w-3 h-3 text-indigo-600" />
       : <ArrowDown className="w-3 h-3 text-indigo-600" />;
   };
 
-  // Filter records
   const filteredRecords = records
     .filter(record => {
       if (searchQuery === '') return true;
@@ -208,16 +399,89 @@ export default function FinanceLPJ() {
       return valA.localeCompare(valB) * dir;
     });
 
-  const totalSudah = records.filter(r => r.status === 'Sudah Input').length;
-  const totalBelum = records.filter(r => r.status === 'Belum Input').length;
+  const totalSudah = activeTab === 'surat'
+    ? records.filter(r => r.status === 'Sudah Input').length
+    : mutasiRecords.filter(r => r.lpj_file_url).length;
+  const totalBelum = activeTab === 'surat'
+    ? records.filter(r => r.status === 'Belum Input').length
+    : mutasiRecords.filter(r => !r.lpj_file_url).length;
+  const totalDokumen = activeTab === 'surat' ? records.length : mutasiRecords.length;
+
+  const filteredMutasi = mutasiRecords.filter(r => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      r.auditor_name.toLowerCase().includes(q) ||
+      r.from_branch.toLowerCase().includes(q) ||
+      r.to_branch.toLowerCase().includes(q)
+    );
+  });
+
+  // Helper: render checklist + comment cell
+  const renderReviewCell = (refType: string, refId: string) => {
+    const key = `${refType}:${refId}`;
+    const review = getReview(refType, refId);
+    const isSaving = savingChecklist === key;
+
+    return (
+      <div className="flex items-center gap-2">
+        {/* Checklist toggle */}
+        <button
+          onClick={() => handleChecklistToggle(refType, refId)}
+          disabled={isSaving}
+          title={review.checklist ? 'Sudah dicek — klik untuk hapus' : 'Klik untuk centang'}
+          className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all duration-200 active:scale-90 flex-shrink-0 ${
+            review.checklist
+              ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+              : 'border-gray-300 hover:border-indigo-400 bg-white hover:bg-indigo-50'
+          } ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          {review.checklist && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+        </button>
+
+        {/* Comment button */}
+        <button
+          onClick={() => openCommentModal(refType, refId)}
+          title={review.comment ? review.comment : 'Tambah catatan'}
+          className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-200 active:scale-90 flex-shrink-0 ${
+            review.comment
+              ? 'bg-indigo-50 border-indigo-300 text-indigo-600'
+              : 'border-gray-200 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50'
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Comment preview (truncated) */}
+        {review.comment && (
+          <span
+            className="text-[11px] text-gray-500 max-w-[120px] truncate leading-tight cursor-pointer hover:text-indigo-600 transition-colors"
+            title={review.comment}
+            onClick={() => openCommentModal(refType, refId)}
+          >
+            {review.comment}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      {/* Comment Modal */}
+      <CommentModal
+        open={commentModal.open}
+        initialComment={commentModal.initialComment}
+        refType={commentModal.refType}
+        refId={commentModal.refId}
+        onClose={() => setCommentModal(prev => ({ ...prev, open: false }))}
+        onSaved={handleCommentSaved}
+      />
+
       {/* Top Navigation Bar */}
       <nav className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo & Title */}
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
                 <FileText className="h-5 w-5" />
@@ -227,12 +491,8 @@ export default function FinanceLPJ() {
                 <span className="text-[10px] text-gray-500 font-medium -mt-1">Finance Portal</span>
               </div>
             </div>
-
-            {/* Right side */}
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600 hidden sm:block">
-                {user?.email}
-              </span>
+              <span className="text-sm text-gray-600 hidden sm:block">{user?.email}</span>
               <button
                 onClick={handleLogout}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200/50 transition-all hover:border-red-300 active:scale-95"
@@ -254,7 +514,7 @@ export default function FinanceLPJ() {
               Laporan Pertanggungjawaban
             </h1>
             <p className="text-gray-500 mt-1 text-sm">
-              Monitor status LPJ seluruh Surat Tugas dan Addendum yang telah disetujui.
+              Monitor status LPJ seluruh Surat Tugas, Addendum, dan Audit Mutasi.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -262,14 +522,14 @@ export default function FinanceLPJ() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Cari nomor surat, cabang, inputter..."
+                placeholder="Cari nomor surat, cabang, auditor"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all bg-gray-50 focus:bg-white w-[280px]"
               />
             </div>
             <button
-              onClick={fetchLPJData}
+              onClick={() => { fetchLPJData(); fetchMutasiLPJData(); fetchReviews(); }}
               disabled={loading}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/50 transition-all active:scale-95 disabled:opacity-50"
             >
@@ -286,9 +546,7 @@ export default function FinanceLPJ() {
             <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-500 mb-1">Total Dokumen</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold tracking-tight text-gray-900">{records.length}</p>
-                </div>
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{totalDokumen}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50/50 flex items-center justify-center border border-indigo-100/50 shadow-sm">
                 <FileText className="w-6 h-6 text-indigo-600" />
@@ -301,9 +559,7 @@ export default function FinanceLPJ() {
             <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-500 mb-1">Sudah Input LPJ</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold tracking-tight text-emerald-600">{totalSudah}</p>
-                </div>
+                <p className="text-3xl font-bold tracking-tight text-emerald-600">{totalSudah}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-green-50/50 flex items-center justify-center border border-emerald-100/50 shadow-sm">
                 <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,9 +574,7 @@ export default function FinanceLPJ() {
             <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-500 mb-1">Belum Input LPJ</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold tracking-tight text-amber-600">{totalBelum}</p>
-                </div>
+                <p className="text-3xl font-bold tracking-tight text-amber-600">{totalBelum}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/50 flex items-center justify-center border border-amber-100/50 shadow-sm">
                 <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -331,178 +585,285 @@ export default function FinanceLPJ() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr className="bg-gradient-to-r from-gray-50 to-gray-100/50">
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-16">
-                    No
-                  </th>
-                  <th
-                    onClick={() => handleSort('letter_number')}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none group"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Nomor Surat
-                      {getSortIcon('letter_number')}
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort('branch_name')}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none group"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Cabang
-                      {getSortIcon('branch_name')}
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort('inputter_name')}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none group"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Inputter
-                      {getSortIcon('inputter_name')}
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort('audit_status')}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none group"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Status Audit
-                      {getSortIcon('audit_status')}
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort('status')}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none group"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Status LPJ
-                      {getSortIcon('status')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    File
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+        {/* Sub-Tab Navigation */}
+        <div className="flex gap-1 mb-6 bg-gray-100/80 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => { setActiveTab('surat'); setSearchQuery(''); }}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'surat'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/80'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Surat Tugas &amp; Addendum
+          </button>
+          <button
+            onClick={() => { setActiveTab('mutasi'); setSearchQuery(''); }}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'mutasi'
+                ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/80'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Audit Mutasi
+          </button>
+        </div>
+
+        {/* Surat Tugas & Addendum Table */}
+        {activeTab === 'surat' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100/50">
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
+                    <th
+                      onClick={() => handleSort('letter_number')}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                    >
+                      <div className="flex items-center gap-1.5">Nomor Surat {getSortIcon('letter_number')}</div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('branch_name')}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                    >
+                      <div className="flex items-center gap-1.5">Cabang {getSortIcon('branch_name')}</div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('inputter_name')}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                    >
+                      <div className="flex items-center gap-1.5">Inputter {getSortIcon('inputter_name')}</div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('audit_status')}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                    >
+                      <div className="flex items-center gap-1.5">Status Audit {getSortIcon('audit_status')}</div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('status')}
+                      className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                    >
+                      <div className="flex items-center gap-1.5">Status LPJ {getSortIcon('status')}</div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">File</th>
+                    {/* NEW: Finance Review columns */}
+                    <th className="px-6 py-3 text-left text-xs font-bold text-indigo-500 uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Cek &amp; Catatan
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm text-gray-500 font-medium">Memuat data...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <FileText className="w-12 h-12 text-gray-300" />
+                          <span className="text-sm text-gray-500 font-medium">
+                            {searchQuery ? 'Tidak ada data yang sesuai pencarian' : 'Belum ada data LPJ'}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((record, index) => {
+                      // Parse ref_type dan ref_id dari record.id (format: "letter-123" atau "addendum-456")
+                      const [rawType, rawId] = record.id.split('-');
+                      const refType = rawType === 'letter' ? 'letter' : 'addendum';
+                      const refId = rawId;
+
+                      return (
+                        <tr key={record.id} className="hover:bg-slate-50/80 transition-all duration-200 group">
+                          <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-400 font-medium">{index + 1}</td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[13.5px] font-bold text-gray-800 font-mono tracking-tight group-hover:text-indigo-600 transition-colors">
+                                {record.letter_number}
+                              </span>
+                              <span className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                record.type === 'Surat Tugas' ? 'bg-blue-50 text-blue-600' : 'bg-indigo-50 text-indigo-600'
+                              }`}>
+                                {record.type}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="text-[13.5px] font-medium text-gray-700">{record.branch_name}</span>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="text-[13.5px] font-medium text-gray-700">{record.inputter_name}</span>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`text-[13px] font-semibold ${
+                                record.audit_status === 'Sedang Audit' ? 'text-indigo-600' : 'text-gray-500'
+                              }`}>
+                                {record.audit_status}
+                              </span>
+                              {record.audit_end_date && (
+                                <span className="text-[11px] font-medium text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md w-fit inline-flex">
+                                  s.d. {new Date(record.audit_end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold ${
+                              record.status === 'Sudah Input'
+                                ? 'bg-emerald-50/80 text-emerald-700 border border-emerald-200/50'
+                                : 'bg-amber-50/80 text-amber-700 border border-amber-200/50'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                record.status === 'Sudah Input' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
+                              }`} />
+                              {record.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            {record.file_url ? (
+                              <a
+                                href={record.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-gray-700 hover:text-indigo-700 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 transition-all duration-200 shadow-sm hover:shadow"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                File LPJ
+                              </a>
+                            ) : (
+                              <span className="text-sm font-medium text-gray-300 ml-4">-</span>
+                            )}
+                          </td>
+                          {/* Finance Review Cell */}
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            {renderReviewCell(refType, refId)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {!loading && filteredRecords.length > 0 && (
+              <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100">
+                <p className="text-xs text-gray-500">
+                  Menampilkan <span className="font-semibold text-gray-700">{filteredRecords.length}</span> dari <span className="font-semibold text-gray-700">{records.length}</span> data
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mutasi Table */}
+        {activeTab === 'mutasi' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100/50">
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Auditor</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Dari</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Ke</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tgl Berangkat</th>
+                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status LPJ</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">File LPJ</th>
+                    {/* NEW: Finance Review columns */}
+                    <th className="px-6 py-3 text-left text-xs font-bold text-indigo-500 uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Cek &amp; Catatan
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {mutasiLoading ? (
+                    <tr><td colSpan={9} className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                         <span className="text-sm text-gray-500 font-medium">Memuat data...</span>
                       </div>
-                    </td>
-                  </tr>
-                ) : filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
+                    </td></tr>
+                  ) : filteredMutasi.length === 0 ? (
+                    <tr><td colSpan={9} className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="w-12 h-12 text-gray-300" />
-                        <span className="text-sm text-gray-500 font-medium">
-                          {searchQuery
-                            ? 'Tidak ada data yang sesuai pencarian'
-                            : 'Belum ada data LPJ'}
-                        </span>
+                        <span className="text-sm text-gray-500 font-medium">Belum ada data LPJ Audit Mutasi</span>
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecords.map((record, index) => (
-                    <tr 
-                      key={record.id} 
-                      className="hover:bg-slate-50/80 transition-all duration-200 group"
-                    >
-                      <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-400 font-medium">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[13.5px] font-bold text-gray-800 font-mono tracking-tight group-hover:text-indigo-600 transition-colors">
-                            {record.letter_number}
-                          </span>
-                          <span className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                            record.type === 'Surat Tugas' 
-                              ? 'bg-blue-50 text-blue-600' 
-                              : 'bg-indigo-50 text-indigo-600'
+                    </td></tr>
+                  ) : (
+                    filteredMutasi.map((r, index) => (
+                      <tr key={r.id} className="hover:bg-slate-50/80 transition-all duration-200 group">
+                        <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-400 font-medium">{index + 1}</td>
+                        <td className="px-6 py-5 whitespace-nowrap text-[13.5px] font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">{r.auditor_name}</td>
+                        <td className="px-6 py-5 whitespace-nowrap text-[13.5px] font-medium text-gray-700">{r.from_branch}</td>
+                        <td className="px-6 py-5 whitespace-nowrap text-[13.5px] font-medium text-gray-700">{r.to_branch}</td>
+                        <td className="px-6 py-5 whitespace-nowrap text-[13px] text-gray-500">
+                          {r.departure_date ? new Date(r.departure_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                        </td>
+                        <td className="px-6 py-5 whitespace-nowrap text-right text-[13.5px] font-semibold text-indigo-600">
+                          {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(r.total)}
+                        </td>
+                        <td className="px-6 py-5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold ${
+                            r.lpj_file_url
+                              ? 'bg-emerald-50/80 text-emerald-700 border border-emerald-200/50'
+                              : 'bg-amber-50/80 text-amber-700 border border-amber-200/50'
                           }`}>
-                            {record.type}
+                            <span className={`w-1.5 h-1.5 rounded-full ${r.lpj_file_url ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {r.lpj_file_url ? 'Sudah Input' : 'Belum Input'}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <span className="text-[13.5px] font-medium text-gray-700">
-                          {record.branch_name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <span className="text-[13.5px] font-medium text-gray-700">
-                          {record.inputter_name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <div className="flex flex-col gap-0.5">
-                          <span className={`text-[13px] font-semibold ${
-                            record.audit_status === 'Sedang Audit' ? 'text-indigo-600' : 'text-gray-500'
-                          }`}>
-                            {record.audit_status}
-                          </span>
-                          {record.audit_end_date && (
-                            <span className="text-[11px] font-medium text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md w-fit inline-flex">
-                              s.d. {new Date(record.audit_end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
+                        </td>
+                        <td className="px-6 py-5 whitespace-nowrap">
+                          {r.lpj_file_url ? (
+                            <a
+                              href={r.lpj_file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-gray-700 hover:text-indigo-700 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 transition-all duration-200 shadow-sm hover:shadow"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              File LPJ
+                            </a>
+                          ) : (
+                            <span className="text-sm font-medium text-gray-300 ml-4">-</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold ${
-                          record.status === 'Sudah Input' 
-                            ? 'bg-emerald-50/80 text-emerald-700 border border-emerald-200/50 shadow-[0_1px_2px_rgba(16,185,129,0.05)]' 
-                            : 'bg-amber-50/80 text-amber-700 border border-amber-200/50 shadow-[0_1px_2px_rgba(245,158,11,0.05)]'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            record.status === 'Sudah Input' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
-                          }`} />
-                          {record.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        {record.file_url ? (
-                          <a
-                            href={record.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-gray-700 hover:text-indigo-700 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 transition-all duration-200 shadow-sm hover:shadow"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            File LPJ
-                          </a>
-                        ) : (
-                          <span className="text-sm font-medium text-gray-300 ml-4">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Table Footer */}
-          {!loading && filteredRecords.length > 0 && (
-            <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100">
-              <p className="text-xs text-gray-500">
-                Menampilkan <span className="font-semibold text-gray-700">{filteredRecords.length}</span> dari <span className="font-semibold text-gray-700">{records.length}</span> data
-              </p>
+                        </td>
+                        {/* Finance Review Cell */}
+                        <td className="px-6 py-5 whitespace-nowrap">
+                          {renderReviewCell('mutasi', String(r.id))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+            {!mutasiLoading && filteredMutasi.length > 0 && (
+              <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100">
+                <p className="text-xs text-gray-500">
+                  Menampilkan <span className="font-semibold text-gray-700">{filteredMutasi.length}</span> dari <span className="font-semibold text-gray-700">{mutasiRecords.length}</span> data
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Logout Confirmation Modal */}
@@ -514,9 +875,7 @@ export default function FinanceLPJ() {
                 <LogOut className="w-8 h-8 text-red-500 ml-1" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">Konfirmasi Logout</h3>
-              <p className="text-sm text-gray-500">
-                Apakah Anda yakin ingin keluar dari OPTIMA Portal?
-              </p>
+              <p className="text-sm text-gray-500">Apakah Anda yakin ingin keluar dari OPTIMA Portal?</p>
             </div>
             <div className="px-6 py-4 bg-slate-50 flex items-center gap-3 border-t border-slate-100">
               <button

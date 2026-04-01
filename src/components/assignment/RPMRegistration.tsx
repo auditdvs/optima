@@ -7,8 +7,8 @@ import {
   SortingState,
   useReactTable
 } from '@tanstack/react-table';
-import { AlertTriangle, ArrowUpDown, Download, Pencil, Plus, RotateCcw, Save, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, ArrowUpDown, ChevronDown, Download, Pencil, Plus, RotateCcw, Save, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../contexts/AuthContext';
@@ -122,6 +122,7 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
   // All branches list and lookup map for auto-fill region
   const [allBranches, setAllBranches] = useState<string[]>([]);
   const [branchToRegion, setBranchToRegion] = useState<Record<string, string>>({});
+  const [branchesLoading, setBranchesLoading] = useState(false);
   
   // Track pending changes (local only, not saved to DB yet)
   const [pendingChanges, setPendingChanges] = useState<Record<string, { status?: string; due_date?: string }>>({});
@@ -138,6 +139,29 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
   // Preview letter number state
   const [previewLetterNumber, setPreviewLetterNumber] = useState<string>('');
   const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Custom Combobox states
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const [branchSearch, setBranchSearch] = useState('');
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+        setBranchDropdownOpen(false);
+      }
+    };
+    if (branchDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [branchDropdownOpen]);
+
+  // Filtered branches for combobox
+  const filteredBranches = useMemo(() => {
+    if (!branchSearch) return allBranches;
+    return allBranches.filter(b => b.toLowerCase().includes(branchSearch.toLowerCase()));
+  }, [allBranches, branchSearch]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = Object.keys(pendingChanges).length > 0;
@@ -171,31 +195,43 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
 
   // Fetch branches once and store all data
   const fetchBranches = async () => {
+    setBranchesLoading(true);
     try {
       const { data, error } = await supabase
         .from('branches')
         .select('name, region')
         .order('name');
 
-      if (error) throw error;
-      
-      if (data) {
-        // Create lookup map: branch name -> region
-        const lookup: Record<string, string> = {};
-        const names: string[] = [];
-        
-        data.forEach(branch => {
-          if (branch.name && branch.region) {
-            lookup[branch.name] = branch.region;
-            names.push(branch.name);
-          }
-        });
-        
-        setBranchToRegion(lookup);
-        setAllBranches(names);
+      if (error) {
+        console.error('Error fetching branches:', error);
+        toast.error('Gagal memuat daftar cabang. Hubungi admin jika masalah berlanjut.');
+        return;
       }
+      
+      if (!data || data.length === 0) {
+        console.warn('Branches table returned empty — check RLS policy for this user role.');
+        toast.error('Daftar cabang kosong. Kemungkinan akses dibatasi, hubungi admin.');
+        return;
+      }
+
+      // Create lookup map: branch name -> region
+      const lookup: Record<string, string> = {};
+      const names: string[] = [];
+      
+      data.forEach(branch => {
+        if (branch.name && branch.region) {
+          lookup[branch.name] = branch.region;
+          names.push(branch.name);
+        }
+      });
+      
+      setBranchToRegion(lookup);
+      setAllBranches(names);
     } catch (error) {
       console.error('Error fetching branches:', error);
+      toast.error('Gagal memuat daftar cabang.');
+    } finally {
+      setBranchesLoading(false);
     }
   };
 
@@ -622,7 +658,11 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
             Export
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setShowAddModal(true);
+              // Re-fetch branches if not loaded yet (handles slow load / first open)
+              if (allBranches.length === 0) fetchBranches();
+            }}
             className="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -686,8 +726,8 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">Tambah Surat RPM</h3>
@@ -714,18 +754,64 @@ export default function RPMRegistrationComponent({ refreshTrigger }: RPMRegistra
 
                 {/* Branch selection with auto-fill Regional */}
                 <div className="flex gap-3">
-                  <div className="flex-1 relative z-20">
+                  <div className="flex-1 relative" ref={branchDropdownRef}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cabang/Region/HO *</label>
-                    <select
-                      value={newLetter.branch_or_region_ho}
-                      onChange={(e) => handleBranchSelect(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    <div
+                      role="combobox"
+                      aria-expanded={branchDropdownOpen}
+                      className={`w-full px-4 py-2 border rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
+                        branchesLoading ? 'bg-gray-100 cursor-wait' : 'bg-white hover:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent'
+                      } ${!newLetter.branch_or_region_ho ? 'text-gray-500' : 'text-gray-900'} border-gray-300`}
+                      onClick={() => !branchesLoading && setBranchDropdownOpen(!branchDropdownOpen)}
                     >
-                      <option value="">-- Pilih Cabang --</option>
-                      {allBranches.map((branch: string) => (
-                        <option key={branch} value={branch}>{branch}</option>
-                      ))}
-                    </select>
+                      <span className="truncate">
+                        {branchesLoading ? 'Memuat cabang...' : (newLetter.branch_or_region_ho || '-- Pilih Cabang --')}
+                      </span>
+                      {branchesLoading ? (
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${branchDropdownOpen ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
+                    
+                    {branchDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
+                        <div className="p-2 border-b border-gray-100 bg-gray-50">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Cari cabang..."
+                              value={branchSearch}
+                              onChange={(e) => setBranchSearch(e.target.value)}
+                              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              onClick={(e) => e.stopPropagation()}
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+                        <ul className="max-h-56 overflow-y-auto py-1">
+                          {filteredBranches.length > 0 ? (
+                            filteredBranches.map((branch: string) => (
+                              <li
+                                key={branch}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleBranchSelect(branch);
+                                  setBranchDropdownOpen(false);
+                                  setBranchSearch('');
+                                }}
+                                className={`px-4 py-2 text-sm cursor-pointer font-medium transition-colors ${newLetter.branch_or_region_ho === branch ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                              >
+                                {branch}
+                              </li>
+                            ))
+                          ) : (
+                            <li className="px-4 py-6 text-sm text-gray-500 text-center bg-gray-50/50">Cabang tidak ditemukan</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   <div className="w-20 flex-shrink-0">

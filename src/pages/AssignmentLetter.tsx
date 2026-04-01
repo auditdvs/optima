@@ -192,7 +192,7 @@ export default function AssignmentLetter() {
                   </button>
                 </div>
 
-                <div className="max-h-[80vh] overflow-y-auto pr-2">
+                <div className="pr-2">
                   {activeTab === 'letter' ? (
                     <AssignmentLetterForm
                       onSuccess={handleFormSuccess}
