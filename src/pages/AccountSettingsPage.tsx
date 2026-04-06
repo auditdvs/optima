@@ -552,6 +552,7 @@ const AccountSettingsPage = () => {
       // - month: YYYY-MM only (avoids date-format mismatch like "2026-01-05T00:00:00" vs "2026-01-05")
       const normalizeAuditType = (t: string) => {
         const s = (t || '').toLowerCase();
+        if (s.includes('addendum')) return s.trim();
         if (s.includes('regular') || s.includes('reguler')) return 'regular';
         if (s.includes('fraud') || s.includes('investigasi') || s.includes('khusus')) return 'fraud';
         return s.trim();
@@ -560,10 +561,15 @@ const AccountSettingsPage = () => {
 
       const uniqueMap = new Map();
       allRecords.forEach(a => {
+        const typeNorm = normalizeAuditType(a.audit_type);
+        const isAddendum = typeNorm.includes('addendum');
+        const refNumKey = isAddendum ? (a.reference_number || '') : '';
+        
         const key = [
           (a.branch_name || '').toLowerCase().trim(),
-          normalizeAuditType(a.audit_type),
+          typeNorm,
           toYearMonth(a.audit_start_date),
+          refNumKey
         ].join('|');
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, a);
@@ -641,7 +647,9 @@ const AccountSettingsPage = () => {
          // Deduplicate by Month (YYYY-MM) to catch duplicates with slightly different dates
          // Assuming audit_start_date is YYYY-MM-DD
          const monthKey = a.audit_start_date ? a.audit_start_date.substring(0, 7) : 'unknown';
-         const key = `${a.branch_name}|${a.audit_type}|${monthKey}`;
+         const isAddendum = (a.audit_type || '').toLowerCase().includes('addendum');
+         const refNumKey = isAddendum ? (a.reference_number || '') : '';
+         const key = `${a.branch_name}|${a.audit_type}|${monthKey}|${refNumKey}`;
          
          if (dedupMap.has(key)) {
             const existing = dedupMap.get(key);
