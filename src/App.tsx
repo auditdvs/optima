@@ -17,6 +17,7 @@ import AuditorWorkpapers from './pages/AuditorWorkpapers';
 import BranchDirectory from './pages/BranchDirectory';
 import Broadcast from './pages/Broadcast';
 import ChatPage from './pages/ChatPage';
+import GrammarCorrection from './pages/GrammarCorrection';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
@@ -162,6 +163,11 @@ function App() {
               <Route path="chat" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
                   <ChatPage />
+                </PrivateRoute>
+              } />
+              <Route path="grammar-correction" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <GrammarCorrection />
                 </PrivateRoute>
               } />
               <Route path="email-address" element={

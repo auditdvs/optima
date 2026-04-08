@@ -139,11 +139,16 @@ export default function Changelog() {
                   <div className="absolute left-[11px] top-8 bottom-[-32px] w-[2px] bg-gray-100" />
                 )}
                 
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-4 relative z-10">
                   <div className="bg-white rounded-full p-1 ring-4 ring-white z-10 shadow-sm border border-gray-100">
                     <Calendar className="w-5 h-5 text-indigo-500" />
                   </div>
                   <h3 className="text-md font-bold text-gray-800">{log.period}</h3>
+                  <div className="ml-2 flex items-center">
+                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full shadow-sm">
+                      {log.items.length} Pembaruan
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="ml-10 space-y-4">

@@ -1,5 +1,6 @@
 import {
   Blocks,
+  BookOpen,
   ChartPie,
   ChevronDown,
   ChevronsUpDown,
@@ -279,6 +280,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
       chatItem.badge = unreadChatCount;
     }
     communicationItems.push(chatItem);
+    communicationItems.push({ path: '/grammar-correction', icon: BookOpen, label: 'Grammar AI' });
 
     communicationItems.push({ path: '/notification-history', icon: History, label: 'History' });
     communicationItems.push({ path: '/pull-request', icon: GitPullRequest, label: 'Req Database' });

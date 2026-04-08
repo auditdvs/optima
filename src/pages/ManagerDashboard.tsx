@@ -3,6 +3,7 @@ import { EChartsOption } from 'echarts';
 import { AlertTriangle, ArrowDown, Building2, TrendingUp, Users, Wallet } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import MonthlyReportGenerator from '../components/manager-dashboard/MonthlyReportGenerator';
 import CountUp from '../components/common/CountUp';
 import CurrencyCountUp from '../components/common/CurrencyCountUp';
 import LazyEChart from '../components/common/LazyEChart';
@@ -362,6 +363,7 @@ const ManagerDashboard = () => {
     <div className="p-0 space-y-3">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Manager Dashboard</h1>
+        <MonthlyReportGenerator />
       </div>
 
       {/* Tab Navigation */}
