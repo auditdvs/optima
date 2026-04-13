@@ -31,12 +31,14 @@ interface RegionalFraudSummary {
   totalFraud: number;
   totalPayment: number;
   outstanding: number;
-  caseCount: number;
+  caseCount: number; // Unique branches
+  staffCount: number; // Total persons
 }
 
 interface MonthlyFraudTrend {
   month: string;
-  count: number;
+  count: number; // Represents unique branch/case count
+  staffCount: number; // Represents total staff count
   amount: number;
 }
 
@@ -128,14 +130,33 @@ const FraudData = () => {
           totalFraud: 0,
           totalPayment: 0,
           outstanding: 0,
-          caseCount: 0
+          caseCount: 0,
+          staffCount: 0
         });
       }
 
       const summary = regionMap.get(region)!;
       summary.totalFraud += fraud.fraud_amount;
       summary.totalPayment += fraud.payment_fraud;
-      summary.caseCount += 1;
+      summary.staffCount += 1;
+      
+      // Use a local set or check if we already counted this branch for this region?
+      // Actually, to count unique branches per region, we need to track them.
+    });
+
+    // To get unique branches per region correctly:
+    const regionBranchMap = new Map<string, Set<string>>();
+    data.forEach(fraud => {
+      if (!regionBranchMap.has(fraud.region)) {
+        regionBranchMap.set(fraud.region, new Set());
+      }
+      regionBranchMap.get(fraud.region)!.add(fraud.audit_master_id);
+    });
+
+    regionBranchMap.forEach((branches, region) => {
+      if (regionMap.has(region)) {
+        regionMap.get(region)!.caseCount = branches.size;
+      }
     });
 
     // Calculate outstanding and convert to array
@@ -151,30 +172,36 @@ const FraudData = () => {
   };
 
   const generateMonthlyTrends = (data: FraudStaffData[]) => {
-    const monthlyMap = new Map<string, MonthlyFraudTrend>();
+    const periodMap = new Map<string, { staffCount: number; amount: number; branchIds: Set<string> }>();
 
     // Initialize all months
     MONTHS.forEach(month => {
-      monthlyMap.set(month, { month, count: 0, amount: 0 });
+      periodMap.set(month, { staffCount: 0, amount: 0, branchIds: new Set() });
     });
 
     // Aggregate data by month
     data.forEach(fraud => {
       if (fraud.audit_end_date) {
         const month = format(new Date(fraud.audit_end_date), 'MMM');
-        const trend = monthlyMap.get(month);
+        const trend = periodMap.get(month);
         if (trend) {
-          trend.count += 1;
+          trend.staffCount += 1;
           trend.amount += fraud.fraud_amount;
+          trend.branchIds.add(fraud.audit_master_id);
         }
       }
     });
 
-    setMonthlyTrends(Array.from(monthlyMap.values()));
+    setMonthlyTrends(Array.from(periodMap.entries()).map(([month, data]) => ({
+      month,
+      count: data.branchIds.size,
+      staffCount: data.staffCount,
+      amount: data.amount
+    })));
   };
 
   const generateWeeklyTrends = (data: FraudStaffData[]) => {
-    const weeklyMap = new Map<string, MonthlyFraudTrend>();
+    const periodMap = new Map<string, { staffCount: number; amount: number; branchIds: Set<string> }>();
 
     // Aggregate data by week
     data.forEach(fraud => {
@@ -183,51 +210,67 @@ const FraudData = () => {
         const weekNumber = getWeekNumber(date);
         const weekKey = `W${weekNumber}`;
         
-        if (!weeklyMap.has(weekKey)) {
-          weeklyMap.set(weekKey, { month: weekKey, count: 0, amount: 0 });
+        if (!periodMap.has(weekKey)) {
+          periodMap.set(weekKey, { staffCount: 0, amount: 0, branchIds: new Set() });
         }
         
-        const trend = weeklyMap.get(weekKey)!;
-        trend.count += 1;
+        const trend = periodMap.get(weekKey)!;
+        trend.staffCount += 1;
         trend.amount += fraud.fraud_amount;
+        trend.branchIds.add(fraud.audit_master_id);
       }
     });
 
-    // Sort by week number
-    const weeklyArray = Array.from(weeklyMap.values()).sort((a, b) => {
-      const weekA = parseInt(a.month.replace('W', ''));
-      const weekB = parseInt(b.month.replace('W', ''));
-      return weekA - weekB;
-    });
+    // Sort by week number and convert to array
+    const weeklyArray = Array.from(periodMap.entries())
+      .map(([weekKey, data]) => ({
+        month: weekKey,
+        count: data.branchIds.size,
+        staffCount: data.staffCount,
+        amount: data.amount
+      }))
+      .sort((a, b) => {
+        const weekA = parseInt(a.month.replace('W', ''));
+        const weekB = parseInt(b.month.replace('W', ''));
+        return weekA - weekB;
+      });
 
     setMonthlyTrends(weeklyArray);
   };
 
   const generateDailyTrends = (data: FraudStaffData[]) => {
-    const dailyMap = new Map<string, MonthlyFraudTrend>();
+    const periodMap = new Map<string, { staffCount: number; amount: number; branchIds: Set<string> }>();
 
     // Aggregate data by day
     data.forEach(fraud => {
       if (fraud.audit_end_date) {
         const dayKey = format(new Date(fraud.audit_end_date), 'dd/MM');
         
-        if (!dailyMap.has(dayKey)) {
-          dailyMap.set(dayKey, { month: dayKey, count: 0, amount: 0 });
+        if (!periodMap.has(dayKey)) {
+          periodMap.set(dayKey, { staffCount: 0, amount: 0, branchIds: new Set() });
         }
         
-        const trend = dailyMap.get(dayKey)!;
-        trend.count += 1;
+        const trend = periodMap.get(dayKey)!;
+        trend.staffCount += 1;
         trend.amount += fraud.fraud_amount;
+        trend.branchIds.add(fraud.audit_master_id);
       }
     });
 
-    // Sort by date
-    const dailyArray = Array.from(dailyMap.values()).sort((a, b) => {
-      const [dayA, monthA] = a.month.split('/').map(Number);
-      const [dayB, monthB] = b.month.split('/').map(Number);
-      if (monthA !== monthB) return monthA - monthB;
-      return dayA - dayB;
-    });
+    // Sort by date and convert to array
+    const dailyArray = Array.from(periodMap.entries())
+      .map(([dayKey, data]) => ({
+        month: dayKey,
+        count: data.branchIds.size,
+        staffCount: data.staffCount,
+        amount: data.amount
+      }))
+      .sort((a, b) => {
+        const [dayA, monthA] = a.month.split('/').map(Number);
+        const [dayB, monthB] = b.month.split('/').map(Number);
+        if (monthA !== monthB) return monthA - monthB;
+        return dayA - dayB;
+      });
 
     setMonthlyTrends(dailyArray);
   };
@@ -259,7 +302,7 @@ const FraudData = () => {
         axisPointer: { type: 'cross' }
       },
       legend: {
-        data: ['Jumlah Kasus', 'Total Nominal'],
+        data: ['Jumlah Kasus', 'Total Staf', 'Total Nominal'],
         bottom: 0
       },
       grid: {
@@ -279,7 +322,7 @@ const FraudData = () => {
       yAxis: [
         {
           type: 'value',
-          name: 'Jumlah Kasus',
+          name: 'Jumlah (Kasus/Staf)',
           position: 'left',
           axisLabel: {
             formatter: '{value}'
@@ -300,6 +343,15 @@ const FraudData = () => {
           type: 'line',
           data: monthlyTrends.map(item => item.count),
           itemStyle: { color: '#ef4444' },
+          lineStyle: { width: 3 },
+          smooth: true,
+          yAxisIndex: 0
+        },
+        {
+          name: 'Total Staf',
+          type: 'line',
+          data: monthlyTrends.map(item => item.staffCount),
+          itemStyle: { color: '#3b82f6' },
           lineStyle: { width: 3 },
           smooth: true,
           yAxisIndex: 0
@@ -539,6 +591,7 @@ const FraudData = () => {
                       <TableHead className="w-12">No.</TableHead>
                       <TableHead>Region</TableHead>
                       <TableHead className="text-right">Jumlah Kasus</TableHead>
+                      <TableHead className="text-right">Total Staf</TableHead>
                       <TableHead className="text-right">Total Fraud</TableHead>
                       <TableHead className="text-right">Total Payment</TableHead>
                       <TableHead className="text-right">Outstanding</TableHead>
@@ -550,6 +603,7 @@ const FraudData = () => {
                         <TableCell className="text-xs font-medium">{index + 1}</TableCell>
                         <TableCell className="text-xs font-medium">{summary.region}</TableCell>
                         <TableCell className="text-xs text-right">{summary.caseCount}</TableCell>
+                        <TableCell className="text-xs text-right font-medium text-blue-600">{summary.staffCount}</TableCell>
                         <TableCell className="text-xs text-right font-semibold text-red-600">
                           {formatCurrency(summary.totalFraud)}
                         </TableCell>
@@ -563,7 +617,7 @@ const FraudData = () => {
                     ))}
                     {regionalSummary.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4 text-sm text-gray-500">
+                        <TableCell colSpan={7} className="text-center py-4 text-sm text-gray-500">
                           No data available
                         </TableCell>
                       </TableRow>

@@ -18,19 +18,21 @@ interface Auditor {
   full_name: string;
   nik: string | null;
   auditor_id: string | null;
+  mdis_id: string | null;
 }
 
 interface EditAuditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   auditor: Auditor | null;
-  onSubmit: (id: string, fullName: string, nik: string, auditorId: string) => Promise<void>;
+  onSubmit: (id: string, fullName: string, nik: string, auditorId: string, mdisId: string) => Promise<void>;
 }
 
 const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, auditor, onSubmit }) => {
   const [fullName, setFullName] = useState(auditor?.full_name || '');
   const [nik, setNik] = useState(auditor?.nik || '');
   const [auditorId, setAuditorId] = useState(auditor?.auditor_id || '');
+  const [mdisId, setMdisId] = useState(auditor?.mdis_id || '');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
       setFullName(auditor.full_name);
       setNik(auditor.nik || '');
       setAuditorId(auditor.auditor_id || '');
+      setMdisId(auditor.mdis_id || '');
     }
   }, [auditor]);
 
@@ -47,7 +50,7 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
     e.preventDefault();
     setLoading(true);
     try {
-      await onSubmit(auditor.id, fullName, nik, auditorId);
+      await onSubmit(auditor.id, fullName, nik, auditorId, mdisId);
       onClose();
     } catch (error) {
       console.error('Error:', error);
@@ -94,6 +97,15 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">MDIS ID</label>
+            <input
+              type="text"
+              value={mdisId}
+              onChange={(e) => setMdisId(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -118,7 +130,7 @@ export default function AuditorManagement() {
       console.log('Fetching auditors data...');
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, nik, auditor_id')
+        .select('id, full_name, nik, auditor_id, mdis_id')
         .order('full_name', { ascending: true });
     
       console.log('Auditors query result:', { data, error });
@@ -131,11 +143,11 @@ export default function AuditorManagement() {
   });
 
   const updateAuditorMutation = useMutation({
-    mutationFn: async ({ id, full_name, nik, auditor_id }: 
-      { id: string; full_name: string; nik: string; auditor_id: string }) => {
+    mutationFn: async ({ id, full_name, nik, auditor_id, mdis_id }: 
+      { id: string; full_name: string; nik: string; auditor_id: string; mdis_id: string }) => {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name, nik, auditor_id })
+        .update({ full_name, nik, auditor_id, mdis_id })
         .eq('id', id);
       if (error) throw error;
     },
@@ -149,8 +161,8 @@ export default function AuditorManagement() {
     }
   });
 
-  const handleEditAuditor = async (id: string, full_name: string, nik: string, auditor_id: string) => {
-    await updateAuditorMutation.mutateAsync({ id, full_name, nik, auditor_id });
+  const handleEditAuditor = async (id: string, full_name: string, nik: string, auditor_id: string, mdis_id: string) => {
+    await updateAuditorMutation.mutateAsync({ id, full_name, nik, auditor_id, mdis_id });
   };
 
   return (
@@ -173,6 +185,7 @@ export default function AuditorManagement() {
                 <TableHead className="font-semibold text-gray-600">Nama Auditor</TableHead>
                 <TableHead className="font-semibold text-gray-600">NIK</TableHead>
                 <TableHead className="font-semibold text-gray-600">ID Auditor</TableHead>
+                <TableHead className="font-semibold text-gray-600">MDIS ID</TableHead>
                 <TableHead className="font-semibold text-gray-600 text-right pr-6">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -194,6 +207,7 @@ export default function AuditorManagement() {
                     <TableCell className="text-sm text-gray-900 font-medium">{auditor.full_name}</TableCell>
                     <TableCell className="text-sm text-gray-600">{auditor.nik || '-'}</TableCell>
                     <TableCell className="text-sm text-gray-600">{auditor.auditor_id || '-'}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{auditor.mdis_id || '-'}</TableCell>
                     <TableCell className="text-right pr-6">
                       <button
                         onClick={() => {

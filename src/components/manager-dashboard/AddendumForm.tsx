@@ -234,13 +234,13 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
     }
 
     // Validasi field yang diperlukan berdasarkan jenis addendum
-    if (formData.addendum_types.includes('Perubahan Sampel DAPA')) {
+    if (formData.addendum_types.includes('Perubahan/Penambahan Sampel DAPA')) {
       if (!formData.keterangan.trim()) {
-        toast.error('Keterangan perubahan sampel DAPA wajib diisi');
+        toast.error('Keterangan perubahan/penambahan sampel DAPA wajib diisi');
         return;
       }
       if (!formData.link_file.trim()) {
-        toast.error('Link file untuk perubahan sampel DAPA wajib diisi');
+        toast.error('Link file untuk perubahan/penambahan sampel DAPA wajib diisi');
         return;
       }
     }
@@ -342,7 +342,7 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
       }
 
       // Tambahkan field sesuai tipe addendum
-      if (formData.addendum_types.includes('Perubahan Sampel DAPA')) {
+      if (formData.addendum_types.includes('Perubahan/Penambahan Sampel DAPA')) {
         if (formData.keterangan) {
           insertData.keterangan = formData.keterangan;
         }
@@ -516,11 +516,11 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
             <div className="space-y-3">
               <div className="flex items-center">
                 <input
-                  id="Perubahan Sampel DAPA"
+                  id="Perubahan/Penambahan Sampel DAPA"
                   type="checkbox"
-                  checked={formData.addendum_types.includes('Perubahan Sampel DAPA')}
+                  checked={formData.addendum_types.includes('Perubahan/Penambahan Sampel DAPA')}
                   onChange={(e) => {
-                    const value = 'Perubahan Sampel DAPA';
+                    const value = 'Perubahan/Penambahan Sampel DAPA';
                     setFormData(prev => ({
                       ...prev,
                       addendum_types: e.target.checked
@@ -530,8 +530,8 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
                   }}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                 />
-                <label htmlFor="Perubahan Sampel DAPA" className="ml-2 text-sm text-gray-900">
-                  Perubahan Sampel DAPA
+                <label htmlFor="Perubahan/Penambahan Sampel DAPA" className="ml-2 text-sm text-gray-900">
+                  Perubahan/Penambahan Sampel DAPA
                 </label>
               </div>
               <div className="flex items-center">
@@ -581,11 +581,11 @@ export default function AddendumForm({ onSuccess, onCancel }: AddendumFormProps)
           </div>
 
           {/* Field Conditional untuk Perubahan */}
-          {formData.addendum_types.includes('Perubahan Sampel DAPA') && (
+          {formData.addendum_types.includes('Perubahan/Penambahan Sampel DAPA') && (
             <>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Keterangan Perubahan Sampel DAPA *
+                  Keterangan Perubahan/Penambahan Sampel DAPA *
                 </label>
                 <textarea
                   required

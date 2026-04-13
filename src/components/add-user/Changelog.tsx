@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Calendar, CheckCircle2, Loader2, Palette, Plus, Rocket, Tag, Wrench, X } from 'lucide-react';
+import { Calendar, CheckCircle2, FileText, Loader2, Palette, Plus, Rocket, Tag, Wrench, X } from 'lucide-react';
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -74,24 +74,6 @@ export default function Changelog() {
     addLogMutation.mutate(formData);
   };
 
-  // Grouping logic for rendering per month
-  const groupedLogs = logsData?.reduce((acc: any, curr) => {
-    const dateObj = new Date(curr.release_date);
-    const monthYear = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-    
-    if (!acc[monthYear]) {
-      acc[monthYear] = {
-        period: monthYear,
-        icon: curr.icon, 
-        items: []
-      };
-    }
-    acc[monthYear].items.push(curr);
-    return acc;
-  }, {});
-
-  const renderGroups = groupedLogs ? Object.values(groupedLogs) : [];
-
   const getIcon = (iconName: string, className: string) => {
     switch(iconName) {
       case 'Wrench': return <Wrench className={className} />;
@@ -102,90 +84,142 @@ export default function Changelog() {
     }
   };
 
+  const getLabel = (iconName: string) => {
+    switch(iconName) {
+      case 'Wrench': return 'Fixes';
+      case 'Palette': return 'Design';
+      case 'Rocket': return 'Feature';
+      case 'Tag': return 'Misc';
+      default: return 'Update';
+    }
+  };
+
+  const getLabelColor = (iconName: string) => {
+    switch(iconName) {
+      case 'Wrench': return 'text-amber-700 bg-amber-50 border-amber-200';
+      case 'Palette': return 'text-purple-700 bg-purple-50 border-purple-200';
+      case 'Rocket': return 'text-blue-700 bg-blue-50 border-blue-200';
+      case 'Tag': return 'text-gray-700 bg-gray-50 border-gray-200';
+      default: return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
       <Toaster position="top-right" />
       
-      <div className="p-6 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center flex-wrap gap-4">
+      <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-600" />
-            Sistem Changelog
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2 tracking-tight">
+            <Tag className="w-5 h-5 text-gray-400" />
+            Releases
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Rekap daftar perubahan dan rilis fitur sistem secara real-time.
+            System changelog, updates, and feature rollouts.
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
+          className="bg-[#2da44e] hover:bg-[#2c974b] text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm border border-[rgba(27,31,36,0.15)]"
         >
-          <Plus className="w-4 h-4" />
-          Tambah Changelog Baru
+          Draft a new release
         </button>
       </div>
       
-      <div className="p-6">
+      <div className="p-0 bg-white">
         {isLoading ? (
-          <div className="flex justify-center items-center py-10">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-            <span className="ml-2 text-sm text-gray-500">Memuat changelog database...</span>
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <span className="ml-3 text-sm font-medium text-gray-500">Loading releases...</span>
           </div>
         ) : (
-          <div className="space-y-8">
-            {renderGroups.map((log: any, idx) => (
-              <div key={idx} className="relative">
-                {idx !== renderGroups.length - 1 && (
-                  <div className="absolute left-[11px] top-8 bottom-[-32px] w-[2px] bg-gray-100" />
-                )}
+          <div className="max-w-5xl mx-auto py-8">
+            <div className="px-6 space-y-12">
+              {logsData && logsData.map((item: ChangelogItem, idx: number) => {
+                const itemDateObj = new Date(item.release_date);
+                const formattedDate = itemDateObj.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                });
                 
-                <div className="flex items-center gap-3 mb-4 relative z-10">
-                  <div className="bg-white rounded-full p-1 ring-4 ring-white z-10 shadow-sm border border-gray-100">
-                    <Calendar className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <h3 className="text-md font-bold text-gray-800">{log.period}</h3>
-                  <div className="ml-2 flex items-center">
-                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full shadow-sm">
-                      {log.items.length} Pembaruan
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="ml-10 space-y-4">
-                  {log.items.map((item: ChangelogItem, itemIdx: number) => {
-                    const itemDate = new Date(item.release_date).toLocaleDateString('id-ID', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric'
-                    }).replace(/\//g, '-');
+                const isLatest = idx === 0;
 
-                    return (
-                      <div key={itemIdx} className="bg-gray-50 rounded-lg p-4 border border-gray-100/50 hover:border-indigo-100 transition-colors flex flex-col md:flex-row gap-4 items-start">
-                        {/* Date Badge */}
-                        <div className="flex-shrink-0 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-600 whitespace-nowrap shadow-sm mt-0.5">
-                          {itemDate}
+                return (
+                  <div key={item.id} className="relative flex flex-col md:flex-row gap-6">
+                    {/* Timeline connecting line (hidden on mobile) */}
+                    {idx !== logsData.length - 1 && (
+                      <div className="hidden md:block absolute left-[140px] top-8 bottom-[-48px] w-[2px] bg-gray-200 z-0" />
+                    )}
+
+                    {/* Left Column: Date & Badge */}
+                    <div className="md:w-[130px] shrink-0 pt-1 relative z-10 flex flex-col md:items-end gap-2 text-left md:text-right">
+                      <div className="bg-white py-1 pr-2">
+                        <span className="text-sm font-medium text-gray-500 whitespace-nowrap">
+                          {formattedDate}
+                        </span>
+                      </div>
+                      {isLatest && (
+                        <div className="bg-white py-1 pr-2">
+                          <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
+                            Latest
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Column: Content Box */}
+                    <div className="flex-1 min-w-0 relative z-10">
+                      <div className="bg-white border rounded-lg overflow-hidden border-gray-200 shadow-sm transition-shadow hover:shadow-md">
+                        
+                        {/* Box Header */}
+                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-1.5 rounded-md ${getLabelColor(item.icon)} shadow-sm bg-white`}>
+                               {getIcon(item.icon, "w-4 h-4")}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                              {item.title}
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getLabelColor(item.icon)}`}>
+                              {getLabel(item.icon)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Box Body */}
+                        <div className="px-6 py-6 prose prose-sm prose-gray max-w-none text-[#24292f] whitespace-pre-wrap leading-[1.6]">
+                          {item.description}
                         </div>
                         
-                        {/* Content */}
-                        <div className="flex-1">
-                          <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-1">
-                            {getIcon(item.icon, "w-4 h-4 text-emerald-500 flex-shrink-0")}
-                            {item.title}
-                          </h4>
-                          <p className="text-sm text-gray-600 leading-relaxed max-w-3xl">
-                            {item.description}
-                          </p>
+                        {/* Box Footer */}
+                        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
+                             <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" className="w-[12px] h-[12px] opacity-60" alt="avatar" />
+                          </div>
+                          <span className="text-xs text-gray-500 font-medium">
+                            <span className="font-semibold text-gray-700">optima-system</span> released this update
+                          </span>
                         </div>
+
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {(!logsData || logsData.length === 0) && (
+                <div className="text-center py-24 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-200">
+                    <FileText className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">No releases found</h3>
+                  <p className="text-sm text-gray-500 max-w-sm mx-auto">There are no changelog entries documented yet. Draft a new release to get started.</p>
                 </div>
-              </div>
-            ))}
-            
-            {renderGroups.length === 0 && (
-              <p className="text-center text-gray-500 text-sm py-10">Belum ada data changelog di database.</p>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { Bell, Menu, Paintbrush, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { AlertTriangle, Bell, Menu, Paintbrush, PanelLeftClose, PanelLeftOpen, RefreshCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,14 @@ import { supabase } from '../../lib/supabaseClient';
 import '../../styles/bell.css';
 import '../../styles/loaders.css';
 import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import AuditRatingCalculator from './AuditRatingCalculator';
 
 interface Notification {
@@ -56,9 +64,37 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
   const rcmInputRef = useRef<HTMLInputElement>(null);
 
   const [showAuditRating, setShowAuditRating] = useState(false);
+  const [showRefreshModal, setShowRefreshModal] = useState(false);
+  const [isRefreshingBroadcast, setIsRefreshingBroadcast] = useState(false);
+  const refreshChannelRef = useRef<any>(null);
 
+  // Listen for force refresh from superadmin
+  useEffect(() => {
+    if (!user) return;
 
+    if (!refreshChannelRef.current) {
+      refreshChannelRef.current = supabase.channel('system-refresh');
+      
+      refreshChannelRef.current
+        .on('broadcast', { event: 'force-refresh' }, () => {
+          toast.loading('System update requested. Refreshing page...', { 
+            duration: 3000,
+            position: 'top-center'
+          });
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        })
+        .subscribe();
+    }
 
+    return () => {
+      if (refreshChannelRef.current) {
+        supabase.removeChannel(refreshChannelRef.current);
+        refreshChannelRef.current = null;
+      }
+    };
+  }, [user]);
   useEffect(() => {
     if (user && user.id) {
       fetchNotifications();
@@ -334,6 +370,44 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
     }, 500);
   };
 
+  const handleForceRefreshEveryone = () => {
+    if (userRole !== 'superadmin') return;
+    setShowRefreshModal(true);
+  };
+
+  const handleConfirmForceRefresh = async () => {
+    if (userRole !== 'superadmin' || !refreshChannelRef.current) {
+      toast.error('Sistem belum siap. Silakan refresh halaman.');
+      return;
+    }
+
+    setIsRefreshingBroadcast(true);
+
+    try {
+      // Direct send since channel is already subscribed in useEffect
+      const resp = await refreshChannelRef.current.send({
+        type: 'broadcast',
+        event: 'force-refresh',
+        payload: { 
+          timestamp: new Date().getTime(),
+          requestedBy: user?.email 
+        }
+      });
+      
+      if (resp === 'ok') {
+        toast.success('Broadcast refresh signal sent to all users');
+        setShowRefreshModal(false);
+      } else {
+        toast.error('Gagal mengirim sinyal: ' + resp);
+      }
+    } catch (error) {
+      console.error('Error broadcasting refresh:', error);
+      toast.error('Gagal mengirim sinyal refresh');
+    } finally {
+      setIsRefreshingBroadcast(false);
+    }
+  };
+
   return (
     <div className="h-16 bg-white border-b flex items-center justify-between px-6 w-full max-w-fit-content">
       {/* Sidebar Toggle & Clear Cache */}
@@ -379,6 +453,24 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
             </div>
           </div>
         </div>
+
+        {/* Force Refresh Everyone Button (Superadmin only) */}
+        {userRole === 'superadmin' && (
+          <div className="relative group">
+            <button
+              onClick={handleForceRefreshEveryone}
+              className="p-2 rounded-md hover:bg-orange-50 text-gray-500 hover:text-orange-600 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </button>
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-1.5 bg-orange-600 text-white text-xs rounded-md whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50 shadow-lg">
+              Hard Refresh All Users
+              <div className="absolute right-full top-1/2 -translate-y-1/2">
+                <div className="border-4 border-transparent border-r-orange-600"></div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile/Tablet Notification Panel */}
@@ -1023,6 +1115,48 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
       )}
 
 
+      {/* Hard Refresh Confirmation Modal */}
+      <Dialog open={showRefreshModal} onOpenChange={setShowRefreshModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-orange-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-orange-600" />
+              </div>
+              <DialogTitle className="text-xl">Force System Refresh</DialogTitle>
+            </div>
+            <DialogDescription className="text-gray-600 py-2">
+              Anda akan mengirimkan sinyal Hard Refresh ke seluruh pengguna yang sedang aktif membuka aplikasi. 
+              <br /><br />
+              Tindakan ini akan memuat ulang halaman secara paksa di semua browser klien. Gunakan hanya untuk pembaruan sistem yang bersifat kritis.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowRefreshModal(false)}
+              disabled={isRefreshingBroadcast}
+              className="w-full sm:w-auto"
+            >
+              Batal
+            </Button>
+            <Button
+              className="bg-orange-600 hover:bg-orange-700 text-white w-full sm:w-auto"
+              onClick={handleConfirmForceRefresh}
+              disabled={isRefreshingBroadcast}
+            >
+              {isRefreshingBroadcast ? (
+                <span className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Mengirim...
+                </span>
+              ) : (
+                "Ya, Refresh Sekarang"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
