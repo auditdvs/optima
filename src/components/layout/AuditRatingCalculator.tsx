@@ -1,7 +1,39 @@
 import { useEffect, useState } from "react";
-import "../../styles/audit-rating.css";
+import { Info, ShieldAlert, X, FileText, Minus, Plus, Calculator } from "lucide-react";
+import "../../styles/audit-rating.css"; // Keep if there are global styles needed, else we use tailwind
 
-function AuditRatingCalculator() {
+const NumberInput = ({ label, value, onChange, iconBg, delayClass }: { label: string, value: number, onChange: (val: number) => void, iconBg: string, delayClass: string }) => (
+  <div className={`py-3 px-2 rounded-xl border border-gray-100 bg-white flex flex-col items-center justify-center gap-2 shadow-sm hover:shadow-md hover:border-gray-200 transition-all ${delayClass}`}>
+    <div className="flex items-center gap-1.5 mb-0.5">
+      <div className={`w-2 h-2 rounded-full ${iconBg}`}></div>
+      <span className="font-bold text-[11px] text-gray-500 uppercase tracking-widest">{label}</span>
+    </div>
+    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+      <button 
+        type="button" 
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-800 transition-colors focus:outline-none"
+      >
+        <Minus className="w-4 h-4" strokeWidth={2.5} />
+      </button>
+      <input 
+        type="number" 
+        value={value} 
+        onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+        className="w-10 p-0 m-0 text-center bg-transparent font-black text-xl text-gray-800 outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+      />
+      <button 
+        type="button" 
+        onClick={() => onChange(value + 1)}
+        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-800 transition-colors focus:outline-none"
+      >
+        <Plus className="w-4 h-4" strokeWidth={2.5} />
+      </button>
+    </div>
+  </div>
+);
+
+function AuditRatingCalculator({ onClose }: { onClose?: () => void }) {
   const [minor, setMinor] = useState<number>(0);
   const [moderate, setModerate] = useState<number>(0);
   const [major, setMajor] = useState<number>(0);
@@ -41,175 +73,175 @@ function AuditRatingCalculator() {
   };
 
   return (
-    <>
-      <div className="text-center mb-6 relative z-1">
-        <h2 className="text-xl font-semibold text-indigo-600 mb-2">Audit Rating Calculator</h2>
-        <p className="text-gray-500 text-sm">Masukkan jumlah temuan dan checklist fraud jika ada.</p>
-        <p className="text-gray-500 text-sm">Hasil rating akan muncul otomatis.</p>
-      </div>
-
-      <div className="space-y-5 relative z-1">
-        <div className="form-group">
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minor">Minor</label>
-          <div className="relative">
-            <input
-              type="number"
-              id="minor"
-              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white text-gray-900"
-              min="0"
-              value={minor}
-              onChange={(e) => setMinor(parseInt(e.target.value) || 0)}
-            />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="moderate">Moderate</label>
-          <div className="relative">
-            <input
-              type="number"
-              id="moderate"
-              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white text-gray-900"
-              min="0"
-              value={moderate}
-              onChange={(e) => setModerate(parseInt(e.target.value) || 0)}
-            />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="major">Major</label>
-          <div className="relative">
-            <input
-              type="number"
-              id="major"
-              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white text-gray-900" 
-              min="0"
-              value={major}
-              onChange={(e) => setMajor(parseInt(e.target.value) || 0)}
-            />
-          </div>
-        </div>
-
-        <div className="form-group mt-4">
-          <div className="flex items-center">
-            <input
-              id="fraud"
-              type="checkbox"
-              checked={fraud}
-              onChange={(e) => setFraud(e.target.checked)}
-              className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            />
-            <label htmlFor="fraud" className="ml-2 block text-sm text-gray-700">
-              Terdapat Fraud
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 flex flex-col items-center">
-        <div className="text-sm font-medium text-gray-700 mb-3">Rating Audit Issue Anda:</div>
-        <div className={`
-          py-2 px-8 rounded-full font-semibold text-white text-base min-w-[120px] text-center
-          ${rating === 'LOW' ? 'bg-gradient-to-r from-emerald-500 to-green-600' : 
-            rating === 'MEDIUM' ? 'bg-gradient-to-r from-amber-500 to-yellow-600' :
-            'bg-gradient-to-r from-rose-500 to-red-600'}
-          shadow-lg
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div 
+        className={`bg-white rounded-2xl shadow-2xl relative flex flex-row overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] w-full max-h-[90vh] ${showCriteria ? 'max-w-[780px]' : 'max-w-[420px]'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Main Calculator */}
+        <div className={`w-full sm:w-[420px] shrink-0 p-6 relative flex flex-col overflow-y-auto custom-scrollbar transition-colors duration-500
+          ${rating === 'LOW' ? 'bg-emerald-50/30' :
+            rating === 'MEDIUM' ? 'bg-amber-50/30' :
+            'bg-rose-50/30'}
         `}>
-          {rating}
-        </div>
-        
-        {/* Button untuk menampilkan kriteria - Ukuran lebih kecil dan subtle */}
-        <button
-          type="button"
-          onClick={() => setShowCriteria(true)}
-          className="mt-4 flex items-center gap-1 px-2 py-1 text-xs text-indigo-500 bg-white hover:bg-indigo-50 rounded border border-indigo-100 transition-all duration-200"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Lihat Kriteria Rating
-        </button>
-      </div>
 
-      {/* Modal dialog untuk kriteria - tampil saat diklik */}
-      {showCriteria && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40" onClick={() => setShowCriteria(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            {/* Background accent yang lebih halus dan rapi */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full opacity-30"></div>
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-50 rounded-full opacity-30"></div>
-            <div className="absolute top-1/2 right-0 transform translate-x-1/3 -translate-y-1/2 w-32 h-32 bg-blue-50 rounded-full opacity-20"></div>
-            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 w-40 h-40 bg-purple-50 rounded-full opacity-20"></div>
+          {onClose && (
+            <button 
+              onClick={onClose} 
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors z-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
+          <div className="flex items-center gap-4 mb-5 relative z-10">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner border transition-colors duration-500
+              ${rating === 'LOW' ? 'bg-emerald-50 border-emerald-100/50' :
+                rating === 'MEDIUM' ? 'bg-amber-50 border-amber-100/50' :
+                'bg-rose-50 border-rose-100/50'}
+            `}>
+              <Calculator className={`w-6 h-6 transition-colors duration-500
+                ${rating === 'LOW' ? 'text-emerald-600' :
+                  rating === 'MEDIUM' ? 'text-amber-600' :
+                  'text-rose-600'}
+              `} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 tracking-tight leading-tight mb-0.5">Audit Rating Calculator</h2>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                Proyeksikan rating temuan audit dengan simulasi angka di bawah.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 relative z-10 mb-3">
+            <NumberInput 
+              label="Minor" 
+              value={minor} 
+              onChange={setMinor} 
+              iconBg="bg-blue-400" 
+              delayClass="animate-in fade-in slide-in-from-bottom-2 duration-400" 
+            />
+            <NumberInput 
+              label="Moderate" 
+              value={moderate} 
+              onChange={setModerate} 
+              iconBg="bg-amber-400" 
+              delayClass="animate-in fade-in slide-in-from-bottom-3 duration-400" 
+            />
+            <NumberInput 
+              label="Major" 
+              value={major} 
+              onChange={setMajor} 
+              iconBg="bg-rose-500" 
+              delayClass="animate-in fade-in slide-in-from-bottom-4 duration-400" 
+            />
+          </div>
+
+          <div 
+            onClick={() => setFraud(!fraud)}
+            className={`cursor-pointer mb-5 p-3.5 rounded-xl border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 duration-500 shadow-sm flex justify-between items-center relative z-10 ${
+              fraud ? 'bg-red-50 border-red-200 shadow-red-100' : 'bg-white border-gray-100 hover:border-gray-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg transition-colors ${fraud ? 'bg-red-100 text-red-600' : 'bg-gray-50 text-gray-400'}`}>
+                 <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div>
+                <span className={`block text-sm font-bold leading-none ${fraud ? 'text-red-700' : 'text-gray-700'}`}>
+                  Terdapat Fraud
+                </span>
+              </div>
+            </div>
+            {/* Toggle Switch */}
+            <div className={`w-10 h-5 rounded-full transition-colors duration-300 relative flex items-center ${fraud ? 'bg-red-500' : 'bg-gray-200'}`}>
+              <div className={`absolute w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform duration-300 ${fraud ? 'translate-x-5' : 'translate-x-[2px]'}`}></div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between relative z-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="flex flex-col">
+              <span className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 transition-colors duration-500
+                ${rating === 'LOW' ? 'text-emerald-600/60' :
+                  rating === 'MEDIUM' ? 'text-amber-600/60' :
+                  'text-rose-600/60'}
+              `}>Estimasi Rating Asesmen</span>
+              
+              <div className={`
+                inline-flex items-center justify-center py-1.5 px-6 rounded-lg font-black text-lg text-white tracking-widest shadow-md
+                ${rating === 'LOW' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-emerald-500/20' : 
+                  rating === 'MEDIUM' ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-500/20' :
+                  'bg-gradient-to-r from-rose-500 to-rose-600 shadow-rose-500/20'}
+              `}>
+                {rating}
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setShowCriteria(!showCriteria)}
+              className={`flex flex-col items-center justify-center px-3 py-2 text-xs font-bold bg-white/80 backdrop-blur-sm rounded-lg border shadow-sm transition-all focus:outline-none
+                ${rating === 'LOW' ? 'text-emerald-700 border-emerald-200 hover:bg-emerald-50' : 
+                  rating === 'MEDIUM' ? 'text-amber-700 border-amber-200 hover:bg-amber-50' :
+                  'text-rose-700 border-rose-200 hover:bg-rose-50'}
+                ${showCriteria ? 'ring-2 ring-offset-1 ring-indigo-200' : ''}
+              `}
+            >
+              <Info className="w-4 h-4 mb-0.5" />
+              Kriteria
+            </button>
+          </div>
+        </div>
+
+        {/* Expandable Criteria Panel */}
+        <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] border-l border-gray-100 bg-gray-50/80 ${showCriteria ? 'w-[340px] opacity-100' : 'w-0 opacity-0'}`}>
+          <div className="w-[340px] h-full flex flex-col p-5">
             
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100">
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-indigo-600">
-                    <path clipRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" fillRule="evenodd"></path>
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800">Kriteria Rating Audit</h3>
-              </div>
-              <button 
-                onClick={() => setShowCriteria(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="mb-3 shrink-0">
+              <h3 className="text-[13px] font-bold text-gray-900 tracking-tight">Kriteria Rating Audit</h3>
+              <a href="https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents/Memo%20Intern%20-%20Penetapan%20Audit%20Rating.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-500 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 mt-0.5 font-medium transition-colors"><FileText className="w-3 h-3"/> Memo Intern Penetapan Rating</a>
             </div>
 
-            {/* Content - pastikan ini memiliki z-index lebih tinggi dari background */}
-            <div className="space-y-4 mt-2 relative z-10 max-h-[60vh] overflow-y-auto">
-              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                <h4 className="font-semibold text-green-800 mb-2 text-sm">LOW</h4>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  <li>Tidak ada issue/temuan dengan kategori MAJOR atau ada 1 s.d. 7 issue/temuan kategori MODERATE</li>
-                </ul>
-              </div>
+            {/* Cards */}
+            <div className="flex flex-col gap-2 flex-1 overflow-y-auto custom-scrollbar">
               
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                <h4 className="font-semibold text-amber-800 mb-2 text-sm">MEDIUM</h4>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  <li>Tidak ada issue/temuan kategori MAJOR dan terdapat 8 s.d. 15 temuan/issue kategori MODERATE atau</li>
-                  <li>Terdapat 1 issue/temuan kategori MAJOR dan terdapat s.d. 12 issue/temuan kategori MODERATE atau</li>
-                  <li>Terdapat 2 issue/temuan kategori MAJOR dan terdapat s.d. 10 issue/temuan kategori MODERATE</li>
-                </ul>
+              {/* LOW */}
+              <div className="rounded-md border-l-[3px] border-emerald-400 bg-white px-3 py-2 shadow-sm">
+                <div className="text-[9px] font-black text-emerald-600 tracking-widest uppercase mb-0.5">Low</div>
+                <p className="text-[10px] text-gray-600 leading-relaxed">
+                  Tidak ada temuan <span className="font-semibold text-gray-800">MAJOR</span>, atau maks. <span className="font-semibold text-gray-800">7</span> temuan <span className="font-semibold text-gray-800">MODERATE</span>.
+                </p>
               </div>
-              
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                <h4 className="font-semibold text-red-800 mb-2 text-sm">HIGH</h4>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  <li>Tidak ada issue/temuan kategori MAJOR dan terdapat lebih dari 15 temuan/issue kategori MODERATE atau</li>
-                  <li>Terdapat 1 issue/temuan kategori MAJOR dan lebih dari 12 issue/temuan kategori MODERATE atau</li>
-                  <li>Terdapat 2 issue/temuan kategori MAJOR dan lebih dari 10 issue/temuan kategori MODERATE atau</li>
-                  <li>Terdapat lebih dari 2 issue/temuan kategori MAJOR dan atau tidak ada issue/temuan dengan kategori MODERATE atau</li>
-                  <li>Terdapat <strong>FRAUD</strong></li>
+
+              {/* MEDIUM */}
+              <div className="rounded-md border-l-[3px] border-amber-400 bg-white px-3 py-2 shadow-sm">
+                <div className="text-[9px] font-black text-amber-600 tracking-widest uppercase mb-0.5">Medium</div>
+                <ul className="text-[10px] text-gray-600 leading-relaxed space-y-0.5 list-disc list-inside marker:text-amber-300">
+                  <li>0 MAJOR &amp; <span className="font-semibold text-gray-800">8–15</span> MODERATE</li>
+                  <li>1 MAJOR &amp; maks. <span className="font-semibold text-gray-800">12</span> MODERATE</li>
+                  <li>2 MAJOR &amp; maks. <span className="font-semibold text-gray-800">10</span> MODERATE</li>
                 </ul>
               </div>
 
-              {/* Link dokumen */}
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <a 
-                  href="https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents/Memo%20Intern%20-%20Penetapan%20Audit%20Rating.pdf" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-sm text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  Memo Intern - Penetapan Audit Rating
-                </a>
+              {/* HIGH */}
+              <div className="rounded-md border-l-[3px] border-rose-400 bg-white px-3 py-2 shadow-sm">
+                <div className="text-[9px] font-black text-rose-600 tracking-widest uppercase mb-0.5">High</div>
+                <ul className="text-[10px] text-gray-600 leading-relaxed space-y-0.5 list-disc list-inside marker:text-rose-300">
+                  <li>0 MAJOR &amp; <span className="font-semibold text-gray-800">&gt;15</span> MODERATE</li>
+                  <li>1 MAJOR &amp; <span className="font-semibold text-gray-800">&gt;12</span> MODERATE</li>
+                  <li>2 MAJOR &amp; <span className="font-semibold text-gray-800">&gt;10</span> MODERATE</li>
+                  <li><span className="font-semibold text-gray-800">≥3</span> MAJOR (berapapun)</li>
+                  <li className="text-rose-600 font-medium">Terdapat indikasi FRAUD</li>
+                </ul>
               </div>
+
             </div>
           </div>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 

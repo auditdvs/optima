@@ -1096,22 +1096,7 @@ function Navbar({ isSidebarCollapsed, onToggleSidebar }: NavbarProps) {
       )}
 
       {showAuditRating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full opacity-60 transform translate-x-1/4 -translate-y-1/4"></div>
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-50 rounded-full opacity-60 transform -translate-x-1/4 translate-y-1/4"></div>
-            
-            <Button
-              onClick={() => setShowAuditRating(false)}
-              variant="ghost"
-              size="sm"
-              className="absolute top-2 right-2 p-1 z-10"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <AuditRatingCalculator />
-          </div>
-        </div>
+        <AuditRatingCalculator onClose={() => setShowAuditRating(false)} />
       )}
 
 
