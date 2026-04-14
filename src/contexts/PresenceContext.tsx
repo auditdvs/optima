@@ -32,16 +32,16 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
     const updateLastSeen = async () => {
       try {
-        // 1. Fetch IP & GeoIP Data (including Lat/Lon)
+        // 1. Fetch IP & GeoIP Data (Using HTTPS-compliant API)
         let ipUpdate = {};
         try {
-          const res = await fetch('http://ip-api.com/json/');
+          const res = await fetch('https://freeipapi.com/api/json');
           const data = await res.json();
-          if (data.status === 'success') {
+          if (data.ipAddress) {
             ipUpdate = { 
-              last_ip: data.query,
-              ip_location: `${data.city}, ${data.regionName} (${data.isp})`,
-              ip_coords: `${data.lat},${data.lon}`
+              last_ip: data.ipAddress,
+              ip_location: `${data.cityName}, ${data.regionName} (${data.asName || 'ISP'})`,
+              ip_coords: `${data.latitude},${data.longitude}`
             };
           } else {
             const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -64,7 +64,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.error('[Presence] Heartbeat update failed:', error.message, error.code);
         } else {
-          console.log('[Presence] Heartbeat & GeoData OK for', userId);
+          console.log('[Presence] Heartbeat & GeoData (HTTPS) OK for', userId);
         }
       } catch (e) {
         console.error('[Presence] Heartbeat exception:', e);
