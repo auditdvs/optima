@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertTriangle, Search, ShieldBan, ShieldCheck, Trash2, UserPen, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, MapPin, Search, ShieldBan, ShieldCheck, Trash2, UserPen, UserPlus, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { usePresence } from '../../contexts/PresenceContext';
@@ -24,6 +24,9 @@ interface User {
   last_sign_in_at: string | null;
   banned_until: string | null;
   status: 'ACTIVE' | 'OFFLINE';
+  ip_address?: string | null;
+  ip_location?: string | null;
+  ip_coords?: string | null;
 }
 
 interface AddUserModalProps {
@@ -340,6 +343,9 @@ export default function UserManagement() {
         role: userRoles?.find(r => r.user_id === user.id)?.role || 'user',
         last_sign_in_at: user.last_sign_in_at,
         banned_until: (user as any).banned_until || null,
+        ip_address: userProfiles?.find(p => p.id === user.id)?.last_ip || (user as any).last_sign_in_ip || user.user_metadata?.ip_address || null,
+        ip_location: userProfiles?.find(p => p.id === user.id)?.ip_location || null,
+        ip_coords: userProfiles?.find(p => p.id === user.id)?.ip_coords || null,
         status: 'OFFLINE' as const // Will be overridden by presence
       }));
     },
@@ -522,6 +528,8 @@ export default function UserManagement() {
                 <TableHead className="font-semibold text-gray-600">Email</TableHead>
                 <TableHead className="font-semibold text-gray-600">Name</TableHead>
                 <TableHead className="font-semibold text-gray-600">Role</TableHead>
+                <TableHead className="font-semibold text-gray-600">IP Address</TableHead>
+                <TableHead className="font-semibold text-gray-600">Lokasi / ISP</TableHead>
                 <TableHead className="font-semibold text-gray-600">Status</TableHead>
                 <TableHead className="font-semibold text-gray-600 text-right pr-6">Actions</TableHead>
               </TableRow>
@@ -583,6 +591,34 @@ export default function UserManagement() {
                             <div className="w-2 h-2 bg-gray-900 rotate-45" />
                           </div>
                         </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs font-medium font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                      {user.ip_address || 'Unrecorded'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 group/loc">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-700 font-medium whitespace-nowrap">
+                          {user.ip_location?.split(' (')[0] || '-'}
+                        </span>
+                        <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
+                          {user.ip_location?.split(' (')[1]?.replace(')', '') || ''}
+                        </span>
+                      </div>
+                      {user.ip_coords && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${user.ip_coords}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 bg-rose-50 rounded-lg text-rose-500 hover:bg-rose-500 hover:text-white transition-all opacity-0 group-hover/loc:opacity-100 shadow-sm border border-rose-100"
+                          title="View on Google Maps"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                        </a>
                       )}
                     </div>
                   </TableCell>

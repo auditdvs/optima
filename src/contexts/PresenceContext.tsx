@@ -32,15 +32,39 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
     const updateLastSeen = async () => {
       try {
+        // 1. Fetch IP & GeoIP Data (including Lat/Lon)
+        let ipUpdate = {};
+        try {
+          const res = await fetch('http://ip-api.com/json/');
+          const data = await res.json();
+          if (data.status === 'success') {
+            ipUpdate = { 
+              last_ip: data.query,
+              ip_location: `${data.city}, ${data.regionName} (${data.isp})`,
+              ip_coords: `${data.lat},${data.lon}`
+            };
+          } else {
+            const ipRes = await fetch('https://api.ipify.org?format=json');
+            const ipJson = await ipRes.json();
+            if (ipJson.ip) ipUpdate = { last_ip: ipJson.ip };
+          }
+        } catch (e) {
+          console.warn('[Presence] Failed to fetch Geolocation:', e);
+        }
+
+        // 2. Update profiles table
         const { error } = await supabase
           .from('profiles')
-          .update({ last_seen_at: new Date().toISOString() })
+          .update({ 
+            last_seen_at: new Date().toISOString(),
+            ...ipUpdate
+          })
           .eq('id', userId);
         
         if (error) {
           console.error('[Presence] Heartbeat update failed:', error.message, error.code);
         } else {
-          console.log('[Presence] Heartbeat OK for', userId);
+          console.log('[Presence] Heartbeat & GeoData OK for', userId);
         }
       } catch (e) {
         console.error('[Presence] Heartbeat exception:', e);
