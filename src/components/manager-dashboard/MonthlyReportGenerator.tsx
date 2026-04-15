@@ -43,6 +43,23 @@ interface FraudDetail {
   audit_master_id?: string;
 }
 
+type ReportPeriodMode = 'monthly' | 'range' | 'yearly';
+
+interface ReportPeriodMeta {
+  mode: ReportPeriodMode;
+  year: number;
+  startMonth: number;
+  endMonth: number;
+  startDate: string;
+  endDate: string;
+  label: string;
+  uppercaseLabel: string;
+  contextLabel: string;
+  reportTypeLabel: string;
+  executionPeriodText: string;
+  fileLabel: string;
+}
+
 // ==================== CONSTANTS ====================
 const MONTH_OPTIONS = [
   { value: 1, label: 'Januari' },
@@ -64,6 +81,7 @@ const PUTER_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0IjoiZ3VpIiwidiI6
 const KIMI_API_KEY = 'sk-dDuwBkuALgzMB2pkPc3pkyO7Wai0Sx9zBbkvv7oVhtMJzsc2';
 const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const FREE_MODELS = [
   { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
@@ -88,7 +106,13 @@ const GROQ_MODELS = [
   { value: 'groq:gemma2-9b-it', label: 'Gemma 2 9B' },
 ];
 
-const ALL_MODELS = [...FREE_MODELS, ...PUTER_MODELS, ...KIMI_MODELS, ...GROQ_MODELS];
+const OPENROUTER_MODELS = [
+  { value: 'openrouter:z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air' },
+  { value: 'openrouter:liquid/lfm-2.5-1.2b-thinking:free', label: 'Liquid LFM 2.5 1.2B Thinking' },
+  { value: 'openrouter:nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 3 Super 120B' },
+];
+
+const ALL_MODELS = [...FREE_MODELS, ...PUTER_MODELS, ...KIMI_MODELS, ...GROQ_MODELS, ...OPENROUTER_MODELS];
 
 const COLORS = {
   headerBlue: [17, 53, 107] as [number, number, number],
@@ -134,6 +158,62 @@ const formatRpCompact = (value: number) => {
 };
 
 const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+const getMonthLabel = (month: number) => MONTH_OPTIONS.find((m) => m.value === month)?.label || '';
+
+const formatLongDate = (d: Date) => `${d.getDate()} ${getMonthLabel(d.getMonth() + 1)} ${d.getFullYear()}`;
+
+const sanitizeFileLabel = (value: string) => value
+  .replace(/\s+/g, '_')
+  .replace(/[^\w-]/g, '');
+
+const buildReportPeriodMeta = (
+  mode: ReportPeriodMode,
+  year: number,
+  selectedMonth: number,
+  selectedEndMonth: number,
+): ReportPeriodMeta => {
+  const startMonth = mode === 'yearly' ? 1 : selectedMonth;
+  const endMonth = mode === 'monthly' ? selectedMonth : mode === 'yearly' ? 12 : Math.max(selectedMonth, selectedEndMonth);
+  const startDateObj = new Date(year, startMonth - 1, 1);
+  const endDateObj = new Date(year, endMonth, 0);
+
+  const startMonthLabel = getMonthLabel(startMonth);
+  const endMonthLabel = getMonthLabel(endMonth);
+
+  const label = mode === 'yearly'
+    ? `Tahun ${year}`
+    : startMonth === endMonth
+      ? `${startMonthLabel} ${year}`
+      : `${startMonthLabel} - ${endMonthLabel} ${year}`;
+
+  const contextLabel = mode === 'yearly'
+    ? `tahun ${year}`
+    : mode === 'monthly'
+      ? `bulan ${label}`
+      : `periode ${label}`;
+
+  const reportTypeLabel = mode === 'yearly'
+    ? 'TAHUNAN'
+    : mode === 'monthly'
+      ? 'BULANAN'
+      : 'PERIODE';
+
+  return {
+    mode,
+    year,
+    startMonth,
+    endMonth,
+    startDate: formatDate(startDateObj),
+    endDate: formatDate(endDateObj),
+    label,
+    uppercaseLabel: label.toUpperCase(),
+    contextLabel,
+    reportTypeLabel,
+    executionPeriodText: `${formatLongDate(startDateObj)} - ${formatLongDate(endDateObj)}`,
+    fileLabel: sanitizeFileLabel(label),
+  };
+};
 
 const toDisplayDate = (iso: string) => {
   if (!iso) return '-';
@@ -361,10 +441,7 @@ const drawDonutChart = (
 };
 
 // ==================== DATA FETCHING ====================
-const fetchReportData = async (month: number, year: number): Promise<ReportData> => {
-  const startDate = formatDate(new Date(year, month - 1, 1));
-  const endDate = formatDate(new Date(year, month, 0));
-
+const fetchReportData = async (startDate: string, endDate: string): Promise<ReportData> => {
   const { data: audits, error: auditsError } = await supabase
     .from('audit_master')
     .select('id, branch_name, region, audit_type, team, leader, audit_start_date, audit_end_date, rating')
@@ -430,8 +507,7 @@ const fetchReportData = async (month: number, year: number): Promise<ReportData>
 // ==================== AI NARRATIVE ====================
 const generateAINarrative = async (
   data: ReportData,
-  monthLabel: string,
-  year: number,
+  period: ReportPeriodMeta,
   model: string,
   signal: AbortSignal,
 ): Promise<string> => {
@@ -454,9 +530,9 @@ const generateAINarrative = async (
     else if (r === 'low') ratingCounts.low++;
   });
 
-  const prompt = `Anda adalah seorang Manager Senior Audit Internal yang berpengalaman. Tugas Anda adalah menulis "Bab 6: Kesimpulan dan Rekomendasi" untuk laporan audit bulanan resmi yang akan disampaikan kepada Direksi dan Komite Audit.
+  const prompt = `Anda adalah seorang Manager Senior Audit Internal yang berpengalaman. Tugas Anda adalah menulis "Bab 6: Kesimpulan dan Rekomendasi" untuk laporan audit resmi yang akan disampaikan kepada Direksi dan Komite Audit.
 
-DATA AUDIT BULAN ${monthLabel.toUpperCase()} ${year}:
+DATA AUDIT PERIODE ${period.uppercaseLabel}:
 
 [AUDIT REGULER]
 - Total cabang diaudit: ${data.totalReguler} cabang
@@ -513,7 +589,7 @@ e. [Judul Singkat]: [Narasi tentang pola regional — sebutkan regional dengan f
     return generateAINarrativePuter(prompt, puterModel, signal)
       .catch((err: any) => {
         if (err.name === 'AbortError') throw err;
-        return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+        return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
       });
   }
 
@@ -523,7 +599,7 @@ e. [Judul Singkat]: [Narasi tentang pola regional — sebutkan regional dengan f
     return generateAINarrativeKimi(prompt, kimiModel, signal)
       .catch((err: any) => {
         if (err.name === 'AbortError') throw err;
-        return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+        return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
       });
   }
 
@@ -533,13 +609,23 @@ e. [Judul Singkat]: [Narasi tentang pola regional — sebutkan regional dengan f
     return generateAINarrativeGroq(prompt, groqModel, signal)
       .catch((err: any) => {
         if (err.name === 'AbortError') throw err;
-        return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+        return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
+      });
+  }
+
+  // Route ke OpenRouter jika model dipilih dari OPENROUTER_MODELS
+  if (model.startsWith('openrouter:')) {
+    const openRouterModel = model.replace('openrouter:', '');
+    return generateAINarrativeOpenRouter(prompt, openRouterModel, signal)
+      .catch((err: any) => {
+        if (err.name === 'AbortError') throw err;
+        return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
       });
   }
 
   try {
     const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!geminiKey) return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+    if (!geminiKey) return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
 
     const resp = await fetch(`${GEMINI_API_URL}/${model}:generateContent?key=${geminiKey}`, {
       method: 'POST',
@@ -551,13 +637,13 @@ e. [Judul Singkat]: [Narasi tentang pola regional — sebutkan regional dengan f
       signal,
     });
 
-    if (!resp.ok) return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+    if (!resp.ok) return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
     const result = await resp.json();
     const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text || generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+    return text || generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
   } catch (err: any) {
     if (err.name === 'AbortError') throw err;
-    return generateFallbackNarrative(data, monthLabel, year, ratingCounts, outstandingFraud, recoveryRate);
+    return generateFallbackNarrative(data, period, ratingCounts, outstandingFraud, recoveryRate);
   }
 };
 
@@ -653,10 +739,72 @@ const generateAINarrativeGroq = async (
   return text;
 };
 
+// ==================== OPENROUTER ====================
+const generateAINarrativeOpenRouter = async (
+  prompt: string,
+  model: string,
+  signal: AbortSignal,
+): Promise<string> => {
+  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!openRouterKey) throw new Error('VITE_OPENROUTER_API_KEY belum dikonfigurasi di .env');
+
+  const resp = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openRouterKey}`,
+      'HTTP-Referer': window.location.origin,
+      'X-Title': 'Optima Monthly Report Generator',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      reasoning: {
+        enabled: false,
+      },
+      temperature: 0.6,
+      max_tokens: 1200,
+    }),
+    signal,
+  });
+
+  const result = await resp.json();
+
+  if (!resp.ok) {
+    const errorMessage = result?.error?.message
+      ?? result?.error
+      ?? `OpenRouter API error: ${resp.status}`;
+    throw new Error(String(errorMessage));
+  }
+
+  if (result?.error) {
+    const errorMessage = result?.error?.message ?? result.error;
+    throw new Error(String(errorMessage));
+  }
+
+  const content = result?.choices?.[0]?.message?.content;
+  const text = Array.isArray(content)
+    ? content
+        .map((item: any) => typeof item === 'string' ? item : item?.text || '')
+        .join('')
+        .trim()
+    : typeof content === 'string'
+      ? content.trim()
+      : '';
+
+  if (!text) throw new Error('OpenRouter API: respons tidak valid');
+
+  // Beberapa provider bisa mengembalikan error sebagai string JSON/plain text di content.
+  if (text.includes('Max turns') || text.startsWith('{"error"')) {
+    throw new Error(text);
+  }
+
+  return text;
+};
+
 const generateFallbackNarrative = (
   data: ReportData,
-  monthLabel: string,
-  year: number,
+  period: ReportPeriodMeta,
   ratingCounts: { high: number; medium: number; low: number },
   outstandingFraud: number,
   recoveryRate: string,
@@ -667,7 +815,7 @@ const generateFallbackNarrative = (
 
   return `6.1 Kesimpulan
 
-a. Volume Audit: Divisi Audit Internal telah melaksanakan total ${data.totalReguler + data.totalKhusus} kegiatan audit pada bulan ${monthLabel} ${year}, terdiri dari ${data.totalReguler} audit reguler dan ${data.totalKhusus} audit khusus/fraud.
+a. Volume Audit: Divisi Audit Internal telah melaksanakan total ${data.totalReguler + data.totalKhusus} kegiatan audit selama ${period.contextLabel}, terdiri dari ${data.totalReguler} audit reguler dan ${data.totalKhusus} audit khusus/fraud.
 
 b. Audit Reguler: Dari ${data.totalReguler} cabang yang diaudit secara reguler, sebanyak ${ratingCounts.high} cabang (${data.totalReguler > 0 ? Math.round((ratingCounts.high / data.totalReguler) * 100) : 0}%) mendapatkan rating HIGH, ${ratingCounts.medium} cabang rating MEDIUM, dan ${ratingCounts.low} cabang rating LOW. Cabang-cabang dengan rating HIGH wajib menyelesaikan rencana tindak lanjut dalam waktu yang telah disepakati.
 
@@ -679,7 +827,7 @@ e. Analisis Regional: ${top1 ? `Regional ${top1[0]} dan ${top2 ? `Regional ${top
 
 6.2 Rekomendasi
 
-1. Divisi terkait agar segera memproses dan mendampingi penyelesaian pengembalian (recovery) kerugian fraud dari seluruh pelaku yang telah teridentifikasi pada periode ${monthLabel} ${year}.
+1. Divisi terkait agar segera memproses dan mendampingi penyelesaian pengembalian (recovery) kerugian fraud dari seluruh pelaku yang telah teridentifikasi selama ${period.contextLabel}.
 
 2. Cabang-cabang dengan rating HIGH pada audit reguler (${ratingCounts.high} cabang) diwajibkan menyampaikan Rencana Tindak Lanjut (RTL) secara tertulis kepada Divisi Audit Internal paling lambat 30 hari setelah tanggal laporan.
 
@@ -694,14 +842,15 @@ e. Analisis Regional: ${top1 ? `Regional ${top1[0]} dan ${top2 ? `Regional ${top
 const generatePDF = async (
   data: ReportData,
   narrative: string,
-  monthLabel: string,
-  year: number,
+  period: ReportPeriodMeta,
 ): Promise<jsPDF> => {
   const pdf = new jsPDF('p', 'mm', 'a4');
   const PW = pdf.internal.pageSize.getWidth();
   const PH = pdf.internal.pageSize.getHeight();
   const M = 20;
   const CW = PW - M * 2;
+  const periodLabel = period.label;
+  const periodContextLabel = period.contextLabel;
 
   // ---------- HELPERS ----------
 
@@ -725,7 +874,7 @@ const generatePDF = async (
     pdf.text(rightText, PW - M, 5, { align: 'right' });
   };
 
-  const HEADER_LEFT = `LAPORAN BULANAN KEGIATAN AUDIT — ${monthLabel.toUpperCase()} ${year}`;
+  const HEADER_LEFT = `LAPORAN ${period.reportTypeLabel} KEGIATAN AUDIT — ${period.uppercaseLabel}`;
   const HEADER_RIGHT = 'DIVISI INTERNAL AUDIT | RAHASIA';
 
   const drawPageFooter = (pageNum: number) => {
@@ -805,24 +954,21 @@ const generatePDF = async (
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(22);
   pdf.setTextColor(...COLORS.headerBlue);
-  pdf.text('LAPORAN BULANAN', PW / 2, titleY, { align: 'center' });
+  pdf.text(`LAPORAN ${period.reportTypeLabel}`, PW / 2, titleY, { align: 'center' });
   pdf.text('KEGIATAN AUDIT', PW / 2, titleY + 12, { align: 'center' });
 
   pdf.setFontSize(28);
   pdf.setTextColor(...COLORS.red);
-  pdf.text(`${monthLabel.toUpperCase()} ${year}`, PW / 2, titleY + 26, { align: 'center' });
+  pdf.text(period.uppercaseLabel, PW / 2, titleY + 26, { align: 'center' });
 
   pdf.setDrawColor(...COLORS.accentBlue);
   pdf.setLineWidth(0.8);
   pdf.line(M + 20, titleY + 32, PW - M - 20, titleY + 32);
 
-  const lastDay = new Date(year, parseInt(String(
-    MONTH_OPTIONS.findIndex(m => m.label === monthLabel) + 1,
-  )), 0).getDate();
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.setTextColor(...COLORS.textMed);
-  pdf.text(`Periode Pelaksanaan: 1 - ${lastDay} ${monthLabel} ${year}`, PW / 2, titleY + 42, { align: 'center' });
+  pdf.text(`Periode Pelaksanaan: ${period.executionPeriodText}`, PW / 2, titleY + 42, { align: 'center' });
   pdf.text(`Diterbitkan: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, PW / 2, titleY + 50, { align: 'center' });
 
   pdf.setFillColor(240, 240, 240);
@@ -855,10 +1001,10 @@ const generatePDF = async (
   const tocItems = [
     { num: '1.', title: 'Pendahuluan', page: '2' },
     { num: '2.', title: 'Ringkasan Eksekutif', page: '2' },
-    { num: '3.', title: `Audit Reguler ${monthLabel} ${year}`, page: '3' },
+    { num: '3.', title: `Audit Reguler ${periodLabel}`, page: '3' },
     { num: '   3.1', title: 'Daftar Cabang yang Diaudit', page: '3' },
     { num: '   3.2', title: 'Distribusi Rating Hasil Audit', page: '4' },
-    { num: '4.', title: `Audit Khusus / Fraud ${monthLabel} ${year}`, page: '4' },
+    { num: '4.', title: `Audit Khusus / Fraud ${periodLabel}`, page: '4' },
     { num: '   4.1', title: 'Daftar Kasus Fraud per Cabang', page: '5' },
     { num: '   4.2', title: 'Rincian Pelaku dan Nominal Fraud', page: '7' },
     { num: '   4.3', title: 'Status Pengembalian Fraud', page: '8' },
@@ -902,7 +1048,7 @@ const generatePDF = async (
   // ukuran font yang benar dan mengisi lebar CW secara penuh (bukan terpotong)
   setFont('normal', 9, COLORS.textDark);
   const pendahuluanLines = pdf.splitTextToSize(
-    `Laporan ini disusun oleh Divisi Audit Internal dalam rangka menyajikan hasil dan perkembangan kegiatan audit yang dilaksanakan selama bulan ${monthLabel} ${year}. Cakupan laporan meliputi audit reguler terhadap cabang-cabang dalam rangka penilaian kepatuhan dan tata kelola, serta audit khusus/fraud yang dilaksanakan sebagai respons atas indikasi penyimpangan keuangan di sejumlah unit kerja.`,
+    `Laporan ini disusun oleh Divisi Audit Internal dalam rangka menyajikan hasil dan perkembangan kegiatan audit yang dilaksanakan selama ${periodContextLabel}. Cakupan laporan meliputi audit reguler terhadap cabang-cabang dalam rangka penilaian kepatuhan dan tata kelola, serta audit khusus/fraud yang dilaksanakan sebagai respons atas indikasi penyimpangan keuangan di sejumlah unit kerja.`,
     CW,
   );
   pdf.text(pendahuluanLines, M, y);
@@ -922,7 +1068,7 @@ const generatePDF = async (
   const uniqueFraudStaff = [...new Set(data.fraudDetails.map(f => f.fraud_staff))].length;
   const uniqueFraudBranch = [...new Set(data.fraudDetails.map(f => f.branch_name))].filter(Boolean).length;
 
-  const ringkasanText = `Selama bulan ${monthLabel} ${year}, Divisi Audit Internal telah melaksanakan total ${data.totalReguler + data.totalKhusus} kegiatan audit yang terdiri dari ${data.totalReguler} audit reguler dan ${data.totalKhusus} audit khusus/fraud. Kegiatan audit tersebar di berbagai regional di seluruh Indonesia, mencerminkan komitmen divisi audit dalam menjaga integritas dan kepatuhan operasional cabang.`;
+  const ringkasanText = `Selama ${periodContextLabel}, Divisi Audit Internal telah melaksanakan total ${data.totalReguler + data.totalKhusus} kegiatan audit yang terdiri dari ${data.totalReguler} audit reguler dan ${data.totalKhusus} audit khusus/fraud. Kegiatan audit tersebar di berbagai regional di seluruh Indonesia, mencerminkan komitmen divisi audit dalam menjaga integritas dan kepatuhan operasional cabang.`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf ringkasan eksekutif
   // tampil rapi dan mengisi lebar halaman penuh (sebelumnya terpotong di tengah)
@@ -986,10 +1132,10 @@ const generatePDF = async (
       500, 260,
     );
     setFont('bold', 10, COLORS.headerBlue);
-    pdf.text(`Komposisi Kegiatan Audit — ${monthLabel} ${year}`, PW / 2, y + 6, { align: 'center' });
+    pdf.text(`Komposisi Kegiatan Audit — ${periodLabel}`, PW / 2, y + 6, { align: 'center' });
     pdf.addImage(donutImg, 'PNG', M + 10, y + 8, CW - 20, 60);
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Gambar 1: Komposisi Kegiatan Audit ${monthLabel} ${year}`, PW / 2, y + 72, { align: 'center' });
+    pdf.text(`Gambar 1: Komposisi Kegiatan Audit ${periodLabel}`, PW / 2, y + 72, { align: 'center' });
   }
 
   drawPageFooter(4);
@@ -1007,7 +1153,7 @@ const generatePDF = async (
     a => a.audit_type?.toLowerCase().includes('reguler') || a.audit_type?.toLowerCase().includes('regular'),
   );
 
-  const regulerIntro = `Audit reguler merupakan kegiatan pemeriksaan periodik yang dilaksanakan terhadap cabang-cabang berdasarkan jadwal yang telah ditetapkan. Pada bulan ${monthLabel} ${year}, terdapat ${regulerAudits.length} cabang yang menjadi objek audit reguler yang tersebar di berbagai regional. Audit reguler difokuskan pada evaluasi kepatuhan operasional, kecukupan dokumentasi, dan penilaian profil risiko masing-masing cabang.`;
+  const regulerIntro = `Audit reguler merupakan kegiatan pemeriksaan periodik yang dilaksanakan terhadap cabang-cabang berdasarkan jadwal yang telah ditetapkan. Pada ${periodContextLabel}, terdapat ${regulerAudits.length} cabang yang menjadi objek audit reguler yang tersebar di berbagai regional. Audit reguler difokuskan pada evaluasi kepatuhan operasional, kecukupan dokumentasi, dan penilaian profil risiko masing-masing cabang.`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 3
   // tampil rapi dan mengisi lebar CW secara penuh (sebelumnya wrap tidak akurat)
@@ -1061,11 +1207,11 @@ const generatePDF = async (
 
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 1: Daftar Cabang Audit Reguler ${monthLabel} ${year}`, PW / 2, y, { align: 'center' });
+    pdf.text(`Tabel 1: Daftar Cabang Audit Reguler ${periodLabel}`, PW / 2, y, { align: 'center' });
     y += 6;
   } else {
     setFont('italic', 9, COLORS.textMed);
-    pdf.text('Tidak ada data audit reguler pada bulan ini.', M, y);
+    pdf.text('Tidak ada data audit reguler pada periode ini.', M, y);
     y += 10;
   }
 
@@ -1101,12 +1247,12 @@ const generatePDF = async (
       ['high', 'medium', 'low'],
       [ratingCounts.high, ratingCounts.medium, ratingCounts.low],
       ['#28A745', '#F39C12', '#DC3545'],
-      `Distribusi Rating Audit Reguler — ${monthLabel} ${year}`,
+      `Distribusi Rating Audit Reguler — ${periodLabel}`,
       520, 200,
     );
     pdf.addImage(ratingImg, 'PNG', M + 5, y, CW - 10, 55);
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Gambar 2: Distribusi Rating Audit Reguler ${monthLabel} ${year}`, PW / 2, y + 58, { align: 'center' });
+    pdf.text(`Gambar 2: Distribusi Rating Audit Reguler ${periodLabel}`, PW / 2, y + 58, { align: 'center' });
     y += 64;
   }
 
@@ -1129,7 +1275,7 @@ const generatePDF = async (
     a => a.audit_type?.toLowerCase().includes('khusus') || a.audit_type?.toLowerCase().includes('fraud') || a.audit_type?.toLowerCase().includes('special'),
   );
 
-  const khususIntro = `Audit khusus/fraud dilaksanakan atas dasar indikasi atau laporan adanya penyimpangan keuangan pada cabang tertentu. Pada bulan ${monthLabel} ${year}, terdapat ${khususAudits.length} cabang yang menjadi objek audit khusus, tersebar di ${Object.keys(data.regionFrauds).length} regional. Seluruh audit khusus dikonfirmasi sebagai real fraud, dengan total kerugian yang teridentifikasi sebesar ${formatRp(data.totalNominalFraud)}.`;
+  const khususIntro = `Audit khusus/fraud dilaksanakan atas dasar indikasi atau laporan adanya penyimpangan keuangan pada cabang tertentu. Pada ${periodContextLabel}, terdapat ${khususAudits.length} cabang yang menjadi objek audit khusus, tersebar di ${Object.keys(data.regionFrauds).length} regional. Seluruh audit khusus dikonfirmasi sebagai real fraud, dengan total kerugian yang teridentifikasi sebesar ${formatRp(data.totalNominalFraud)}.`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 4
   // tampil rapi dan mengisi lebar CW secara penuh (sebelumnya terpotong)
@@ -1194,7 +1340,7 @@ const generatePDF = async (
 
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 2: Ringkasan Kasus Fraud per Cabang ${monthLabel} ${year}`, PW / 2, y, { align: 'center' });
+    pdf.text(`Tabel 2: Ringkasan Kasus Fraud per Cabang ${periodLabel}`, PW / 2, y, { align: 'center' });
     y += 6;
 
     // FIX: Hapus pdf.text judul chart yang duplikat di sini.
@@ -1205,7 +1351,7 @@ const generatePDF = async (
       const barImg = drawVBarChart(
         topBranches.map(([bn]) => bn.length > 10 ? bn.substring(0, 10) + '.' : bn),
         topBranches.map(([, v]) => v.total),
-        `Nominal Fraud per Cabang — ${monthLabel} ${year}`,
+        `Nominal Fraud per Cabang — ${periodLabel}`,
         520, 200,
       );
       // FIX: Hapus baris pdf.text judul chart yang menyebabkan double title:
@@ -1217,7 +1363,7 @@ const generatePDF = async (
     }
   } else {
     setFont('italic', 9, COLORS.textMed);
-    pdf.text('Tidak ada data audit khusus pada bulan ini.', M, y);
+    pdf.text('Tidak ada data audit khusus pada periode ini.', M, y);
     y += 10;
   }
 
@@ -1235,7 +1381,7 @@ const generatePDF = async (
   y = drawSubTitle('4.2 Rincian Pelaku dan Nominal Fraud', y);
 
   const topBranchByFraud = branchFraudRows[0];
-  const pelakuIntroText = `Berikut adalah daftar lengkap pelaku fraud beserta nominal kerugian yang teridentifikasi dalam pelaksanaan audit khusus bulan ${monthLabel} ${year}. Total teridentifikasi ${data.fraudDetails.length} pelaku${topBranchByFraud ? ` dengan nominal fraud terbesar tercatat pada cabang ${topBranchByFraud[0]} (Regional ${topBranchByFraud[1].region}) sebesar ${formatRp(topBranchByFraud[1].total)} yang melibatkan ${topBranchByFraud[1].pelaku.length} pelaku.` : '.'}`;
+  const pelakuIntroText = `Berikut adalah daftar lengkap pelaku fraud beserta nominal kerugian yang teridentifikasi dalam pelaksanaan audit khusus selama ${periodContextLabel}. Total teridentifikasi ${data.fraudDetails.length} pelaku${topBranchByFraud ? ` dengan nominal fraud terbesar tercatat pada cabang ${topBranchByFraud[0]} (Regional ${topBranchByFraud[1].region}) sebesar ${formatRp(topBranchByFraud[1].total)} yang melibatkan ${topBranchByFraud[1].pelaku.length} pelaku.` : '.'}`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro 4.2 rapi
   setFont('normal', 9, COLORS.textDark);
@@ -1283,7 +1429,7 @@ const generatePDF = async (
 
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 3: Rincian Pelaku Fraud ${monthLabel} ${year}`, PW / 2, y, { align: 'center' });
+    pdf.text(`Tabel 3: Rincian Pelaku Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
   }
 
   drawPageFooter(8);
@@ -1297,7 +1443,7 @@ const generatePDF = async (
 
   y = drawSubTitle('4.3 Status Pengembalian (Recovery) Fraud', y);
 
-  const recoveryIntroText = `Pengembalian fraud merupakan upaya pemulihan kerugian yang dilakukan oleh pelaku atau pihak terkait setelah temuan fraud dikonfirmasi. Berdasarkan data yang tercatat dalam sistem hingga tanggal pelaporan, status pengembalian fraud untuk periode ${monthLabel} ${year} adalah sebagai berikut:`;
+  const recoveryIntroText = `Pengembalian fraud merupakan upaya pemulihan kerugian yang dilakukan oleh pelaku atau pihak terkait setelah temuan fraud dikonfirmasi. Berdasarkan data yang tercatat dalam sistem hingga tanggal pelaporan, status pengembalian fraud untuk ${periodContextLabel} adalah sebagai berikut:`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar teks intro recovery rapi
   setFont('normal', 9, COLORS.textDark);
@@ -1344,11 +1490,11 @@ const generatePDF = async (
 
   y = (pdf as any).lastAutoTable.finalY + 4;
   setFont('italic', 7.5, COLORS.textLight);
-  pdf.text(`Tabel 4: Status Pengembalian Fraud ${monthLabel} ${year}`, PW / 2, y, { align: 'center' });
+  pdf.text(`Tabel 4: Status Pengembalian Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
   y += 7;
 
   const recoveryNote = data.totalPengembalianFraud === 0
-    ? `Hingga tanggal laporan ini diterbitkan, belum ada pengembalian dana yang diterima dari seluruh pelaku fraud yang teridentifikasi pada periode ${monthLabel} ${year}. Proses penagihan dan pemulihan kerugian akan terus dipantau dan dilaporkan pada periode berikutnya. Divisi Audit Internal berkoordinasi dengan pihak terkait untuk memastikan proses recovery berjalan sesuai ketentuan yang berlaku.`
+    ? `Hingga tanggal laporan ini diterbitkan, belum ada pengembalian dana yang diterima dari seluruh pelaku fraud yang teridentifikasi selama ${periodContextLabel}. Proses penagihan dan pemulihan kerugian akan terus dipantau dan dilaporkan pada periode berikutnya. Divisi Audit Internal berkoordinasi dengan pihak terkait untuk memastikan proses recovery berjalan sesuai ketentuan yang berlaku.`
     : `Hingga tanggal laporan ini diterbitkan, total pengembalian yang diterima adalah ${formatRp(data.totalPengembalianFraud)} atau ${recoveryPct}% dari total kerugian. Saldo yang belum terpulihkan sebesar ${formatRp(outstanding)} masih dalam proses penagihan dan pemulihan. Divisi Audit Internal berkoordinasi dengan pihak terkait untuk memastikan proses recovery berjalan sesuai ketentuan yang berlaku.`;
 
   drawHighlightBox(recoveryNote, y, [236, 245, 252], COLORS.accentBlue, [40, 80, 130]);
@@ -1364,7 +1510,7 @@ const generatePDF = async (
 
   y = drawSectionTitle('5. ANALISIS REGIONAL', y);
 
-  const regionalIntro = 'Analisis regional bertujuan untuk mengidentifikasi pola distribusi kasus fraud berdasarkan wilayah/regional secara kumulatif. Data ini penting untuk menentukan prioritas pengawasan dan alokasi sumber daya audit pada periode selanjutnya. Analisis mencakup seluruh data historis yang tersedia dalam sistem.';
+  const regionalIntro = `Analisis regional bertujuan untuk mengidentifikasi pola distribusi kasus fraud berdasarkan wilayah/regional selama ${periodContextLabel}. Data ini penting untuk menentukan prioritas pengawasan dan alokasi sumber daya audit pada periode selanjutnya.`;
 
   // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 5 rapi
   setFont('normal', 9, COLORS.textDark);
@@ -1440,7 +1586,7 @@ const generatePDF = async (
     }
   } else {
     setFont('italic', 9, COLORS.textMed);
-    pdf.text('Tidak ada kasus fraud regional untuk dianalisis bulan ini.', M, y);
+    pdf.text('Tidak ada kasus fraud regional untuk dianalisis pada periode ini.', M, y);
   }
 
   drawPageFooter(10);
@@ -1599,14 +1745,19 @@ const generatePDF = async (
 export default function MonthlyReportGenerator() {
   const currentDate = new Date();
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedPeriodMode, setSelectedPeriodMode] = useState<ReportPeriodMode>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedEndMonth, setSelectedEndMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedModel, setSelectedModel] = useState(ALL_MODELS[0].value);
   const [step, setStep] = useState<ProgressStep>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [lastGeneratedFileName, setLastGeneratedFileName] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
   const yearOptions = Array.from({ length: 3 }, (_, i) => currentDate.getFullYear() - i);
+  const periodMeta = buildReportPeriodMeta(selectedPeriodMode, selectedYear, selectedMonth, selectedEndMonth);
+  const rangeEndMonthOptions = MONTH_OPTIONS.filter((m) => m.value >= selectedMonth);
 
   const handleGenerate = async () => {
     abortRef.current = new AbortController();
@@ -1614,10 +1765,10 @@ export default function MonthlyReportGenerator() {
 
     try {
       setStep('fetching');
-      const data = await fetchReportData(selectedMonth, selectedYear);
+      const data = await fetchReportData(periodMeta.startDate, periodMeta.endDate);
 
       if (data.auditDetails.length === 0 && data.totalReguler === 0 && data.totalKhusus === 0) {
-        setErrorMessage(`Tidak ada data audit untuk ${MONTH_OPTIONS[selectedMonth - 1].label} ${selectedYear}.`);
+        setErrorMessage(`Tidak ada data audit untuk ${periodMeta.label}.`);
         setStep('error');
         return;
       }
@@ -1626,14 +1777,14 @@ export default function MonthlyReportGenerator() {
       await new Promise(r => setTimeout(r, 400));
 
       setStep('ai_narrative');
-      const monthLabel = MONTH_OPTIONS[selectedMonth - 1].label;
-      const narrative = await generateAINarrative(data, monthLabel, selectedYear, selectedModel, abortRef.current!.signal);
+      const narrative = await generateAINarrative(data, periodMeta, selectedModel, abortRef.current!.signal);
 
       setStep('generating_pdf');
-      const pdf = await generatePDF(data, narrative, monthLabel, selectedYear);
+      const pdf = await generatePDF(data, narrative, periodMeta);
 
       setStep('done');
-      const fileName = `Laporan_Audit_${monthLabel}_${selectedYear}.pdf`;
+      const fileName = `Laporan_Audit_${periodMeta.fileLabel}.pdf`;
+      setLastGeneratedFileName(fileName);
       pdf.save(fileName);
       toast.success(`Laporan berhasil di-download: ${fileName}`);
 
@@ -1670,10 +1821,10 @@ export default function MonthlyReportGenerator() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-indigo-600" />
-              Generate Laporan Bulanan
+              Generate Laporan Audit
             </DialogTitle>
             <DialogDescription>
-              Pilih periode bulan dan tahun untuk generate laporan audit bulanan secara otomatis.
+              Pilih periode bulanan, beberapa bulan, atau tahunan untuk generate laporan audit secara otomatis.
             </DialogDescription>
           </DialogHeader>
 
@@ -1683,27 +1834,108 @@ export default function MonthlyReportGenerator() {
                 <Calendar className="w-4 h-4 text-indigo-500" />
                 Periode Laporan
               </label>
-              <div className="flex gap-3">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  disabled={isGenerating}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
-                >
-                  {MONTH_OPTIONS.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
+              <select
+                value={selectedPeriodMode}
+                onChange={(e) => {
+                  const nextMode = e.target.value as ReportPeriodMode;
+                  setSelectedPeriodMode(nextMode);
+                  if (nextMode !== 'range') setSelectedEndMonth(selectedMonth);
+                }}
+                disabled={isGenerating}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+              >
+                <option value="monthly">Bulanan</option>
+                <option value="range">Per Beberapa Bulan</option>
+                <option value="yearly">Tahunan</option>
+              </select>
+
+              {selectedPeriodMode === 'monthly' && (
+                <div className="flex gap-3">
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setSelectedMonth(value);
+                      setSelectedEndMonth(value);
+                    }}
+                    disabled={isGenerating}
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                  >
+                    {MONTH_OPTIONS.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    disabled={isGenerating}
+                    className="w-28 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                  >
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {selectedPeriodMode === 'range' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        setSelectedMonth(value);
+                        if (selectedEndMonth < value) setSelectedEndMonth(value);
+                      }}
+                      disabled={isGenerating}
+                      className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                    >
+                      {MONTH_OPTIONS.map((m) => (
+                        <option key={m.value} value={m.value}>Dari {m.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedEndMonth}
+                      onChange={(e) => setSelectedEndMonth(Number(e.target.value))}
+                      disabled={isGenerating}
+                      className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                    >
+                      {rangeEndMonthOptions.map((m) => (
+                        <option key={m.value} value={m.value}>Sampai {m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    disabled={isGenerating}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                  >
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
+              {selectedPeriodMode === 'yearly' && (
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
                   disabled={isGenerating}
-                  className="w-28 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 bg-white"
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
+              )}
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                Periode aktif: <span className="font-medium">{periodMeta.label}</span>
+                <br />
+                Cakupan data: {periodMeta.executionPeriodText}
               </div>
             </div>
 
@@ -1738,6 +1970,11 @@ export default function MonthlyReportGenerator() {
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
                 </optgroup>
+                <optgroup label="OpenRouter">
+                  {OPENROUTER_MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
               </select>
               {selectedModel.startsWith('puter:') && (
                 <p className="text-xs text-emerald-600 flex items-center gap-1">
@@ -1752,6 +1989,11 @@ export default function MonthlyReportGenerator() {
               {selectedModel.startsWith('groq:') && (
                 <p className="text-xs text-orange-600 flex items-center gap-1">
                   <span>⚡</span> Groq — Super cepat, gratis
+                </p>
+              )}
+              {selectedModel.startsWith('openrouter:') && (
+                <p className="text-xs text-sky-600 flex items-center gap-1">
+                  <span>✓</span> OpenRouter cukup cepat
                 </p>
               )}
             </div>
@@ -1786,7 +2028,7 @@ export default function MonthlyReportGenerator() {
                 <div>
                   <p className="text-sm font-medium text-green-800">Laporan berhasil di-download!</p>
                   <p className="text-xs text-green-600">
-                    Laporan_Audit_{MONTH_OPTIONS[selectedMonth - 1].label}_{selectedYear}.pdf
+                    {lastGeneratedFileName || `Laporan_Audit_${periodMeta.fileLabel}.pdf`}
                   </p>
                 </div>
               </div>
