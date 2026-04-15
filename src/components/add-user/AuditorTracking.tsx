@@ -298,15 +298,15 @@ const AuditorTracking: React.FC = () => {
   );
 
   return (
-    <Card className="mb-0 border-gray-200 shadow-sm bg-white">
-      <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <Card className="border-gray-200 shadow-sm bg-white">
+      <CardContent className="p-5">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-2">
           <div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">Auditor Tracking</h2>
             <p className="text-sm text-gray-500 mt-1">Posisi terkini setiap auditor berdasarkan surat tugas & addendum.</p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-grow md:flex-grow-0 md:w-[300px]">
+            <div className="relative flex-grow md:flex-grow-0 md:w-[500px]">
               <input
                 type="text"
                 value={searchQuery}
@@ -356,7 +356,7 @@ const AuditorTracking: React.FC = () => {
 
         {/* Table */}
         <div className="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-          <div className="max-h-[calc(100vh-340px)] overflow-y-auto relative custom-scrollbar">
+          <div className="max-h-[calc(100vh-400px)] overflow-y-auto relative custom-scrollbar">
             <Table>
               <TableHeader className="bg-gray-50/50 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                 <TableRow>

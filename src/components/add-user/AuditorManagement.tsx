@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, UserPen, X } from 'lucide-react';
+import { Loader2, MapPin, UserPen, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -19,13 +19,14 @@ interface Auditor {
   nik: string | null;
   auditor_id: string | null;
   mdis_id: string | null;
+  area?: string | null;
 }
 
 interface EditAuditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   auditor: Auditor | null;
-  onSubmit: (id: string, fullName: string, nik: string, auditorId: string, mdisId: string) => Promise<void>;
+  onSubmit: (id: string, fullName: string, nik: string, auditorId: string, mdisId: string, area: string) => Promise<void>;
 }
 
 const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, auditor, onSubmit }) => {
@@ -33,6 +34,7 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
   const [nik, setNik] = useState(auditor?.nik || '');
   const [auditorId, setAuditorId] = useState(auditor?.auditor_id || '');
   const [mdisId, setMdisId] = useState(auditor?.mdis_id || '');
+  const [area, setArea] = useState(auditor?.area || '');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
       setNik(auditor.nik || '');
       setAuditorId(auditor.auditor_id || '');
       setMdisId(auditor.mdis_id || '');
+      setArea(auditor.area || '');
     }
   }, [auditor]);
 
@@ -50,7 +53,7 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
     e.preventDefault();
     setLoading(true);
     try {
-      await onSubmit(auditor.id, fullName, nik, auditorId, mdisId);
+      await onSubmit(auditor.id, fullName, nik, auditorId, mdisId, area);
       onClose();
     } catch (error) {
       console.error('Error:', error);
@@ -106,6 +109,16 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Area / Regional</label>
+            <input
+              type="text"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="Contoh: Regional 1"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -119,6 +132,38 @@ const EditAuditorModal: React.FC<EditAuditorModalProps> = ({ isOpen, onClose, au
   );
 };
 
+// ── Helper: fuzzy name match (same logic as AuditorTracking) ──────────────────
+const normalize = (s: string) => s.toLowerCase().replace(/[.,]/g, '').trim();
+const filterShort = (tokens: string[]) => tokens.filter(t => t.length > 3);
+
+function isNameMatch(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const na = normalize(a), nb = normalize(b);
+  if (na === nb) return true;
+  const ta = filterShort(na.split(/\s+/));
+  const tb = filterShort(nb.split(/\s+/));
+  if (ta.length >= 2 && tb.length >= 2) {
+    const ja = ta.join(' '), jb = tb.join(' ');
+    if (ja.includes(jb) || jb.includes(ja)) return true;
+  }
+  let exact = 0;
+  ta.forEach(t => { if (tb.includes(t)) exact++; });
+  return exact >= 2;
+}
+
+function isAuditorInLetter(name: string, letter: any): boolean {
+  if (letter.leader && isNameMatch(name, letter.leader)) return true;
+  let members: string[] = [];
+  try {
+    if (letter.team) {
+      members = letter.team.startsWith('[')
+        ? JSON.parse(letter.team)
+        : letter.team.split(',').map((s: string) => s.trim());
+    }
+  } catch { members = letter.team ? [letter.team] : []; }
+  return members.some((m: string) => isNameMatch(name, m));
+}
+
 export default function AuditorManagement() {
   const queryClient = useQueryClient();
   const [showEditAuditorModal, setShowEditAuditorModal] = useState(false);
@@ -127,27 +172,56 @@ export default function AuditorManagement() {
   const { data: auditors, isLoading: isLoadingAuditors } = useQuery({
     queryKey: ['auditors'],
     queryFn: async () => {
-      console.log('Fetching auditors data...');
-      const { data, error } = await supabase
+      // Fetch auditor profiles including manual area
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, nik, auditor_id, mdis_id')
-        .order('full_name', { ascending: true });
-    
-      console.log('Auditors query result:', { data, error });
-      if (error) {
-        console.error('Auditors query error:', error);
-        throw error;
-      }
-      return data as Auditor[];
+        .select('id, full_name, nik, auditor_id, mdis_id, area');
+      if (profilesError) throw profilesError;
+
+      const data = (profiles || []) as Auditor[];
+
+      // Custom sort:
+      // 1. Single-letter area (A, B, C...) ascending
+      // 2. Multi-letter area ascending
+      // 3. Null/empty area last
+      data.sort((a, b) => {
+        const aArea = a.area?.trim() || null;
+        const bArea = b.area?.trim() || null;
+        const aIsInactive = aArea?.toLowerCase().includes('innactive') || aArea?.toLowerCase().includes('inactive');
+        const bIsInactive = bArea?.toLowerCase().includes('innactive') || bArea?.toLowerCase().includes('inactive');
+
+        // Inactive goes last
+        if (aIsInactive && !bIsInactive) return 1;
+        if (!aIsInactive && bIsInactive) return -1;
+
+        // Null area goes last (before inactive)
+        if (!aArea && !bArea) return a.full_name.localeCompare(b.full_name, 'id');
+        if (!aArea) return 1;
+        if (!bArea) return -1;
+
+        const aIsSingle = aArea.length === 1;
+        const bIsSingle = bArea.length === 1;
+
+        // Single-letter before multi-letter
+        if (aIsSingle && !bIsSingle) return -1;
+        if (!aIsSingle && bIsSingle) return 1;
+
+        // Same type: sort A-Z
+        const areaCompare = aArea.localeCompare(bArea, 'id');
+        if (areaCompare !== 0) return areaCompare;
+        return a.full_name.localeCompare(b.full_name, 'id');
+      });
+
+      return data;
     }
   });
 
   const updateAuditorMutation = useMutation({
-    mutationFn: async ({ id, full_name, nik, auditor_id, mdis_id }: 
-      { id: string; full_name: string; nik: string; auditor_id: string; mdis_id: string }) => {
+    mutationFn: async ({ id, full_name, nik, auditor_id, mdis_id, area }: 
+      { id: string; full_name: string; nik: string; auditor_id: string; mdis_id: string; area: string }) => {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name, nik, auditor_id, mdis_id })
+        .update({ full_name, nik, auditor_id, mdis_id, area: area || null })
         .eq('id', id);
       if (error) throw error;
     },
@@ -161,14 +235,14 @@ export default function AuditorManagement() {
     }
   });
 
-  const handleEditAuditor = async (id: string, full_name: string, nik: string, auditor_id: string, mdis_id: string) => {
-    await updateAuditorMutation.mutateAsync({ id, full_name, nik, auditor_id, mdis_id });
+  const handleEditAuditor = async (id: string, full_name: string, nik: string, auditor_id: string, mdis_id: string, area: string) => {
+    await updateAuditorMutation.mutateAsync({ id, full_name, nik, auditor_id, mdis_id, area });
   };
 
   return (
-    <Card className="mb-0 border-gray-200 shadow-sm bg-white">
-      <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <Card className="border-gray-200 shadow-sm bg-white">
+      <CardContent className="p-5">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-2">
           <div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">Manage User Auditors</h2>
             <p className="text-sm text-gray-500 mt-1">Map users to specific auditors.</p>
@@ -176,15 +250,15 @@ export default function AuditorManagement() {
         </div>
         
         <div className="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto relative custom-scrollbar">
+          <div className="max-h-[calc(100vh-380px)] overflow-y-auto relative custom-scrollbar">
             <Table>
               <TableHeader className="bg-gray-50/50 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                 <TableRow>
                 <TableHead className="w-16 font-semibold text-gray-600 pl-6">No.</TableHead>
-                <TableHead className="font-semibold text-gray-600">ID UUID</TableHead>
                 <TableHead className="font-semibold text-gray-600">Nama Auditor</TableHead>
-                <TableHead className="font-semibold text-gray-600">NIK</TableHead>
                 <TableHead className="font-semibold text-gray-600">ID Auditor</TableHead>
+                <TableHead className="font-semibold text-gray-600">Area</TableHead>
+                <TableHead className="font-semibold text-gray-600">NIK</TableHead>
                 <TableHead className="font-semibold text-gray-600">MDIS ID</TableHead>
                 <TableHead className="font-semibold text-gray-600 text-right pr-6">Action</TableHead>
               </TableRow>
@@ -192,7 +266,7 @@ export default function AuditorManagement() {
             <TableBody>
               {isLoadingAuditors ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     <div className="flex justify-center items-center gap-2 text-gray-500">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Loading data...</span>
@@ -200,13 +274,17 @@ export default function AuditorManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                auditors?.map((auditor, index) => (
-                  <TableRow key={auditor.id} className="hover:bg-gray-50/50 transition-colors">
+                auditors?.map((auditor, index) => {
+                  const isInactive = auditor.area?.toLowerCase().includes('innactive') || auditor.area?.toLowerCase().includes('inactive');
+                  return (
+                  <TableRow key={auditor.id} className={`transition-colors ${isInactive ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-gray-50/50'}`}>
                     <TableCell className="text-sm text-gray-500 pl-6 font-medium">{index + 1}</TableCell>
-                    <TableCell className="text-xs text-gray-500 font-mono">{auditor.id}</TableCell>
                     <TableCell className="text-sm text-gray-900 font-medium">{auditor.full_name}</TableCell>
-                    <TableCell className="text-sm text-gray-600">{auditor.nik || '-'}</TableCell>
                     <TableCell className="text-sm text-gray-600">{auditor.auditor_id || '-'}</TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {auditor.area || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">{auditor.nik || '-'}</TableCell>
                     <TableCell className="text-sm text-gray-600">{auditor.mdis_id || '-'}</TableCell>
                     <TableCell className="text-right pr-6">
                       <button
@@ -221,7 +299,8 @@ export default function AuditorManagement() {
                       </button>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -238,3 +317,4 @@ export default function AuditorManagement() {
     </Card>
   );
 }
+

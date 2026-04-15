@@ -57,10 +57,10 @@ export default function PendingApprovals({ onReprocess, isReprocessing, reproces
   });
 
   return (
-    <Card className="mb-0 border-gray-200 shadow-sm bg-white">
-      <CardContent className="p-6">
+    <Card className="border-gray-200 shadow-sm bg-white">
+      <CardContent className="p-5">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-2">
           <div>
             <div className="flex items-center gap-3">
                <h2 className="text-xl font-bold text-gray-900 tracking-tight">Reprocess Queue</h2>
@@ -106,7 +106,7 @@ export default function PendingApprovals({ onReprocess, isReprocessing, reproces
 
         {/* Table Section */}
         <div className="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-          <div className="max-h-[calc(100vh-350px)] overflow-y-auto relative custom-scrollbar">
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto relative custom-scrollbar">
             <Table>
               <TableHeader className="bg-gray-50/50 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                 <TableRow>
