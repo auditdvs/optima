@@ -25,11 +25,13 @@ import FinanceLPJ from './pages/FinanceLPJ';
 import FraudStaffPage from './pages/FraudStaffPage';
 import Login from './pages/Login';
 import ManagerDashboard from './pages/ManagerDashboard';
+import MatriksEditorPage from './pages/MatriksEditorPage';
 import NotificationHistory from './pages/NotificationHistory';
 import PullRequestPage from './pages/PullRequestPage';
 import QASection from './pages/QA';
 import QAManagement from './pages/QAManagement';
 import ResetPassword from './pages/ResetPassword';
+import RiskIssueEditorPage from './pages/RiskIssueEditorPage';
 import ShortlinkPage from './pages/ShortlinkPage';
 import ShortlinkRedirect from './pages/ShortlinkRedirect';
 import SupportTickets from './pages/SupportTickets';
@@ -233,6 +235,16 @@ function App() {
             <Route path="/fraud-staff" element={
               <PrivateRoute>
                 <FraudStaffPage />
+              </PrivateRoute>
+            } />
+            <Route path="/matriks-editor" element={
+              <PrivateRoute requiredRoles={['superadmin', 'qa', 'manager']}>
+                <MatriksEditorPage />
+              </PrivateRoute>
+            } />
+            <Route path="/risk-issue-editor" element={
+              <PrivateRoute requiredRoles={['superadmin', 'qa', 'manager']}>
+                <RiskIssueEditorPage />
               </PrivateRoute>
             } />
             {/* Public routes for auditee survey - no auth required */}

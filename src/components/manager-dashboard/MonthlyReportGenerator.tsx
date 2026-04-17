@@ -1246,7 +1246,7 @@ const generatePDF = async (
     const ratingImg = drawHBarChart(
       ['high', 'medium', 'low'],
       [ratingCounts.high, ratingCounts.medium, ratingCounts.low],
-      ['#28A745', '#F39C12', '#DC3545'],
+      ['#DC3545', '#F39C12', '#28A745'],
       `Distribusi Rating Audit Reguler — ${periodLabel}`,
       520, 200,
     );

@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowLeft, ClipboardList, Download, ExternalLink, File, FileSpreadsheet, Table } from 'lucide-react';
+import { useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import COA from '../components/tools/COA';
 import ReportErrorButton from '../components/tools/ToolsError';
@@ -82,6 +83,16 @@ function BackButton({ to, text = "Kembali" }: BackButtonProps) {
 
 function THCLinks() {
   const thcLinks = [
+    {
+      url: "https://dvsaudit-thc.hf.space/",
+      title: "Pengolahan THC Bebas",
+      description: "Spek tools lebih tinggi, boleh dicoba dengan file yang besar."
+    },
+    {
+      url: "https://streamlit.komida.co.id/",
+      title: "Pengolahan THC Server Komida",
+      description: "Spek tools lebih tinggi, boleh dicoba dengan file yang besar."
+    },
     {
       url: "https://thc001.streamlit.app/",
       title: "Pengolahan THC Regional A",
@@ -204,8 +215,6 @@ function THCLinks() {
   );
 }
 
-
-
 function Tools() {
   const mainTools = [
     {
@@ -302,6 +311,47 @@ function Tools() {
 }
 
 function THCProcessing() {
+  const [activeServerPopup, setActiveServerPopup] = useState<'merge' | 'final' | null>(null);
+
+  const popupConfig: Record<'merge' | 'final', {
+    title: string;
+    subtitle: string;
+    links: Array<{ label: string; href: string; className: string }>;
+  }> = {
+    merge: {
+      title: 'Pilih Server',
+      subtitle: 'Merge Simpanan & Pinjaman',
+      links: [
+        {
+          label: 'Server Streamlit',
+          href: 'https://mergeall.streamlit.app/',
+          className: 'border-blue-200 bg-blue-50',
+        },
+        {
+          label: 'Server Hugging Face',
+          href: 'https://dvsaudit-merge-dbcr.hf.space',
+          className: 'border-orange-200 bg-orange-50',
+        },
+      ],
+    },
+    final: {
+      title: 'Pilih Server',
+      subtitle: 'Format Data THC Gabungan Final',
+      links: [
+        {
+          label: 'Server Streamlit',
+          href: 'https://thcgabunganfinal.streamlit.app/',
+          className: 'border-blue-200 bg-blue-50',
+        },
+        {
+          label: 'Server Hugging Face',
+          href: 'https://dvsaudit-thc-gabungan-final.hf.space',
+          className: 'border-orange-200 bg-orange-50',
+        },
+      ],
+    },
+  };
+
   const processingSteps = [
     {
       step: "01",
@@ -334,9 +384,11 @@ function THCProcessing() {
     {
       step: "05",
       title: "Merge Simpanan & Pinjaman",
-      description: "Penggabungan data pivot simpanan dan pinjaman yang sudah diproses",
-      link: "https://mergeall.streamlit.app/",
-      isInternal: false
+      description: "Penggabungan data pivot simpanan dan pinjaman yang sudah diproses (pilih server Streamlit atau Hugging Face).",
+      link: "",
+      isInternal: false,
+      showServerPopup: true,
+      popupType: 'merge' as const
     },
     {
       step: "06",
@@ -348,9 +400,11 @@ function THCProcessing() {
     {
       step: "07",
       title: "Format Data THC Gabungan Final",
-      description: "Melakukan pengolahan sesuai dengan file excel yang tadinya bernama Format Data THC Gabungan",
-      link: "https://thcgabunganfinal.streamlit.app/",
-      isInternal: false
+      description: "Melakukan pengolahan sesuai dengan file excel yang tadinya bernama Format Data THC Gabungan (pilih server Streamlit atau Hugging Face).",
+      link: "",
+      isInternal: false,
+      showServerPopup: true,
+      popupType: 'final' as const
     }
   ];
 
@@ -366,7 +420,24 @@ function THCProcessing() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {processingSteps.map((step, index) => (
-          step.isInternal ? (
+          step.showServerPopup ? (
+            <button
+              key={index}
+              type="button"
+              onClick={() => setActiveServerPopup(step.popupType ?? null)}
+              className="text-left no-underline h-full"
+            >
+              <div className="p-6 border-2 border-emerald-200 bg-emerald-50 rounded-lg hover:shadow-lg transition-all duration-300 h-full flex flex-col w-full">
+                <div className="flex items-center mb-3">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white text-sm font-bold mr-3">
+                    {step.step}
+                  </span>
+                  <h3 className="text-lg font-semibold text-gray-900">{step.title}</h3>
+                </div>
+                <p className="text-gray-600 flex-grow">{step.description}</p>
+              </div>
+            </button>
+          ) : step.isInternal ? (
             <Link key={index} to={step.link} className="no-underline h-full">
               <div className="p-6 border-2 border-blue-200 bg-blue-50 rounded-lg hover:shadow-lg transition-all duration-300 h-full flex flex-col">
                 <div className="flex items-center mb-3">
@@ -396,6 +467,42 @@ function THCProcessing() {
           )
         ))}
       </div>
+
+      {activeServerPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 p-5">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{popupConfig[activeServerPopup].title}</h3>
+                <p className="text-sm text-gray-600">{popupConfig[activeServerPopup].subtitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveServerPopup(null)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Tutup popup"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {popupConfig[activeServerPopup].links.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 hover:shadow transition-shadow ${item.className}`}
+                >
+                  <span className="font-medium text-gray-900">{item.label}</span>
+                  <ExternalLink size={16} className="text-gray-500" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -411,7 +518,7 @@ function WorkPaper() {
     {
       title: "KK Pemeriksaan Audit Khusus",
       description: "Template kertas kerja untuk pemeriksaan audit khusus/fraud",
-      url: "https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents//KK%20Pemeriksaan%20Audit%20Khusus.xlsx",
+      url: "https://keamzxefzypvbaxjyacv.supabase.co/storage/v1/object/public/documents/KK%20Pemeriksaan%20Audit%20Khusus.xlsx",
       disabled: false
     }
   ];
@@ -449,7 +556,7 @@ function AnomalyProcessing() {
       category: "THC Analysis"
     },
     {
-      url: "https://allanomaly.streamlit.app/",
+      url: "https://dvsaudit-all-anomaly.hf.space/",
       title: "Analisa Anomali Keseluruhan",
       description: "Analisa total anomali pinjaman dan simpanan berdasarkan Petugas Lapang dan Center Meeting",
       category: "THC Analysis"

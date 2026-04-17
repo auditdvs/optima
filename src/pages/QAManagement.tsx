@@ -1,12 +1,14 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, Eye, Save, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, ExternalLink, Eye, Save, Search, Trash2, Upload, X } from 'lucide-react';
 // @ts-ignore
 import Papa from 'papaparse';
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { MatriksData, MatriksTable } from '../components/qa-management/MatriksSection';
+import { RiskIssueData, RiskIssueTable } from '../components/qa-management/RiskIssueSection';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { useAuth } from '../contexts/AuthContext';
 import { getActiveAuditors } from '../lib/auditorService';
 import { supabase } from '../lib/supabaseClient';
 
@@ -137,11 +139,40 @@ const formatAuditPeriod = (audit: AuditMaster): string => {
   return '-';
 };
 
+const getRiskIssueTableSetupMessage = (error: unknown) => {
+  if (!error || typeof error !== 'object') return null;
+
+  const maybeError = error as { message?: string; details?: string; hint?: string; code?: string };
+  const combined = [
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+    maybeError.code,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (
+    combined.includes('risk_issue') ||
+    combined.includes('created_by') ||
+    combined.includes('audit_type') ||
+    combined.includes('relation') ||
+    combined.includes('schema cache') ||
+    combined.includes('404')
+  ) {
+    return 'Struktur risk_issue belum lengkap di Supabase. Jalankan ulang SQL `sql/setup_risk_issue_editor.sql`.';
+  }
+
+  return null;
+};
+
 const QAManagement: React.FC = () => {
+  const { user } = useAuth();
   // --- State ---
   const [audits, setAudits] = useState<AuditMaster[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'approved_docs' | 'matriks'>('approved_docs');
+  const [activeTab, setActiveTab] = useState<'regular' | 'special' | 'approved_docs' | 'matriks' | 'risk_issue'>('approved_docs');
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -166,6 +197,11 @@ const QAManagement: React.FC = () => {
   const [matriksDeleting, setMatriksDeleting] = useState(false);
   const [showConfirmDeleteMatriks, setShowConfirmDeleteMatriks] = useState(false);
 
+  // Risk Issue State
+  const [riskIssueData, setRiskIssueData] = useState<RiskIssueData[]>([]);
+  const [riskIssueLoading, setRiskIssueLoading] = useState(false);
+  const [riskIssueLastUpdated, setRiskIssueLastUpdated] = useState<string | null>(null);
+
   // Approved Docs State
   const [approvedDocs, setApprovedDocs] = useState<ApprovedDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
@@ -187,9 +223,25 @@ const QAManagement: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'matriks') {
       fetchMatriksData();
+    } else if (activeTab === 'risk_issue') {
+      fetchRiskIssueData();
     } else if (activeTab === 'approved_docs') {
       fetchApprovedDocs();
     }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (activeTab === 'matriks') {
+        fetchMatriksData();
+      }
+      if (activeTab === 'risk_issue') {
+        fetchRiskIssueData();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
   }, [activeTab]);
 
   // --- Data Fetching ---
@@ -265,6 +317,66 @@ const QAManagement: React.FC = () => {
       toast.error('Failed to fetch matriks data');
     } finally {
       setMatriksLoading(false);
+    }
+  };
+
+  const fetchRiskIssueData = async () => {
+    try {
+      setRiskIssueLoading(true);
+      const { data, error } = await supabase
+        .from('risk_issue')
+        .select('*')
+        .order('id');
+
+      if (error) {
+        console.error('Error fetching risk issue data:', error);
+        toast.error(getRiskIssueTableSetupMessage(error) || 'Failed to fetch risk issue data');
+        return;
+      }
+
+      const riskIssueRows = (data || []) as RiskIssueData[];
+      const createdByIds = Array.from(
+        new Set(riskIssueRows.map((item) => item.created_by).filter(Boolean))
+      ) as string[];
+
+      let profileMap = new Map<string, string>();
+      if (createdByIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', createdByIds);
+
+        if (profileError) {
+          console.error('Error fetching risk issue creators:', profileError);
+        } else {
+          profileMap = new Map(
+            (profiles || []).map((profile) => [profile.id, profile.full_name || '-'])
+          );
+        }
+      }
+
+      const enrichedRows = riskIssueRows.map((item) => ({
+        ...item,
+        created_by_name: item.created_by
+          ? profileMap.get(item.created_by) || (item.created_by === user?.id ? 'Saya' : 'QA')
+          : '-',
+      }));
+
+      setRiskIssueData(enrichedRows);
+
+      if (enrichedRows.length > 0) {
+        const sorted = [...enrichedRows].sort((a, b) =>
+          new Date(b.last_updated || 0).getTime() - new Date(a.last_updated || 0).getTime()
+        );
+        setRiskIssueLastUpdated(sorted[0].last_updated || null);
+      } else {
+        setRiskIssueLastUpdated(null);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(getRiskIssueTableSetupMessage(error) || 'Failed to fetch risk issue data');
+    } finally {
+      setRiskIssueLoading(false);
     }
   };
 
@@ -586,6 +698,14 @@ const QAManagement: React.FC = () => {
     }
   };
 
+  const handleOpenMatriksEditor = () => {
+    window.open('/matriks-editor', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleOpenRiskIssueEditor = () => {
+    window.open('/risk-issue-editor', '_blank', 'noopener,noreferrer');
+  };
+
 
 
   // --- Filtering ---
@@ -646,6 +766,11 @@ const QAManagement: React.FC = () => {
                Last updated: {new Date(matriksLastUpdated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
              </p>
           )}
+          {activeTab === 'risk_issue' && riskIssueLastUpdated && (
+             <p className="text-xs text-gray-500 mt-1">
+               Last updated: {new Date(riskIssueLastUpdated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+             </p>
+          )}
         </div>
         
         <div className="flex flex-col gap-3 w-full md:w-auto">
@@ -672,12 +797,31 @@ const QAManagement: React.FC = () => {
             >
               Matriks
             </button>
+            <button
+              onClick={() => setActiveTab('risk_issue')}
+              className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === 'risk_issue'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Risk Issue
+            </button>
           </div>
 
           {/* Action Buttons based on Active Tab */}
           <div className="flex gap-2 flex-wrap md:justify-end">
             {activeTab === 'matriks' ? (
               <>
+                <Button
+                  onClick={handleOpenMatriksEditor}
+                  disabled={matriksDeleting || matriksUploading}
+                  size="sm"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="md:hidden lg:inline">Edit Sheet</span>
+                </Button>
                 {matriksData.length > 0 && (
                   <Button
                     onClick={() => setShowConfirmDeleteMatriks(true)}
@@ -701,6 +845,17 @@ const QAManagement: React.FC = () => {
                     className="hidden"
                   />
                 </label>
+              </>
+            ) : activeTab === 'risk_issue' ? (
+              <>
+                <Button
+                  onClick={handleOpenRiskIssueEditor}
+                  size="sm"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="md:hidden lg:inline">Edit Sheet</span>
+                </Button>
               </>
             ) : activeTab === 'approved_docs' ? (
               <></>
@@ -884,6 +1039,12 @@ const QAManagement: React.FC = () => {
       ) : activeTab === 'matriks' ? (
         <div className="bg-white p-4 md:p-6 rounded-lg shadow overflow-hidden">
           <MatriksTable data={matriksData} loading={matriksLoading} />
+        </div>
+      ) : activeTab === 'risk_issue' ? (
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow flex flex-col min-h-0">
+          <div className="max-h-[70vh] min-h-0 overflow-auto">
+            <RiskIssueTable data={riskIssueData} loading={riskIssueLoading} />
+          </div>
         </div>
       ) : (
         <>
