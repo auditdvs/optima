@@ -18,39 +18,57 @@ function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a valid password reset token from URL hash
+    let mounted = true;
+
+    // Check if we have a valid password reset token from URL
     const checkPasswordResetToken = async () => {
-      // Check if URL has the password recovery hash/token
+      // 1. Check for token in hash (Implicit flow) or query params (PKCE flow)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const queryParams = new URLSearchParams(window.location.search);
+      
       const accessToken = hashParams.get('access_token');
       const type = hashParams.get('type');
+      const code = queryParams.get('code');
       
-      // If we have access_token and type=recovery in URL, let Supabase handle it
-      if (accessToken && type === 'recovery') {
-        // Small delay to allow Supabase to process URL hash
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          setIsSessionValid(true);
-          return;
-        }
-      }
+      let resolved = false;
+
+      // Small delay to allow Supabase to process URL hash/code
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Also listen for PASSWORD_RECOVERY event
+      // If we have token/code, listen for the recovery event or check session
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'PASSWORD_RECOVERY' && session) {
-          setIsSessionValid(true);
+        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
+          resolved = true;
+          if (mounted) setIsSessionValid(true);
         }
       });
 
-      // If no valid token in URL hash, check if there's a recovery session already
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      if (isSessionValid === null) {
-        // No valid password reset token found
-        setIsSessionValid(false);
+      // Also check immediate session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        resolved = true;
+        if (mounted) setIsSessionValid(true);
+      }
+
+      // If not resolved yet, wait a bit longer (up to 2 more seconds)
+      if (!resolved) {
+        for (let i = 0; i < 4; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (retrySession) {
+            resolved = true;
+            if (mounted) setIsSessionValid(true);
+            break;
+          }
+        }
+      }
+
+      // Final fallback: if still not resolved and no token-like params in URL, it's invalid
+      if (!resolved && !accessToken && !code) {
+        if (mounted) setIsSessionValid(false);
+      } else if (!resolved) {
+        // We had params but couldn't get a session - likely expired or already used
+        if (mounted) setIsSessionValid(false);
       }
 
       return () => {
@@ -59,6 +77,9 @@ function ResetPassword() {
     };
 
     checkPasswordResetToken();
+    return () => { 
+      mounted = false; 
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

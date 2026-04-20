@@ -240,38 +240,47 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     onlineCount: onlineUserIds.size,
   }), [onlineUserIds]);
 
-  // Block rendering until geolocation is granted
+  // Block rendering until geolocation is granted (only for non-public pages)
   if (userId) {
-    if (locationStatus === 'pending') {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 font-sans">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
-            <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-500 animate-pulse">
-              <MapPin className="w-10 h-10" />
+    const isPublicPage = [
+      '/login', 
+      '/reset-password', 
+      '/survey', 
+      '/s/'
+    ].some(path => window.location.pathname.startsWith(path));
+
+    if (!isPublicPage) {
+      if (locationStatus === 'pending') {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 font-sans">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
+              <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-500 animate-pulse">
+                <MapPin className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Meminta Akses Lokasi</h2>
+              <p className="text-gray-600 leading-relaxed text-sm">
+                Sistem OPTIMA membutuhkan informasi dari GPS perangkat untuk tujuan validasi keamanan sesi operasi. Silakan klik <strong>"Allow"</strong> atau <strong>"Izinkan"</strong> pada peramban/browser Anda.
+              </p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Meminta Akses Lokasi</h2>
-            <p className="text-gray-600 leading-relaxed text-sm">
-              Sistem OPTIMA membutuhkan informasi dari GPS perangkat untuk tujuan validasi keamanan sesi operasi. Silakan klik <strong>"Allow"</strong> atau <strong>"Izinkan"</strong> pada peramban/browser Anda.
-            </p>
           </div>
-        </div>
-      );
-    }
-    
-    if (locationStatus === 'denied') {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 font-sans">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
-              <AlertTriangle className="w-10 h-10" />
+        );
+      }
+      
+      if (locationStatus === 'denied') {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 font-sans">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                <AlertTriangle className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Akses Ditolak</h2>
+              <p className="text-gray-600 leading-relaxed text-sm">
+                Anda tidak dapat mengakses sistem OPTIMA tanpa memberikan izin koordinat lokasi dari perangkat ini. Harap beri izin pada setelan browser Anda dan segarkan (<em className="font-semibold text-gray-900">refresh</em>) halaman.
+              </p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Akses Ditolak</h2>
-            <p className="text-gray-600 leading-relaxed text-sm">
-              Anda tidak dapat mengakses sistem OPTIMA tanpa memberikan izin koordinat lokasi dari perangkat ini. Harap beri izin pada setelan browser Anda dan segarkan (<em className="font-semibold text-gray-900">refresh</em>) halaman.
-            </p>
           </div>
-        </div>
-      );
+        );
+      }
     }
   }
 
