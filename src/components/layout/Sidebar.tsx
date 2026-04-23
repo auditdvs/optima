@@ -55,6 +55,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
   const [editNickname, setEditNickname] = useState('');
   const [editFullName, setEditFullName] = useState('');
   const [editProfilePic, setEditProfilePic] = useState('');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   // Collapsible groups state (Accordion style)
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -149,7 +150,8 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
           full_name: fullName,
           profile_pic: profilePicUrl,
           role: accData?.role || userRole || 'user',
-          nickname: nickname
+          nickname: nickname,
+          phone_number: profileData?.phone_number || ''
         });
 
       } catch (error) {
@@ -460,6 +462,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
                       setEditNickname(accountData?.nickname || '');
                       setEditFullName(accountData?.full_name || '');
                       setEditProfilePic(accountData?.profile_pic || DEFAULT_PROFILE_PICS[0]);
+                      setEditPhoneNumber(accountData?.phone_number || '');
                       setShowEditProfile(true);
                   }}
                   className="flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors w-full text-left"
@@ -609,6 +612,26 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
               />
               <p className="text-xs text-gray-400 mt-1">Full name cannot be changed</p>
             </div>
+
+            {/* Phone Number Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number (WhatsApp)</label>
+              <input
+                type="text"
+                value={editPhoneNumber}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val.startsWith('0')) {
+                    setEditPhoneNumber('62' + val.substring(1));
+                  } else {
+                    setEditPhoneNumber(val);
+                  }
+                }}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono"
+                placeholder="62..."
+              />
+              <p className="text-[10px] text-gray-400 mt-1 italic">* Awalan 0 otomatis diubah ke 62</p>
+            </div>
             
             {/* Save Button */}
             <button
@@ -636,12 +659,23 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
                     
                     if (error2) throw error2;
                   }
+
+                  // Update profiles table for phone_number
+                  const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                      phone_number: editPhoneNumber,
+                    })
+                    .eq('id', user.id);
+                  
+                  if (profileError) throw profileError;
                   
                   // Update local state
                   setAccountData((prev: any) => ({
                     ...prev,
                     nickname: editNickname,
                     profile_pic: editProfilePic,
+                    phone_number: editPhoneNumber
                   }));
                   
                   toast.success('Profile updated successfully!');

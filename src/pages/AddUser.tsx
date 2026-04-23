@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Database, FileText, LayoutDashboard, MapPin, Search, UserCheck, Users, X } from 'lucide-react';
+import { AlertTriangle, Database, FileText, LayoutDashboard, MapPin, MessageSquare, Search, UserCheck, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import AuditorManagement from '../components/add-user/AuditorManagement';
 import AuditorTracking from '../components/add-user/AuditorTracking';
 import Changelog from '../components/add-user/Changelog';
 import MSSQLConnectionLog from '../components/add-user/MSSQLConnectionLog';
+import RequestHistory from '../components/add-user/RequestHistory';
 import OverviewStats from '../components/add-user/OverviewStats';
 import { AddAuditorModal, EditPICModal, ManagePICModal, PIC } from '../components/add-user/PICModals';
 import PendingApprovals, { ReprocessItem } from '../components/add-user/PendingApprovals';
@@ -18,7 +19,7 @@ export default function UserControlPanel() {
   const [showManagePICModal, setShowManagePICModal] = useState(false);
   const [selectedPIC, setSelectedPIC] = useState<PIC | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'auditors' | 'queue' | 'tracking' | 'mssql_log' | 'changelog'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'auditors' | 'queue' | 'tracking' | 'mssql_log' | 'request_history' | 'changelog'>('overview');
   const queryClient = useQueryClient();
 
   // Reprocess State
@@ -254,6 +255,18 @@ export default function UserControlPanel() {
           </button>
           
           <button
+            onClick={() => setActiveTab('request_history')}
+            className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
+              activeTab === 'request_history'
+                ? 'border-[#fd8c73] text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <MessageSquare className="w-[18px] h-[18px]" />
+            Request Data
+          </button>
+          
+          <button
             onClick={() => setActiveTab('changelog')}
             className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
               activeTab === 'changelog'
@@ -294,6 +307,10 @@ export default function UserControlPanel() {
 
       {activeTab === 'mssql_log' && (
         <MSSQLConnectionLog />
+      )}
+
+      {activeTab === 'request_history' && (
+        <RequestHistory />
       )}
 
       {activeTab === 'changelog' && (
