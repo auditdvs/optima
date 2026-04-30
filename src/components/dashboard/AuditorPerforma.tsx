@@ -1,4 +1,4 @@
-import { CalendarIcon, ClipboardCheck, Eye, History as HistoryIcon, Search, Star, UsersIcon } from "lucide-react";
+import { CalendarIcon, ClipboardCheck, Eye, History as HistoryIcon, Search, Star, UsersIcon, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { supabaseService } from '../../lib/supabaseService';
@@ -64,6 +64,84 @@ const AuditorPerforma = () => {
   const [loadingSurvey, setLoadingSurvey] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<SurveySummary | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+  // AI States
+  const [aiInsights, setAiInsights] = useState<string[] | null>(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  const generatePuterAIInsights = async (branchName: string, conclusion: any, feedbacks: any[]) => {
+    setIsGeneratingAi(true);
+    setAiInsights(null);
+    try {
+      const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+      if (!GROQ_API_KEY) throw new Error("Groq API Key missing");
+      
+      const prompt = `Anda adalah Asisten Audit Internal. Analisis hasil survei kepuasan auditee untuk cabang ${branchName}.
+Data Skor (1-5):
+- Atribut Profesional: ${conclusion.avgA?.toFixed(2) || 'N/A'}
+- Ruang Lingkup: ${conclusion.avgB?.toFixed(2) || 'N/A'}
+- Kinerja Pelaksanaan: ${conclusion.avgC?.toFixed(2) || 'N/A'}
+- Keseluruhan: ${conclusion.avgD?.toFixed(2) || 'N/A'}
+
+Kritik & Saran (Maksimal 10):
+${feedbacks.slice(0, 10).map((f: any, idx: number) => `Responden ${idx+1}: Harapan: "${f.harapan}", Kritik: "${f.kritik_saran}"`).join('\n')}
+
+Berdasarkan data di atas, buatlah sebuah KESIMPULAN BERBENTUK ESSAY/NARASI yang mengalir secara alami dalam 1 hingga 2 paragraf saja. 
+DILARANG KERAS menggunakan format poin-poin (bullet points, angka, garis strip, dsb) atau membuat daftar berbaris. Teks harus berupa paragraf panjang layaknya cerita atau laporan naratif.
+Gunakan tag HTML <strong> untuk menegaskan kata kunci. Jangan beri judul, pengantar, atau penutup. Hanya paragraf essay saja.`;
+
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.6
+        }),
+      });
+
+      if (!resp.ok) throw new Error('API error');
+      const result = await resp.json();
+      const text = result?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Invalid response');
+      
+      const paragraphs = text.split(/\n+/)
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0 && !line.startsWith('```'));
+      
+      if (paragraphs.length > 0) {
+        setAiInsights(paragraphs);
+      } else {
+        throw new Error('No paragraphs found');
+      }
+    } catch (err) {
+      console.error('AI Error:', err);
+      // Fallback: Gabungkan insight lokal menjadi satu paragraf narasi/essay panjang
+      if (conclusion && conclusion.dimensionInsights) {
+        setAiInsights([conclusion.dimensionInsights.join(' ')]);
+      } else {
+        setAiInsights(["Belum ada data yang cukup untuk ditarik kesimpulan."]);
+      }
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showFeedbackModal && selectedBranch) {
+      const conclusion = generateSurveyConclusion(selectedBranch.feedbacks);
+      if (conclusion) {
+        generatePuterAIInsights(selectedBranch.branch_name, conclusion, selectedBranch.feedbacks);
+      } else {
+        setAiInsights(null);
+      }
+    } else {
+      setAiInsights(null);
+    }
+  }, [showFeedbackModal, selectedBranch]);
 
 
   const fetchAuditorMonthlyData = async () => {
@@ -1076,12 +1154,10 @@ const AuditorPerforma = () => {
                     return (
                       <div className="mt-6 border-t-2 border-indigo-100 pt-6">
                         <div className="flex items-center gap-2 mb-4">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.346A3.49 3.49 0 0015 18.58V19a2 2 0 01-2 2H11a2 2 0 01-2-2v-.42c0-.893-.356-1.73-.983-2.357l-.347-.345z" />
-                            </svg>
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <Sparkles className="w-4 h-4 text-white" />
                           </div>
-                          <h4 className="text-sm font-bold text-gray-800">Kesimpulan Berdasarkan Scoring</h4>
+                          <h4 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">Kesimpulan Analisis AI (Llama 3.3 70B)</h4>
                           <span className={`ml-auto text-xs font-bold px-2.5 py-1 rounded-full ${
                             allAvg >= 4.5 ? 'bg-emerald-100 text-emerald-700' :
                             allAvg >= 3.5 ? 'bg-green-100 text-green-700' :
@@ -1132,17 +1208,21 @@ const AuditorPerforma = () => {
                         </div>
 
                         {/* Textual Insights */}
-                        <div className="space-y-2">
-                          {dimensionInsights.map((insight, i) => (
-                            <div key={i} className="flex items-start gap-2.5 text-sm text-gray-700 bg-indigo-50/60 rounded-lg px-3 py-2.5">
-                              <span className="mt-0.5 w-4 h-4 rounded-full bg-indigo-200 text-indigo-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                              <p dangerouslySetInnerHTML={{ __html: insight }} />
+                        <div className="text-sm text-gray-800 bg-purple-50/40 rounded-xl p-5 border border-purple-100 shadow-sm leading-relaxed text-justify space-y-4">
+                          {isGeneratingAi ? (
+                            <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                              <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-3" />
+                              <span className="text-sm animate-pulse text-purple-600 font-medium">Menghasilkan narasi cerdas dengan Llama 3.3 70B...</span>
                             </div>
-                          ))}
+                          ) : (
+                            (aiInsights || dimensionInsights).map((insight, i) => (
+                              <p key={i} dangerouslySetInnerHTML={{ __html: insight }} />
+                            ))
+                          )}
                         </div>
 
                         <p className="mt-3 text-[10px] text-gray-400 italic">
-                          * Kesimpulan dibuat secara otomatis berdasarkan rata-rata skor {selectedBranch.feedbacks.length} responden per dimensi Section 1 (skala 1–5).
+                          * Kesimpulan dianalisis secara otomatis oleh AI (Llama 3.3 70B via Groq) berdasarkan rata-rata skor dan umpan balik responden.
                         </p>
                       </div>
                     );

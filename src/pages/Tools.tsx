@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowLeft, ClipboardList, Download, ExternalLink, File, FileSpreadsheet, Table } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardList, Database, Download, ExternalLink, File, FileSpreadsheet, Table } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import COA from '../components/tools/COA';
+import DatabaseTab from '../components/tools/DatabaseTab';
 import ReportErrorButton from '../components/tools/ToolsError';
 import '../styles/download-button.css';
 
@@ -256,6 +257,14 @@ function Tools() {
       iconColor: "text-lime-600",
       title: "Chart of Accounts",
       description: "Daftar kode akun perusahaan"
+    },
+    {
+      to: "/tools/database",
+      icon: Database,
+      iconBg: "bg-indigo-100",
+      iconColor: "text-indigo-600",
+      title: "Database",
+      description: "Request pengambilan data dari server MDIS"
     }
   ];
   
@@ -294,7 +303,7 @@ function Tools() {
       </div>
 
       {/* Sub-page Content */}
-      <div className="animate-in fade-in zoom-in-95 duration-300">
+      <div className="animate-in fade-in duration-500">
         <Routes>
           <Route path="/" element={<THCProcessing />} />
           <Route path="thc-processing" element={<THCProcessing />} />
@@ -304,6 +313,7 @@ function Tools() {
 
           <Route path="tools-update" element={<UpdateTools />} />
           <Route path="coa" element={<COA />} />
+          <Route path="database" element={<DatabaseTab />} />
         </Routes>
       </div>
     </div>
@@ -311,9 +321,9 @@ function Tools() {
 }
 
 function THCProcessing() {
-  const [activeServerPopup, setActiveServerPopup] = useState<'merge' | 'final' | null>(null);
+  const [activeServerPopup, setActiveServerPopup] = useState<'merge' | 'gabungan' | 'final' | null>(null);
 
-  const popupConfig: Record<'merge' | 'final', {
+  const popupConfig: Record<'merge' | 'gabungan' | 'final', {
     title: string;
     subtitle: string;
     links: Array<{ label: string; href: string; className: string }>;
@@ -330,6 +340,22 @@ function THCProcessing() {
         {
           label: 'Server Hugging Face',
           href: 'https://dvsaudit-merge-dbcr.hf.space',
+          className: 'border-orange-200 bg-orange-50',
+        },
+      ],
+    },
+    gabungan: {
+      title: 'Pilih Server',
+      subtitle: 'Format Data THC Gabungan',
+      links: [
+        {
+          label: 'Server Streamlit',
+          href: 'https://thcgabungan.streamlit.app/',
+          className: 'border-blue-200 bg-blue-50',
+        },
+        {
+          label: 'Server Hugging Face',
+          href: 'https://dvsaudit-thc-gabungan.hf.space',
           className: 'border-orange-200 bg-orange-50',
         },
       ],
@@ -393,9 +419,11 @@ function THCProcessing() {
     {
       step: "06",
       title: "Format Data THC Gabungan",
-      description: "Format final data THC gabungan dari semua sumber data",
-      link: "https://thcgabungan.streamlit.app/",
-      isInternal: false
+      description: "Format final data THC gabungan dari semua sumber data (pilih server Streamlit atau Hugging Face).",
+      link: "",
+      isInternal: false,
+      showServerPopup: true,
+      popupType: 'gabungan' as const
     },
     {
       step: "07",
@@ -469,8 +497,14 @@ function THCProcessing() {
       </div>
 
       {activeServerPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 p-5">
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setActiveServerPopup(null)}
+        >
+          <div 
+            className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{popupConfig[activeServerPopup].title}</h3>

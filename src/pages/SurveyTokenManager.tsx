@@ -12,7 +12,9 @@ import {
     Ticket,
     Trash2,
     Users,
-    X
+    X,
+    Loader2,
+    Sparkles
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useState } from 'react';
@@ -26,6 +28,7 @@ import {
 } from '../components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { supabaseService } from '../lib/supabaseService';
 
 interface SurveyToken {
   id: string;
@@ -61,14 +64,30 @@ interface AuditBranch {
   branch_name: string;
 }
 
+interface RecapData {
+  auditorName: string;
+  totalRating: number;
+  responseCount: number;
+  feedbacks: { harapan: string; kritik_saran: string }[];
+  aiConclusion?: string;
+  isGenerating?: boolean;
+  hasAttemptedAI?: boolean;
+}
+
 function SurveyTokenManager() {
   const { user, userRole } = useAuth();
   const [tokens, setTokens] = useState<SurveyToken[]>([]);
   const [auditBranches, setAuditBranches] = useState<AuditBranch[]>([]);
   const [availableBranches, setAvailableBranches] = useState<AuditBranch[]>([]);
+  const [usedBranches, setUsedBranches] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed' | 'inactive'>('all');
+  
+  // Recap tab state
+  const [activeTab, setActiveTab] = useState<'tokens' | 'recap'>('tokens');
+  const [recapData, setRecapData] = useState<RecapData[]>([]);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -149,7 +168,7 @@ function SurveyTokenManager() {
         const tokenIds = tokensData.map(t => t.id);
         const { data: responseCounts, error: countError } = await supabase
           .from('survey_responses')
-          .select('token_id')
+          .select('*')
           .in('token_id', tokenIds);
         
         if (countError) throw countError;
@@ -159,6 +178,113 @@ function SurveyTokenManager() {
         responseCounts?.forEach(r => {
           countMap[r.token_id] = (countMap[r.token_id] || 0) + 1;
         });
+
+        // Generate Recap Data for Superadmin
+        if (isAdmin) {
+          // Ambil data dari audit_master untuk memetakan cabang ke auditor aslinya (Leader & Team)
+          const { data: audits } = await supabaseService
+            .from('audit_master')
+            .select('branch_name, leader, team, created_at')
+            .or('audit_type.ilike.%reguler%,audit_type.ilike.%regular%')
+            .order('created_at', { ascending: false });
+
+          const branchAuditorsMap: Record<string, string[]> = {};
+          if (audits) {
+            audits.forEach((l: any) => {
+              // Pakai data yang paling terbaru jika ada duplikat cabang
+              if (!branchAuditorsMap[l.branch_name]) {
+                const auditors = new Set<string>();
+                if (l.leader) auditors.add(l.leader.trim());
+                if (l.team) {
+                  const parts = l.team.split(',').map((p: string) => p.trim());
+                  const teamMembers: string[] = [];
+                  for (let i = 0; i < parts.length; i++) {
+                    const current = parts[i];
+                    // Deteksi gelar akademik (biasanya mengandung titik atau singkatan umum 2-3 huruf)
+                    const isTitle = current.includes('.') || ['SE','SH','ST','SP','MM','MSI','SPD','MPD'].includes(current.toUpperCase().replace(/\./g, ''));
+                    
+                    if (i > 0 && isTitle) {
+                      teamMembers[teamMembers.length - 1] += ', ' + current;
+                    } else {
+                      if (current) teamMembers.push(current);
+                    }
+                  }
+                  teamMembers.forEach(m => auditors.add(m));
+                }
+                branchAuditorsMap[l.branch_name] = Array.from(auditors);
+              }
+            });
+          }
+
+          const recapMap = new Map<string, RecapData>();
+          tokensData.forEach(t => {
+            const actualAuditors = branchAuditorsMap[t.branch_name] || [];
+            const auditorsToProcess = actualAuditors.length > 0 ? actualAuditors : [`(Belum Ada di Audit Master) - ${t.branch_name}`];
+
+            auditorsToProcess.forEach(auditor => {
+              if (!recapMap.has(auditor)) {
+                recapMap.set(auditor, { auditorName: auditor, totalRating: 0, feedbacks: [], responseCount: 0 });
+              }
+              const auditorData = recapMap.get(auditor)!;
+              const tResponses = responseCounts?.filter((r: any) => r.token_id === t.id) || [];
+              
+              tResponses.forEach((r: any) => {
+                auditorData.responseCount++;
+                
+                let totalScore = 0;
+                let questionCount = 0;
+                const questions = [
+                  'a1','a2','a3','a4','a5','a6',
+                  'b1','b2','b3',
+                  'c1','c2','c3','c4','c5','c6','c7',
+                  'd1','d2','d3'
+                ];
+                
+                questions.forEach(q => {
+                  if (r[q] !== null && r[q] !== undefined) {
+                    totalScore += Number(r[q]);
+                    questionCount++;
+                  }
+                });
+                
+                const avgScore = questionCount > 0 ? totalScore / questionCount : 0;
+                auditorData.totalRating += avgScore;
+                
+                if (r.harapan || r.kritik_saran) {
+                  auditorData.feedbacks.push({
+                    harapan: r.harapan || '',
+                    kritik_saran: r.kritik_saran || ''
+                  });
+                }
+              });
+            });
+          });
+
+          const cachedConclusionsStr = localStorage.getItem('ai_recap_conclusions');
+          const cachedConclusions = cachedConclusionsStr ? JSON.parse(cachedConclusionsStr) : {};
+
+          const finalRecap = Array.from(recapMap.values()).map(data => {
+            const calculatedTotal = data.responseCount > 0 ? (data.totalRating / data.responseCount) : 0;
+            
+            let cachedAi = undefined;
+            const cacheEntry = cachedConclusions[data.auditorName];
+            // Gunakan cache hanya jika jumlah respondennya masih persis sama (belum ada survei baru masuk)
+            if (cacheEntry && cacheEntry.responseCount === data.responseCount) {
+              cachedAi = cacheEntry.conclusion;
+            }
+            
+            return {
+              ...data,
+              totalRating: calculatedTotal,
+              aiConclusion: cachedAi
+            };
+          }).filter(d => d.responseCount > 0).sort((a, b) => {
+            if (b.responseCount !== a.responseCount) return b.responseCount - a.responseCount;
+            return b.totalRating - a.totalRating;
+          });
+          
+          setRecapData(finalRecap);
+        }
         
         // Update tokens with actual counts (creator_name already in token from DB)
         const tokensWithCounts = tokensData.map(token => ({
@@ -168,9 +294,24 @@ function SurveyTokenManager() {
         }));
         
         setTokens(tokensWithCounts);
+        setTokens(tokensWithCounts);
       } else {
         setTokens([]);
       }
+
+      // Selalu ambil seluruh cabang yang sudah memiliki token (lintas auditor) menggunakan supabaseService
+      // untuk mem-filter dropdown agar cabang yang sudah dikerjakan auditor lain tidak muncul lagi
+      try {
+        const { data: allUsedData } = await supabaseService
+          .from('survey_tokens')
+          .select('branch_name');
+        if (allUsedData) {
+          setUsedBranches(allUsedData.map((t: any) => t.branch_name));
+        }
+      } catch (err) {
+        console.error('Failed to fetch global used branches', err);
+      }
+
     } catch (error) {
       console.error('Error fetching tokens:', error);
       toast.error('Gagal memuat data token');
@@ -208,12 +349,12 @@ function SurveyTokenManager() {
 
   // Filter available branches (exclude those with active tokens)
   useEffect(() => {
-    const existingBranchNames = tokens.map(t => t.branch_name);
+    const existingBranchNames = [...new Set([...tokens.map(t => t.branch_name), ...usedBranches])];
     const available = auditBranches.filter(
       branch => !existingBranchNames.includes(branch.branch_name)
     );
     setAvailableBranches(available);
-  }, [auditBranches, tokens]);
+  }, [auditBranches, tokens, usedBranches]);
 
   // Create new token
   const handleCreateToken = async (e: React.FormEvent) => {
@@ -232,6 +373,20 @@ function SurveyTokenManager() {
       if (!branch) {
         toast.error('Data cabang tidak valid');
         setIsSubmitting(false);
+        return;
+      }
+
+      // Pengecekan ekstra: Pastikan cabang ini belum dibuat tokennya oleh auditor lain di waktu yang sama
+      const { data: existingToken } = await supabaseService
+        .from('survey_tokens')
+        .select('id')
+        .eq('branch_name', branch.branch_name)
+        .maybeSingle();
+      
+      if (existingToken) {
+        toast.error('Gagal: Token untuk cabang ini baru saja dibuat oleh auditor lain!');
+        setIsSubmitting(false);
+        fetchTokens();
         return;
       }
 
@@ -287,17 +442,35 @@ function SurveyTokenManager() {
     if (!tokenToDelete) return;
 
     try {
-      const { error } = await supabase
+      const isSuperAdmin = userRole?.toLowerCase() === 'superadmin';
+      
+      const client = isSuperAdmin ? supabaseService : supabase;
+
+      // Hapus semua response yang terhubung terlebih dahulu untuk menghindari Foreign Key Constraint error
+      await client
+        .from('survey_responses')
+        .delete()
+        .eq('token_id', tokenToDelete);
+
+      // Kemudian baru hapus tokennya
+      const { data, error } = await client
         .from('survey_tokens')
         .delete()
-        .eq('id', tokenToDelete);
+        .eq('id', tokenToDelete)
+        .select();
 
       if (error) throw error;
+      
+      // Pastikan data benar-benar terhapus (bukan gagal diam-diam karena RLS jika pakai client biasa)
+      if (!isSuperAdmin && data && data.length === 0) {
+        throw new Error('Anda tidak memiliki akses untuk menghapus token ini');
+      }
+
       toast.success('Token berhasil dihapus');
       fetchTokens();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting token:', error);
-      toast.error('Gagal menghapus token');
+      toast.error(error.message || 'Gagal menghapus token');
     } finally {
       setIsDeleteModalOpen(false);
       setTokenToDelete(null);
@@ -378,6 +551,126 @@ function SurveyTokenManager() {
     fetchTokenResponses(token.id);
   };
 
+  // Generate AI Recap for an Auditor
+  const generateAIRecap = async (auditorName: string) => {
+    const dataIndex = recapData.findIndex(d => d.auditorName === auditorName);
+    if (dataIndex === -1) return;
+    
+    const data = recapData[dataIndex];
+    
+    setRecapData(prev => {
+      const next = [...prev];
+      next[dataIndex].isGenerating = true;
+      next[dataIndex].hasAttemptedAI = true; // Mark as attempted to prevent infinite auto-retry
+      return next;
+    });
+
+    try {
+      const prompt = `Anda adalah Asisten AI untuk mengevaluasi kinerja Auditor berdasarkan hasil survei kepuasan auditee.
+Auditor: ${auditorName}
+Total Rating Keseluruhan (1-5 Bintang): ${data.totalRating.toFixed(2)}
+
+Kritik & Saran dari Auditee (Sampel Acak):
+${data.feedbacks.slice(0, 15).map((f, i) => `${i+1}. Harapan: "${f.harapan}", Saran: "${f.kritik_saran}"`).join('\n')}
+
+Berikan SATU PARAGRAF KESIMPULAN BERBENTUK NARASI/ESSAY yang analitis mengenai kinerja auditor ini.
+DILARANG menggunakan poin-poin/bullet points. Gunakan tag HTML <strong> untuk menegaskan kata kunci.`;
+
+      let aiText = '';
+      try {
+        const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+        if (!OPENROUTER_API_KEY) throw new Error("No OpenRouter Key");
+        
+        const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': window.location.origin,
+          },
+          body: JSON.stringify({
+            model: 'z-ai/glm-4.5-air:free',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.6
+          }),
+        });
+        if (!resp.ok) throw new Error('OpenRouter API error');
+        const result = await resp.json();
+        if (result.error) throw new Error(result.error.message);
+        aiText = result?.choices?.[0]?.message?.content;
+        if (!aiText) throw new Error('Empty AI response');
+      } catch (err) {
+        console.warn('GLM 4.5 Air failed, falling back to Groq Llama 3.3 70B', err);
+        const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+        if (!GROQ_API_KEY) throw new Error("No Groq Key");
+
+        const resp2 = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.6
+          }),
+        });
+        if (!resp2.ok) throw new Error('Groq API error');
+        const result2 = await resp2.json();
+        aiText = result2?.choices?.[0]?.message?.content;
+        if (!aiText) throw new Error('Empty Groq response');
+      }
+
+      // Format markdown ** menjadi <strong> agar rapi dirender React
+      if (aiText) {
+        aiText = aiText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      }
+
+      // Save to localStorage cache
+      const cachedConclusionsStr = localStorage.getItem('ai_recap_conclusions');
+      const cachedConclusions = cachedConclusionsStr ? JSON.parse(cachedConclusionsStr) : {};
+      
+      cachedConclusions[auditorName] = {
+        conclusion: aiText,
+        responseCount: data.responseCount,
+        totalRating: data.totalRating
+      };
+      
+      localStorage.setItem('ai_recap_conclusions', JSON.stringify(cachedConclusions));
+
+      setRecapData(prev => {
+        const next = [...prev];
+        next[dataIndex].aiConclusion = aiText;
+        return next;
+      });
+      toast.success(`Kesimpulan AI untuk ${auditorName} berhasil dibuat!`);
+    } catch (err: any) {
+      toast.error('Gagal memuat Kesimpulan AI');
+      console.error(err);
+    } finally {
+      setRecapData(prev => {
+        const next = [...prev];
+        next[dataIndex].isGenerating = false;
+        return next;
+      });
+    }
+  };
+
+  // Generate All AI Conclusions sequentially
+  const generateAllAIRecaps = async () => {
+    setIsGeneratingAll(true);
+    try {
+      // Find all auditors that don't have a conclusion yet
+      const toGenerate = recapData.filter(d => !d.aiConclusion);
+      for (const data of toGenerate) {
+        await generateAIRecap(data.auditorName);
+      }
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-6 lg:p-8">
       {/* Header */}
@@ -401,7 +694,27 @@ function SurveyTokenManager() {
           </button>
         </div>
 
-        {/* Filters */}
+        {/* Tabs for Superadmin */}
+        {userRole?.toLowerCase() === 'superadmin' && (
+          <div className="flex gap-4 border-b border-gray-200 mb-6">
+            <button
+              onClick={() => setActiveTab('tokens')}
+              className={`py-3 px-6 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'tokens' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Manajemen Token
+            </button>
+            <button
+              onClick={() => setActiveTab('recap')}
+              className={`py-3 px-6 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'recap' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Recap Auditor
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'tokens' ? (
+          <>
+            {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           {/* Search */}
           <div className="relative flex-1">
@@ -594,6 +907,92 @@ function SurveyTokenManager() {
             </div>
           )}
         </div>
+          </>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Rekapitulasi Kinerja Auditor</h2>
+                <p className="text-sm text-gray-500 mt-1">Berdasarkan hasil rata-rata survei auditee dan analisis AI (GLM 4.5 Air / Llama 3.3 70B)</p>
+              </div>
+              <button
+                onClick={generateAllAIRecaps}
+                disabled={isGeneratingAll || recapData.every(d => d.aiConclusion)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-purple-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {isGeneratingAll ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Sedang Memproses AI...
+                  </>
+                ) : recapData.every(d => d.aiConclusion) ? (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    Selesai
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    Generate Kesimpulan AI
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50/80 border-b border-gray-100">
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">No.</th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[280px] w-1/4">Auditor</th>
+                    <th className="text-center px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">Total Rating</th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {recapData.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        Belum ada data survei untuk direkap
+                      </td>
+                    </tr>
+                  ) : (
+                    recapData.map((data, idx) => (
+                      <tr key={data.auditorName} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-500">{idx + 1}</td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-gray-900">{data.auditorName}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{data.responseCount} Responden</p>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200/60 rounded-xl font-bold">
+                            <span className="text-yellow-500 text-lg leading-none">★</span>
+                            <span>{data.totalRating.toFixed(2)}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {data.aiConclusion ? (
+                            <div className="text-sm text-gray-700 bg-purple-50/60 rounded-xl p-4 border border-purple-100 leading-relaxed text-justify">
+                              <p dangerouslySetInnerHTML={{ __html: data.aiConclusion }} />
+                            </div>
+                          ) : data.isGenerating ? (
+                            <div className="flex items-center gap-2 text-purple-600 text-sm font-medium py-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Menganalisis...
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-400 italic py-2">
+                              Belum ada kesimpulan AI
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Token Modal */}

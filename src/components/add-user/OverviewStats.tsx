@@ -131,20 +131,23 @@ export default function OverviewStats() {
       return `W${week} ${d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })}`;
     };
 
-    const grouped: Record<string, { sum: number; count: number; min: number; max: number }> = {};
+    const grouped: Record<string, { sum: number; count: number; min: number; max: number; failed: number }> = {};
     const orderedKeys: string[] = [];
 
     raw.forEach((l: any) => {
       const key = getGroupKey(l.checked_at);
       const val = l.latency_ms ?? 0;
       if (!grouped[key]) {
-        grouped[key] = { sum: 0, count: 0, min: val, max: val };
+        grouped[key] = { sum: 0, count: 0, min: val, max: val, failed: 0 };
         orderedKeys.push(key);
       }
       grouped[key].sum += val;
       grouped[key].count += 1;
       grouped[key].min = Math.min(grouped[key].min, val);
       grouped[key].max = Math.max(grouped[key].max, val);
+      if (l.status === 'failed') {
+        grouped[key].failed += 1;
+      }
     });
 
     return orderedKeys.map(key => ({
@@ -153,6 +156,7 @@ export default function OverviewStats() {
       min: grouped[key].min,
       max: grouped[key].max,
       count: grouped[key].count,
+      failed: grouped[key].failed,
     }));
   }, [overviewStats?.latencyRaw, latencyGrouping]);
 
@@ -295,13 +299,25 @@ export default function OverviewStats() {
           {latencyChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={latencyChartData}>
+                <defs>
+                  <linearGradient id="colorLatency" x1="0" y1="0" x2="1" y2="0">
+                    {latencyChartData.map((data, index) => {
+                      const isHigh = data.latency > 2000 || data.failed > 0;
+                      const offset = latencyChartData.length > 1 ? (index / (latencyChartData.length - 1)) * 100 : 0;
+                      return <stop key={index} offset={`${offset}%`} stopColor={isHigh ? '#ef4444' : '#10b981'} />;
+                    })}
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} unit=" ms" />
                 <Tooltip
                   contentStyle={{ borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: number, name: string, props: any) => {
                     const label = name === 'latency' ? 'Avg Latency' : name === 'min' ? 'Min' : 'Max';
+                    if (name === 'latency' && props.payload.failed > 0) {
+                      return [`${value.toLocaleString('id-ID')} ms (${props.payload.failed} Failed)`, label];
+                    }
                     return [`${value.toLocaleString('id-ID')} ms`, label];
                   }}
                   labelStyle={{ fontWeight: 600, marginBottom: 4 }}
@@ -309,10 +325,18 @@ export default function OverviewStats() {
                 <Line 
                   type="monotone" 
                   dataKey="latency" 
-                  stroke="#10b981" 
+                  stroke="url(#colorLatency)" 
                   strokeWidth={2}
-                  dot={{ r: 2.5, fill: '#10b981', strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: '#059669', strokeWidth: 2, stroke: '#fff' }}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const isHigh = payload.latency > 2000 || payload.failed > 0;
+                    return <circle key={`dot-${cx}-${cy}`} cx={cx} cy={cy} r={isHigh ? 4 : 2.5} fill={isHigh ? '#ef4444' : '#10b981'} strokeWidth={0} />;
+                  }}
+                  activeDot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const isHigh = payload.latency > 2000 || payload.failed > 0;
+                    return <circle key={`active-dot-${cx}-${cy}`} cx={cx} cy={cy} r={6} fill={isHigh ? '#dc2626' : '#059669'} strokeWidth={2} stroke="#fff" />;
+                  }}
                   name="latency"
                 />
               </LineChart>
