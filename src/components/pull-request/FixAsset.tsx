@@ -1,4 +1,4 @@
-import { Download, Trash2 } from 'lucide-react';
+import { Download, FileText, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,7 @@ const FixAsset = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
   const [assetsError, setAssetsError] = useState(false);
+  const [logModal, setLogModal] = useState<{ log: string; branchCode: string } | null>(null);
 
   const isAdmin = ['superadmin', 'dvs', 'manager'].includes(userRole || '');
 
@@ -166,7 +167,13 @@ const FixAsset = () => {
       window.open(resultPath, '_blank');
     } else {
       // Supabase link - download langsung
-      window.location.href = resultPath;
+      const link = document.createElement('a');
+      link.href = resultPath;
+      const fileName = resultPath.split('/').pop() || 'download';
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -197,15 +204,19 @@ const FixAsset = () => {
       <div className="mb-4 flex flex-wrap gap-4 items-center">
         <div className="flex items-center gap-2">
           <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">queued</span>
-          <span className="text-sm text-gray-600">: Menunggu pemrosesan otomatis</span>
+          <span className="text-sm text-gray-600">: Menunggu pemrosesan</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">completed</span>
-          <span className="text-sm text-gray-600">: Selesai, data tersedia untuk diunduh</span>
+          <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">running</span>
+          <span className="text-sm text-gray-600">: Sedang diproses</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-semibold">rejected</span>
-          <span className="text-sm text-gray-600">: Ditolak sistem</span>
+          <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">done</span>
+          <span className="text-sm text-gray-600">: Selesai, siap diunduh</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-semibold">error</span>
+          <span className="text-sm text-gray-600">: Gagal diproses</span>
         </div>
       </div>
 
@@ -279,10 +290,12 @@ const FixAsset = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                          ${request.status === 'completed'
+                          ${request.status === 'done'
                             ? 'bg-emerald-100 text-emerald-800'
-                            : request.status === 'rejected'
+                            : request.status === 'error'
                             ? 'bg-rose-100 text-rose-800'
+                            : request.status === 'running'
+                            ? 'bg-blue-100 text-blue-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}
                       >
@@ -328,11 +341,22 @@ const FixAsset = () => {
                           </button>
                         )}
 
+                        {/* Log icon - visible when there is an error log */}
+                        {request.log && (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-full hover:bg-amber-50"
+                            title="Lihat detail error"
+                            onClick={() => setLogModal({ log: request.log, branchCode: request.branch_code })}
+                          >
+                            <FileText className='text-amber-500' size={18} />
+                          </button>
+                        )}
+
                         {/* Delete action for superadmin */}
                         {userRole === 'superadmin' && (
                           <button
                             onClick={() => {
-                              // Confirm before deleting
                               if (window.confirm(`Are you sure you want to delete this Fix Asset request for branch ${request.branch_code}?`)) {
                                 handleDeleteRequest(request.id);
                               }
@@ -404,6 +428,27 @@ const FixAsset = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Error Log Modal */}
+      {logModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center" onClick={() => setLogModal(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div className="flex items-center gap-2">
+                <FileText className="text-amber-500" size={20} />
+                <h3 className="text-base font-semibold">Error Log — Cabang {logModal.branchCode}</h3>
+              </div>
+              <button onClick={() => setLogModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div className="px-6 py-4">
+              <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto font-mono">{logModal.log}</pre>
+            </div>
+            <div className="flex justify-end px-6 py-4 border-t">
+              <button onClick={() => setLogModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm">Tutup</button>
+            </div>
           </div>
         </div>
       )}

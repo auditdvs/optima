@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis } from 'recharts';
 import CountUp from '../components/common/CountUp';
 import { BranchRow } from "../components/dashboard/BranchLocationTable";
@@ -26,6 +26,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useDashboardCache } from '../contexts/DashboardCacheContext';
 import { useMapCache } from '../contexts/MapCacheContext';
 import { supabase } from '../lib/supabase';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
+import { Button } from '../components/ui/button';
+import { CalendarIcon } from 'lucide-react';
+import { DateRange } from "react-day-picker";
+import { startOfYear, endOfYear, format, isWithinInterval } from "date-fns";
+import { cn } from "../lib/utils";
 
 // sesuaikan path jika berbeda
 const auditorMapping = [
@@ -146,6 +153,7 @@ const auditorChartConfig = {
   },
 } satisfies ChartConfig;
 
+
 const Dashboard = () => {
   // Use cached map data from context
   const { auditedBranchesGeo: cachedAuditedBranchesGeo } = useMapCache();
@@ -181,85 +189,99 @@ const Dashboard = () => {
     }))
   }));
   
-  const [months] = useState(['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
-
-  // Survey Stats State
-  const [surveyStats, setSurveyStats] = useState({
-    avgScore: 0,
-    totalRespondents: 0,
-    totalBranches: 0
+  // Survey & Fraud Stats State
+  const [surveyResponses, setSurveyResponses] = useState<any[]>([]);
+  const [fraudPersons, setFraudPersons] = useState<any[]>([]);
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfYear(new Date()),
+    to: endOfYear(new Date()),
   });
+  const [isAllMonths, setIsAllMonths] = useState(true);
 
   useEffect(() => {
-    const fetchSurveyStats = async () => {
+    const fetchSurveyResponses = async () => {
       try {
         const { data: responses, error } = await supabase
           .from('survey_responses')
           .select('*');
         
         if (error) throw error;
-        
-        if (responses && responses.length > 0) {
-          const totalRespondents = responses.length;
-          
-          // Get unique branches
-          const tokenIds = [...new Set(responses.map(r => r.token_id))];
-          let totalBranches = 0;
-          
-          if (tokenIds.length > 0) {
-            const { data: tokens } = await supabase
-              .from('survey_tokens')
-              .select('branch_name')
-              .in('id', tokenIds);
-            
-            if (tokens) {
-              totalBranches = new Set(tokens.map(t => t.branch_name)).size;
-            }
-          }
-
-          // Calculate average score (Only Sections A, B, C, D which are numeric 1-5 scales)
-          let totalAvgSum = 0;
-          
-          responses.forEach(r => {
-            let sum = 0;
-            let count = 0;
-            // Helper to sum scale values
-            const add = (val: any) => {
-              if (typeof val === 'number') {
-                sum += val;
-                count++;
-              }
-            };
-            
-            // Section A
-            add(r.a1); add(r.a2); add(r.a3); add(r.a4); add(r.a5); add(r.a6);
-            // Section B
-            add(r.b1); add(r.b2); add(r.b3);
-            // Section C
-            add(r.c1); add(r.c2); add(r.c3); add(r.c4); add(r.c5); add(r.c6); add(r.c7);
-            // Section D
-            add(r.d1); add(r.d2); add(r.d3); add(r.d4);
-            
-            if (count > 0) {
-              totalAvgSum += (sum / count);
-            }
-          });
-          
-          const avgScore = totalAvgSum / totalRespondents;
-          
-          setSurveyStats({
-            avgScore,
-            totalRespondents,
-            totalBranches
-          });
-        }
+        setSurveyResponses(responses || []);
       } catch (err) {
-        console.error('Error fetching survey stats:', err);
+        console.error('Error fetching survey responses:', err);
       }
     };
     
-    fetchSurveyStats();
+    const fetchFraudPersons = async () => {
+      try {
+        const { data: fraudData, error } = await supabase
+          .from('work_paper_persons')
+          .select('fraud_amount, fraud_staff, audit_master_id')
+          .not('fraud_staff', 'is', null);
+        
+        if (error) throw error;
+        setFraudPersons(fraudData || []);
+      } catch (err) {
+        console.error('Error fetching fraud persons:', err);
+      }
+    };
+
+    fetchSurveyResponses();
+    fetchFraudPersons();
   }, []);
+
+  const [surveyTokensMap, setSurveyTokensMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchTokens = async () => {
+      const { data: tokens } = await supabase.from('survey_tokens').select('id, branch_name');
+      if (tokens) {
+        const map: Record<string, string> = {};
+        tokens.forEach(t => map[t.id] = t.branch_name);
+        setSurveyTokensMap(map);
+      }
+    };
+    fetchTokens();
+  }, []);
+
+  const currentSurveyStats = useMemo(() => {
+    const filtered = isAllMonths 
+      ? surveyResponses 
+      : surveyResponses.filter(r => {
+          if (!date?.from || !date?.to) return true;
+          const submittedAt = new Date(r.submitted_at);
+          return isWithinInterval(submittedAt, { start: date.from, end: date.to });
+        });
+
+    if (filtered.length === 0) return { avgScore: 0, totalRespondents: 0, totalBranches: 0 };
+
+    const totalRespondents = filtered.length;
+    const branchNames = new Set(filtered.map(r => surveyTokensMap[r.token_id]).filter(Boolean));
+    const totalBranches = branchNames.size;
+
+    let totalAvgSum = 0;
+    filtered.forEach(r => {
+      let sum = 0;
+      let count = 0;
+      const add = (val: any) => {
+        if (typeof val === 'number') {
+          sum += val;
+          count++;
+        }
+      };
+      add(r.a1); add(r.a2); add(r.a3); add(r.a4); add(r.a5); add(r.a6);
+      add(r.b1); add(r.b2); add(r.b3);
+      add(r.c1); add(r.c2); add(r.c3); add(r.c4); add(r.c5); add(r.c6); add(r.c7);
+      add(r.d1); add(r.d2); add(r.d3); add(r.d4);
+      if (count > 0) totalAvgSum += (sum / count);
+    });
+
+    return {
+      avgScore: totalAvgSum / totalRespondents,
+      totalRespondents,
+      totalBranches
+    };
+  }, [surveyResponses, isAllMonths, date, surveyTokensMap]);
 
   // NOTE: All dashboard data fetching has been moved to DashboardCacheContext
   // Data is now automatically cached and shared across navigations
@@ -275,35 +297,64 @@ const Dashboard = () => {
   // NOTE: All data fetching has been moved to DashboardCacheContext and MapCacheContext
   // Data is now automatically cached and shared across navigations
 
-  // Calculate statistics
-  const regularAuditedBranches = new Set(
-    workPapers.filter(wp => wp.audit_type === 'regular').map(wp => wp.branch_name)
-  );
+  const filteredWorkPapers = useMemo(() => {
+    if (isAllMonths) return workPapers;
+    if (!date?.from || !date?.to) return workPapers;
 
-  // Update this section to use workPapers instead of fraudAuditCount
-  const uniqueFraudAudits = new Set<string>();
-  workPapers.forEach(wp => {
-    if (wp.audit_type === 'fraud') {
-      const uniqueKey = `${wp.branch_name}|${wp.audit_start_date}|${wp.audit_end_date}`;
-      uniqueFraudAudits.add(uniqueKey);
-    }
-  });
+    return workPapers.filter(wp => {
+      const auditDate = new Date(wp.audit_start_date);
+      return isWithinInterval(auditDate, { start: date.from, end: date.to });
+    });
+  }, [workPapers, isAllMonths, date]);
 
-  const stats = {
-    totalBranches: branches.length,
-    auditedBranches: regularAuditedBranches.size,
-    unauditedBranches: branches.length - regularAuditedBranches.size,
-    fraudAudits: uniqueFraudAudits.size,
-    annualAudits: workPapers.filter(wp => wp.audit_type === 'regular').length,
-    totalAudits: workPapers.length,
-    totalFraud: totalFraudAmount, // From work_paper_persons
-    totalFraudCases: totalFraudStaffCount, // From work_paper_persons (unique fraud_staff count)
-    totalFraudulentBranches: new Set(workPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size,
-    // Add survey stats
-    surveyAvgScore: surveyStats.avgScore,
-    surveyTotalRespondents: surveyStats.totalRespondents,
-    surveyTotalBranches: surveyStats.totalBranches
-  };
+  // Calculate statistics based on filtered data
+  const stats = useMemo(() => {
+    const regularAuditedBranches = new Set(
+      filteredWorkPapers.filter(wp => wp.audit_type === 'regular').map(wp => wp.branch_name)
+    );
+
+    const uniqueFraudAudits = new Set<string>();
+    filteredWorkPapers.forEach(wp => {
+      if (wp.audit_type === 'fraud') {
+        const uniqueKey = `${wp.branch_name}|${wp.audit_start_date}|${wp.audit_end_date}`;
+        uniqueFraudAudits.add(uniqueKey);
+      }
+    });
+
+    // Link fraud persons to their parent audit to filter by date range
+    const filteredFraudPersons = fraudPersons.filter(person => {
+      const audit = workPapers.find(wp => wp.id === person.audit_master_id);
+      if (!audit) return false;
+      
+      if (isAllMonths) return true;
+      if (!date?.from || !date?.to) return true;
+
+      const auditDate = new Date(audit.audit_start_date);
+      return isWithinInterval(auditDate, { start: date.from, end: date.to });
+    });
+
+    const totalFraud = filteredFraudPersons.reduce((sum, p) => sum + (p.fraud_amount || 0), 0);
+    const uniqueStaff = new Set(
+      filteredFraudPersons
+        .filter(p => p.fraud_staff && p.fraud_staff.trim() !== '')
+        .map(p => p.fraud_staff)
+    );
+
+    return {
+      totalBranches: branches.length,
+      auditedBranches: regularAuditedBranches.size,
+      unauditedBranches: branches.length - regularAuditedBranches.size,
+      fraudAudits: uniqueFraudAudits.size,
+      annualAudits: filteredWorkPapers.filter(wp => wp.audit_type === 'regular').length,
+      totalAudits: filteredWorkPapers.length,
+      totalFraud: totalFraud,
+      totalFraudCases: uniqueStaff.size,
+      totalFraudulentBranches: new Set(filteredWorkPapers.filter(wp => wp.audit_type === 'fraud').map(wp => wp.branch_name)).size,
+      surveyAvgScore: currentSurveyStats.avgScore,
+      surveyTotalRespondents: currentSurveyStats.totalRespondents,
+      surveyTotalBranches: currentSurveyStats.totalBranches
+    };
+  }, [filteredWorkPapers, fraudPersons, workPapers, branches, currentSurveyStats, isAllMonths, date]);
 
   // Filter branches based on search term
   const filteredBranches = branches.filter(branch => 
@@ -398,7 +449,7 @@ const Dashboard = () => {
 
   // Update the getFilteredRadialData function
   const getFilteredRadialData = () => {
-    if (selectedMonth === 'All') {
+    if (isAllMonths) {
       return [{
         month: "all",
         annualAudits: stats.annualAudits,
@@ -406,64 +457,27 @@ const Dashboard = () => {
       }];
     }
     
-    const monthIndex = months.indexOf(selectedMonth) - 1;
-    if (monthIndex < 0) return [{ month: "all", annualAudits: 0, fraudAudits: 0 }];
-    
-    const filteredData = workPapers.filter(wp => {
-      const endDate = new Date(wp.audit_end_date);
-      return endDate.getMonth() === monthIndex;
-    });
-    
-    const annualCount = filteredData.filter(wp => wp.audit_type === 'regular').length;
-    const fraudCount = filteredData.filter(wp => wp.audit_type === 'fraud').length;
-    
     return [{
-      month: selectedMonth.toLowerCase(),
-      annualAudits: annualCount,
-      fraudAudits: fraudCount
+      month: "range",
+      annualAudits: stats.annualAudits,
+      fraudAudits: stats.fraudAudits
     }];
   };
 
   // State to manage selected month for the pie chart
-  const [selectedMonth, setSelectedMonth] = useState('All');
   const [activeIndex, setActiveIndex] = useState(0);
   const [chartInView, setChartInView] = useState(false);
 
-  // Add this function to filter data by selected month
-  const getFilteredPieData = () => {
-    if (selectedMonth === 'All') {
-      return [
-        { name: "Annual Audits", value: stats.annualAudits, fill: "#50C878" },
-        { name: "Special Audits", value: stats.fraudAudits, fill: "#e74c3c" },
-      ];
-    }
-    
-    const monthIndex = months.indexOf(selectedMonth) - 1; // -1 because 'All' is at index 0
-    if (monthIndex < 0) return [];
-    
-    const filteredData = workPapers.filter(wp => {
-      const endDate = new Date(wp.audit_end_date);
-      return endDate.getMonth() === monthIndex;
-    });
-    
-    const annualCount = filteredData.filter(wp => wp.audit_type === 'regular').length;
-    const fraudCount = filteredData.filter(wp => wp.audit_type === 'fraud').length;
-    
-    return [
-      { name: "Annual Audits", value: annualCount, fill: "#50C878" },
-      { name: "Special Audits", value: fraudCount, fill: "#e74c3c" },
-    ];
-  };
-
   // Add variable to store the filtered data
-  const filteredPieData = getFilteredPieData();
+  const filteredPieData = [
+    { name: "Annual Audits", value: stats.annualAudits, fill: "#50C878" },
+    { name: "Special Audits", value: stats.fraudAudits, fill: "#e74c3c" },
+  ];
 
   // Add effect to reset activeIndex when the filtered data changes
   useEffect(() => {
-    if (filteredPieData.length > 0) {
-      setActiveIndex(0);
-    }
-  }, [selectedMonth]);
+    setActiveIndex(0);
+  }, [date, isAllMonths]);
 
   // Add this function before the return statement in Dashboard component
   const getRegionAuditData = () => {
@@ -621,23 +635,9 @@ const Dashboard = () => {
     ];
   };
 
-  // Tambahkan state untuk filter bulan BarChart region
-const [selectedRegionMonth, setSelectedRegionMonth] = useState('All');
-const regionMonths = ['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Fungsi untuk filter data region berdasarkan bulan
 const getRegionAuditDataByMonth = () => {
-  if (selectedRegionMonth === 'All') return getRegionAuditData();
-
-  const monthIndex = regionMonths.indexOf(selectedRegionMonth) - 1;
-  if (monthIndex < 0) return getRegionAuditData();
-
-  // Filter workPapers berdasarkan bulan
-  const filteredWorkPapers = workPapers.filter(wp => {
-    const startDate = new Date(wp.audit_start_date);
-    return startDate.getMonth() === monthIndex;
-  });
-
   // Gunakan region dari branches yang ada
   const regionMap: Record<string, { regular: number; fraud: number }> = {};
   branches.forEach(branch => {
@@ -699,10 +699,68 @@ const getRegionAuditDataByMonth = () => {
 
   return (
     <div className="space-y-4 p-0">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
         <h1 className="text-2xl font-semibold text-gray-900">Dashboard Summary Audits Branches</h1>
         
-        {/* Radio buttons removed - only main dashboard is available */}
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsAllMonths(!isAllMonths)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                isAllMonths 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              Semua Bulan
+            </button>
+          </div>
+
+          {!isAllMonths && (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="h-4 w-[1px] bg-gray-200 mx-1"></div>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400">Periode:</span>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                      "h-8 w-[240px] justify-start text-left font-normal text-xs rounded-xl",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date?.from ? (
+                      date.to ? (
+                        <>
+                          {format(date.from, "LLL dd, y")} -{" "}
+                          {format(date.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(date.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pilih Tanggal</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-none" align="end">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from}
+                    selected={date}
+                    onSelect={setDate}
+                    numberOfMonths={2}
+                    className="rounded-2xl"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Only show stats cards in main section */}
@@ -889,37 +947,9 @@ const getRegionAuditDataByMonth = () => {
                   <CardHeader className="items-center pb-2">
                     <div className="flex flex-row items-center justify-between w-full">
                       <CardTitle className="text-lg font-semibold text-gray-700">Audit Composition</CardTitle>
-                      <Select 
-                        value={selectedMonth} 
-                        onValueChange={setSelectedMonth}
-                      >
-                        <SelectTrigger
-                          className="h-8 w-[150px] rounded-lg pl-2.5"
-                          aria-label="Select month"
-                        >
-                          <SelectValue placeholder="Select month" />
-                        </SelectTrigger>
-                        <SelectContent align="end" className="rounded-xl">
-                          {months.map((month) => (
-  <SelectItem key={month} value={month} className="rounded-lg">
-    <div className="flex items-center gap-2 text-xs">
-      {month !== 'All' && (
-        <span
-          className="flex h-3 w-3 shrink-0 rounded-full"
-          style={{
-            backgroundColor:`var(--color-${month.toLowerCase()})`
-          }}
-        />
-      )}
-      {month}
-    </div>
-  </SelectItem>
-))}
-                        </SelectContent>
-                      </Select>
                     </div>
                     <CardDescription className="text-sm text-slate-500">
-                      {selectedMonth === 'All' ? 'All Months' : `${selectedMonth} 2025`}
+                      {isAllMonths ? 'All Time' : (date?.from && date?.to ? `${format(date.from, 'dd MMM')} - ${format(date.to, 'dd MMM yyyy')}` : 'Pilih Periode')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-1 items-center pb-0 pt-0">
@@ -1167,30 +1197,9 @@ const getRegionAuditDataByMonth = () => {
                 </Card>
 
                 {/* BarChart Audit Summary by Region */}
-<Card className="flex flex-col bg-white shadow-sm border">
-  <CardHeader className="flex flex-row items-center justify-between pb-2">
-    <CardTitle className="text-lg font-semibold">Audit Summary by Region</CardTitle>
-    <Select value={selectedRegionMonth} onValueChange={setSelectedRegionMonth}>
-      <SelectTrigger className="h-8 w-[150px] rounded-lg pl-2.5" aria-label="Filter bulan region">
-        <SelectValue placeholder="Pilih Bulan" />
-      </SelectTrigger>
-      <SelectContent align="end" className="rounded-xl">
-{regionMonths.map((month) => (
-  <SelectItem key={month} value={month} className="rounded-lg">
-    <div className="flex items-center gap-2 text-xs">
-      {month !== 'All' && (
-        <span className="flex h-3 w-3 shrink-0 rounded-full"
-          style={{
-            backgroundColor: `var(--color-${month.toLowerCase()})`
-          }}
-        />
-      )}
-      {month}
-    </div>
-  </SelectItem>
-))}
-      </SelectContent>
-    </Select>
+<Card className="bg-white shadow-sm border" id="chart-summary-region">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-lg font-semibold text-gray-700">Audit Summary by Region</CardTitle>
   </CardHeader>
   <CardContent>
     <div className="h-[300px] w-full">

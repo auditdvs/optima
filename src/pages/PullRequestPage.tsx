@@ -3,10 +3,6 @@ import ComponentAccessGuard from '../components/pull-request/ComponentAccessGuar
 import DbLoanSaving from '../components/pull-request/DbLoanSaving';
 import DetailAnggota from '../components/pull-request/DetailAnggota';
 import FixAsset from '../components/pull-request/FixAsset';
-import KDP from '../components/pull-request/KDP';
-import TAK from '../components/pull-request/TAK';
-import THC from '../components/pull-request/THC';
-import TLP from '../components/pull-request/TLP';
 
 import { RefreshCw } from 'lucide-react';
 
@@ -83,46 +79,6 @@ function PullRequestPage() {
           >
             Fix Asset
           </button>
-          <button
-            className={`py-3 px-4 font-medium text-sm whitespace-nowrap flex-shrink-0 md:flex-1 text-center ${
-              activeTab === 'thc'
-                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('thc')}
-          >
-            THC
-          </button>
-          <button
-            className={`py-3 px-4 font-medium text-sm whitespace-nowrap flex-shrink-0 md:flex-1 text-center ${
-              activeTab === 'tak'
-                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('tak')}
-          >
-            TAK
-          </button>
-          <button
-            className={`py-3 px-4 font-medium text-sm whitespace-nowrap flex-shrink-0 md:flex-1 text-center ${
-              activeTab === 'tlp'
-                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('tlp')}
-          >
-            TLP
-          </button>
-          <button
-            className={`py-3 px-4 font-medium text-sm whitespace-nowrap flex-shrink-0 md:flex-1 text-center ${
-              activeTab === 'kdp'
-                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('kdp')}
-          >
-            KDP
-          </button>
         </div>
       </div>
 
@@ -141,26 +97,6 @@ function PullRequestPage() {
         {activeTab === 'fixAsset' && (
           <ComponentAccessGuard componentName="fix_asset">
             <FixAsset key={refreshKey} />
-          </ComponentAccessGuard>
-        )}
-        {activeTab === 'thc' && (
-          <ComponentAccessGuard componentName="thc">
-            <THC key={refreshKey} />
-          </ComponentAccessGuard>
-        )}
-        {activeTab === 'tak' && (
-          <ComponentAccessGuard componentName="tak">
-            <TAK key={refreshKey} />
-          </ComponentAccessGuard>
-        )}
-        {activeTab === 'tlp' && (
-          <ComponentAccessGuard componentName="tlp">
-            <TLP key={refreshKey} />
-          </ComponentAccessGuard>
-        )}
-        {activeTab === 'kdp' && (
-          <ComponentAccessGuard componentName="kdp">
-            <KDP key={refreshKey} />
           </ComponentAccessGuard>
         )}
       </div>
