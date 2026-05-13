@@ -1,6 +1,7 @@
-import { AlertTriangle, Archive, Calendar, CheckCircle, Clock, Database, Loader2, Play, Plus, RefreshCw, ScrollText, Trash2, XCircle, Zap } from 'lucide-react';
+import { AlertTriangle, Archive, Calendar, CheckCircle, Clock, Database, ExternalLink, HelpCircle, Loader2, Play, Plus, RefreshCw, ScrollText, Trash2, XCircle, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -124,7 +125,7 @@ function ExecuteConfirmModal({
               <Zap size={28} className="text-emerald-600" fill="currentColor" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Jalankan Sekarang?</h3>
-            <p className="text-sm text-gray-500">Semua request yang tertunda akan langsung diproses oleh server tanpa menunggu jadwal malam.</p>
+            <p className="text-sm text-gray-500">Semua request yang tertunda akan langsung diproses oleh server tanpa menunggu jadwal rutin.</p>
           </div>
           <div className="flex border-t border-gray-100">
             <button
@@ -580,7 +581,7 @@ export default function DatabaseTab() {
           <div>
             <h2 className="text-lg font-bold text-gray-900">Database Request</h2>
             <p className="text-sm text-gray-500">Kelola request pengambilan data dari server MDIS</p>
-            <p className="text-xs text-red-500 italic font-semibold"> *) Request akan dieksekusi setelah jam kerja 19.00 s.d. 06.00</p>
+            <p className="text-xs text-red-500 italic font-semibold"> *) Request akan dieksekusi pada jam 07.00 s.d. 11.30 WIB</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -605,6 +606,34 @@ export default function DatabaseTab() {
               Execute Now
             </button>
           )}
+          
+          <div className="flex items-center gap-1 group">
+            <a
+              href="https://dvsaudit-thc-cons.hf.space"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium hover:bg-amber-100 transition-all shadow-sm"
+            >
+              <ExternalLink size={16} />
+              Merge THC, TAK, TLP, KDP
+            </a>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="p-1 text-amber-500 hover:text-amber-600 transition-colors">
+                    <HelpCircle size={18} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[280px] bg-white border border-gray-200 text-gray-700 p-3 shadow-xl">
+                  <p className="leading-relaxed">
+                    Fitur merge ini khusus untuk data yang ditarik dari <span className="font-semibold text-indigo-600">Database Request</span>. 
+                    Tersedia menu untuk analisa simpanan langsung, sehingga setelah di-merge, analisis dapat langsung diinput.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
 
           <button
             type="button"
