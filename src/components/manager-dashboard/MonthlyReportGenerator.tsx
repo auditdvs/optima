@@ -13,6 +13,25 @@ import {
 } from '../ui/dialog';
 
 // ==================== TYPES ====================
+interface RiskIssueRow {
+  id: number;
+  kc_kr_kp: string;
+  judul_temuan: string;
+  kode_risk_issue: string;
+  judul_risk_issue: string;
+  kategori: string;
+  penyebab: string;
+  dampak: string;
+  kelemahan: string;
+  rekomendasi: string;
+  poin: number | null;
+  perbaikan_temuan: string;
+  jatuh_tempo: string;
+  tanggal_audit: string | null;
+  audit_type: string;
+  contoh_temuan?: string;
+}
+
 interface ReportData {
   totalReguler: number;
   totalKhusus: number;
@@ -21,6 +40,7 @@ interface ReportData {
   regionFrauds: Record<string, { count: number; nominal: number }>;
   auditDetails: AuditDetail[];
   fraudDetails: FraudDetail[];
+  riskIssues: RiskIssueRow[];
 }
 
 interface AuditDetail {
@@ -159,7 +179,18 @@ const formatRpCompact = (value: number) => {
 
 const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
+const toTitleCase = (str: string) => {
+  if (!str) return '-';
+  return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
 const getMonthLabel = (month: number) => MONTH_OPTIONS.find((m) => m.value === month)?.label || '';
+
+const toDisplayDate = (iso: string) => {
+  if (!iso) return '-';
+  const [y, m, day] = iso.split('-');
+  return `${day}-${m}-${y}`;
+};
 
 const formatLongDate = (d: Date) => `${d.getDate()} ${getMonthLabel(d.getMonth() + 1)} ${d.getFullYear()}`;
 
@@ -215,12 +246,6 @@ const buildReportPeriodMeta = (
   };
 };
 
-const toDisplayDate = (iso: string) => {
-  if (!iso) return '-';
-  const [y, m, day] = iso.split('-');
-  return `${day}-${m}-${y}`;
-};
-
 // ==================== CANVAS CHARTS ====================
 
 // FIX: Tambah helper createHiDpiCanvas untuk render chart dengan resolusi tinggi (3x scale)
@@ -235,7 +260,7 @@ const createHiDpiCanvas = (width: number, height: number, scale = 3) => {
   return { canvas, ctx };
 };
 
-// FIX: drawHBarChart — gunakan createHiDpiCanvas (scale 3x) agar tidak buram
+// FIX: drawHBarChart - gunakan createHiDpiCanvas (scale 3x) agar tidak buram
 const drawHBarChart = (
   labels: string[],
   values: number[],
@@ -291,7 +316,7 @@ const drawHBarChart = (
   return canvas.toDataURL('image/png');
 };
 
-// FIX: drawVBarChart — gunakan createHiDpiCanvas (scale 3x) agar tidak buram
+// FIX: drawVBarChart - gunakan createHiDpiCanvas (scale 3x) agar tidak buram
 const drawVBarChart = (
   labels: string[],
   values: number[],
@@ -365,7 +390,7 @@ const drawVBarChart = (
   return canvas.toDataURL('image/png');
 };
 
-// FIX: drawDonutChart — gunakan createHiDpiCanvas (scale 3x) agar tidak buram
+// FIX: drawDonutChart - gunakan createHiDpiCanvas (scale 3x) agar tidak buram
 const drawDonutChart = (
   labels: string[],
   values: number[],
@@ -399,7 +424,8 @@ const drawDonutChart = (
     ctx.fillStyle = colors[i % colors.length];
     ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
     ctx.stroke();
 
     const mid = startAngle + slice / 2;
@@ -440,6 +466,93 @@ const drawDonutChart = (
   return canvas.toDataURL('image/png');
 };
 
+// Pie chart (solid, no donut hole) for risk issue distribution
+const drawPieChart = (
+  labels: string[],
+  values: number[],
+  colors: string[],
+  title: string,
+  width = 520,
+  height = 300,
+): string => {
+  const { canvas, ctx } = createHiDpiCanvas(width, height, 3);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  const titleH = 28;
+  ctx.fillStyle = '#11356B';
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, width / 2, titleH - 5);
+
+  const total = values.reduce((s, v) => s + v, 0);
+  if (total === 0) {
+    ctx.fillStyle = '#999';
+    ctx.font = '11px Arial';
+    ctx.fillText('Tidak ada data', width / 2, height / 2);
+    return canvas.toDataURL('image/png');
+  }
+
+  const cx = width * 0.35;
+  const cy = titleH + (height - titleH) / 2;
+  const radius = Math.min(width * 0.3, (height - titleH) / 2.2);
+
+  let startAngle = -Math.PI / 2;
+
+  values.forEach((val, i) => {
+    if (!val) return;
+    const slice = (val / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, startAngle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    const mid = startAngle + slice / 2;
+    const pr = radius * 0.65;
+    const px = cx + Math.cos(mid) * pr;
+    const py = cy + Math.sin(mid) * pr;
+    const pct = Math.round((val / total) * 100);
+    if (pct > 4) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 13px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${pct}%`, px, py + 4);
+    }
+
+    startAngle += slice;
+  });
+
+  // Legend on the right
+  const legendX = width * 0.65;
+  const maxLegend = Math.min(labels.length, 10);
+  const legendStartY = cy - (maxLegend * 22) / 2;
+  for (let i = 0; i < maxLegend; i++) {
+    const ly = legendStartY + i * 22;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(legendX, ly, 12, 12);
+    ctx.fillStyle = '#333';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    const labelText = labels[i].length > 22 ? labels[i].substring(0, 22) + '...' : labels[i];
+    ctx.fillText(`${labelText} (${values[i]})`, legendX + 18, ly + 10);
+  }
+  if (labels.length > maxLegend) {
+    const ly = legendStartY + maxLegend * 22;
+    ctx.fillStyle = '#999';
+    ctx.font = '10px Arial';
+    ctx.fillText(`+${labels.length - maxLegend} lainnya...`, legendX + 18, ly + 10);
+  }
+
+  return canvas.toDataURL('image/png');
+};
+
 // ==================== DATA FETCHING ====================
 const fetchReportData = async (startDate: string, endDate: string): Promise<ReportData> => {
   const { data: audits, error: auditsError } = await supabase
@@ -475,6 +588,29 @@ const fetchReportData = async (startDate: string, endDate: string): Promise<Repo
       });
   }
 
+  // Fetch risk_issue data
+  let riskIssues: RiskIssueRow[] = [];
+  try {
+    const { data: riData, error: riError } = await supabase
+      .from('risk_issue')
+      .select('id, kc_kr_kp, judul_temuan, kode_risk_issue, judul_risk_issue, kategori, penyebab, dampak, kelemahan, rekomendasi, poin, perbaikan_temuan, jatuh_tempo, tanggal_audit, audit_type')
+      .gte('tanggal_audit', startDate)
+      .lte('tanggal_audit', endDate);
+
+    if (!riError && riData) {
+      const riList = riData as RiskIssueRow[];
+      const { data: rcmData } = await supabase.from('rcm').select('code, contoh_temuan');
+      if (rcmData) {
+        const rcmMap: Record<string, string> = {};
+        rcmData.forEach(r => { if (r.code) rcmMap[r.code] = r.contoh_temuan; });
+        riList.forEach(r => { if (r.kode_risk_issue) r.contoh_temuan = rcmMap[r.kode_risk_issue] || '-'; });
+      }
+      riskIssues = riList;
+    }
+  } catch {
+    // Silently ignore risk_issue fetch failures
+  }
+
   const reguler = (audits || []).filter(
     (a: any) => a.audit_type?.toLowerCase().includes('reguler') || a.audit_type?.toLowerCase().includes('regular'),
   );
@@ -501,6 +637,7 @@ const fetchReportData = async (startDate: string, endDate: string): Promise<Repo
     regionFrauds,
     auditDetails: (audits || []) as AuditDetail[],
     fraudDetails: frauds,
+    riskIssues,
   };
 };
 
@@ -530,7 +667,7 @@ const generateAINarrative = async (
     else if (r === 'low') ratingCounts.low++;
   });
 
-  const prompt = `Anda adalah seorang Manager Senior Audit Internal yang berpengalaman. Tugas Anda adalah menulis "Bab 6: Kesimpulan dan Rekomendasi" untuk laporan audit resmi yang akan disampaikan kepada Direksi dan Komite Audit.
+  const prompt = `Anda adalah seorang Manager Senior Audit Internal yang berpengalaman. Tugas Anda adalah menulis "Bab 4: Kesimpulan dan Rekomendasi" untuk laporan audit resmi yang akan disampaikan kepada Direksi dan Komite Audit.
 
 DATA AUDIT PERIODE ${period.uppercaseLabel}:
 
@@ -565,21 +702,21 @@ INSTRUKSI PENULISAN:
 5. Jika recovery rate 0% atau sangat rendah, soroti ini sebagai temuan kritis
 6. Jika seluruh kasus khusus terkonfirmasi fraud (100%), nyatakan ini secara eksplisit sebagai perhatian serius
 
-FORMAT OUTPUT (ikuti persis, langsung mulai dari 6.1):
+FORMAT OUTPUT (ikuti persis, langsung mulai dari 4.1):
 
-6.1 Kesimpulan
+4.1 Kesimpulan
 
 a. [Judul Singkat]: [Narasi 2-3 kalimat yang menginterpretasikan data audit reguler secara keseluruhan]
-b. [Judul Singkat]: [Narasi tentang hasil audit reguler — distribusi rating dan implikasinya]
-c. [Judul Singkat]: [Narasi tentang audit khusus/fraud — volume, pelaku, dan nominal]
+b. [Judul Singkat]: [Narasi tentang hasil audit reguler - distribusi rating dan implikasinya]
+c. [Judul Singkat]: [Narasi tentang audit khusus/fraud - volume, pelaku, dan nominal]
 d. [Judul Singkat]: [Narasi tentang status pengembalian dan recovery rate, soroti bila kritis]
-e. [Judul Singkat]: [Narasi tentang pola regional — sebutkan regional dengan fraud tertinggi dan implikasinya]
+e. [Judul Singkat]: [Narasi tentang pola regional - sebutkan regional dengan fraud tertinggi dan implikasinya]
 
-6.2 Rekomendasi
+4.2 Rekomendasi
 
-1. [Rekomendasi konkret terkait percepatan recovery — sebutkan pihak yang bertanggung jawab dan tenggat waktu bila memungkinkan]
-2. [Rekomendasi terkait cabang rating HIGH — tindak lanjut RTL dengan batas waktu spesifik]
-3. [Rekomendasi terkait regional dengan fraud tertinggi — sebutkan nama regional spesifik]
+1. [Rekomendasi konkret terkait percepatan recovery - sebutkan pihak yang bertanggung jawab dan tenggat waktu bila memungkinkan]
+2. [Rekomendasi terkait cabang rating HIGH - tindak lanjut RTL dengan batas waktu spesifik]
+3. [Rekomendasi terkait regional dengan fraud tertinggi - sebutkan nama regional spesifik]
 4. [Rekomendasi terkait kelengkapan dokumentasi audit khusus]
 5. [Rekomendasi terkait penguatan sistem pengendalian internal secara menyeluruh]`;
 
@@ -813,7 +950,7 @@ const generateFallbackNarrative = (
   const top1 = topRegions[0];
   const top2 = topRegions[1];
 
-  return `6.1 Kesimpulan
+  return `4.1 Kesimpulan
 
 a. Volume Audit: Divisi Audit Internal telah melaksanakan total ${data.totalReguler + data.totalKhusus} kegiatan audit selama ${period.contextLabel}, terdiri dari ${data.totalReguler} audit reguler dan ${data.totalKhusus} audit khusus/fraud.
 
@@ -825,7 +962,7 @@ d. Status Pengembalian: Hingga tanggal laporan ini diterbitkan, total pengembali
 
 e. Analisis Regional: ${top1 ? `Regional ${top1[0]} dan ${top2 ? `Regional ${top2[0]}` : 'regional lainnya'} secara kumulatif merupakan regional dengan jumlah kasus fraud terbanyak, sehingga memerlukan perhatian pengawasan yang lebih intensif.` : 'Tidak terdapat kasus fraud pada periode ini.'}
 
-6.2 Rekomendasi
+4.2 Rekomendasi
 
 1. Divisi terkait agar segera memproses dan mendampingi penyelesaian pengembalian (recovery) kerugian fraud dari seluruh pelaku yang telah teridentifikasi selama ${period.contextLabel}.
 
@@ -874,7 +1011,7 @@ const generatePDF = async (
     pdf.text(rightText, PW - M, 5, { align: 'right' });
   };
 
-  const HEADER_LEFT = `LAPORAN ${period.reportTypeLabel} KEGIATAN AUDIT — ${period.uppercaseLabel}`;
+  const HEADER_LEFT = `LAPORAN ${period.reportTypeLabel} KEGIATAN AUDIT - ${period.uppercaseLabel}`;
   const HEADER_RIGHT = 'DIVISI INTERNAL AUDIT | RAHASIA';
 
   const drawPageFooter = (pageNum: number) => {
@@ -939,7 +1076,7 @@ const generatePDF = async (
   };
 
   // ======================================================
-  // PAGE 1 — COVER
+  // PAGE 1 - COVER
   // ======================================================
   pdf.setFillColor(...COLORS.headerBlue);
   pdf.rect(0, 0, PW, 18, 'F');
@@ -976,7 +1113,7 @@ const generatePDF = async (
   pdf.setFont('helvetica', 'italic');
   pdf.setFontSize(8.5);
   pdf.setTextColor(...COLORS.textMed);
-  pdf.text('RAHASIA — Dokumen ini hanya untuk kalangan internal', PW / 2, titleY + 64, { align: 'center' });
+  pdf.text('RAHASIA - Dokumen ini hanya untuk kalangan internal', PW / 2, titleY + 64, { align: 'center' });
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
@@ -989,7 +1126,7 @@ const generatePDF = async (
   );
 
   // ======================================================
-  // PAGE 2 — DAFTAR ISI
+  // PAGE 2 - DAFTAR ISI
   // ======================================================
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
@@ -1001,15 +1138,12 @@ const generatePDF = async (
   const tocItems = [
     { num: '1.', title: 'Pendahuluan', page: '2' },
     { num: '2.', title: 'Ringkasan Eksekutif', page: '2' },
-    { num: '3.', title: `Audit Reguler ${periodLabel}`, page: '3' },
-    { num: '   3.1', title: 'Daftar Cabang yang Diaudit', page: '3' },
-    { num: '   3.2', title: 'Distribusi Rating Hasil Audit', page: '4' },
-    { num: '4.', title: `Audit Khusus / Fraud ${periodLabel}`, page: '4' },
-    { num: '   4.1', title: 'Daftar Kasus Fraud per Cabang', page: '5' },
-    { num: '   4.2', title: 'Rincian Pelaku dan Nominal Fraud', page: '7' },
-    { num: '   4.3', title: 'Status Pengembalian Fraud', page: '8' },
-    { num: '5.', title: 'Analisis Regional', page: '8' },
-    { num: '6.', title: 'Kesimpulan dan Rekomendasi', page: '9' },
+    { num: '3.', title: 'Ikhtisar Hasil Audit', page: '3' },
+    { num: '   3.1', title: 'Ringkasan Rating Audit dan Temuan Signifikan', page: '3' },
+    { num: '      3.1.1', title: 'Isu Risiko Signifikan', page: '4' },
+    { num: '   3.2', title: `Audit Reguler ${periodLabel}`, page: '5' },
+    { num: '   3.3', title: `Audit Khusus / Fraud ${periodLabel}`, page: '6' },
+    { num: '4.', title: 'Kesimpulan dan Rekomendasi', page: '8' },
   ];
 
   tocItems.forEach(item => {
@@ -1036,7 +1170,7 @@ const generatePDF = async (
   drawPageFooter(3);
 
   // ======================================================
-  // PAGE 3 — PENDAHULUAN + RINGKASAN EKSEKUTIF
+  // PAGE 3 - PENDAHULUAN + RINGKASAN EKSEKUTIF
   // ======================================================
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
@@ -1132,37 +1266,173 @@ const generatePDF = async (
       500, 260,
     );
     setFont('bold', 10, COLORS.headerBlue);
-    pdf.text(`Komposisi Kegiatan Audit — ${periodLabel}`, PW / 2, y + 6, { align: 'center' });
-    pdf.addImage(donutImg, 'PNG', M + 10, y + 8, CW - 20, 60);
+    pdf.text(`Komposisi Kegiatan Audit - ${periodLabel}`, PW / 2, y + 6, { align: 'center' });
+    pdf.addImage(donutImg, 'PNG', M + 10, y + 8, CW - 20, 78);
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Gambar 1: Komposisi Kegiatan Audit ${periodLabel}`, PW / 2, y + 72, { align: 'center' });
+    pdf.text(`Gambar 1: Komposisi Kegiatan Audit ${periodLabel}`, PW / 2, y + 90, { align: 'center' });
   }
 
   drawPageFooter(4);
 
   // ======================================================
-  // PAGE 4 — AUDIT REGULER 3.1 Daftar Cabang
+  // PAGE 4+ - 3. IKHTISAR HASIL AUDIT
   // ======================================================
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
   y = 22;
 
-  y = drawSectionTitle(`3. AUDIT REGULER`, y);
+  y = drawSectionTitle('3. IKHTISAR HASIL AUDIT', y);
 
   const regulerAudits = data.auditDetails.filter(
     a => a.audit_type?.toLowerCase().includes('reguler') || a.audit_type?.toLowerCase().includes('regular'),
   );
+  const khususAudits = data.auditDetails.filter(
+    a => a.audit_type?.toLowerCase().includes('khusus') || a.audit_type?.toLowerCase().includes('fraud') || a.audit_type?.toLowerCase().includes('special'),
+  );
 
-  const regulerIntro = `Audit reguler merupakan kegiatan pemeriksaan periodik yang dilaksanakan terhadap cabang-cabang berdasarkan jadwal yang telah ditetapkan. Pada ${periodContextLabel}, terdapat ${regulerAudits.length} cabang yang menjadi objek audit reguler yang tersebar di berbagai regional. Audit reguler difokuskan pada evaluasi kepatuhan operasional, kecukupan dokumentasi, dan penilaian profil risiko masing-masing cabang.`;
+  const ratingCounts = { high: 0, medium: 0, low: 0 };
+  regulerAudits.forEach(a => {
+    const r = (a.rating || '').toLowerCase();
+    if (r === 'high') ratingCounts.high++;
+    else if (r === 'medium') ratingCounts.medium++;
+    else if (r === 'low') ratingCounts.low++;
+  });
 
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 3
-  // tampil rapi dan mengisi lebar CW secara penuh (sebelumnya wrap tidak akurat)
+  const ikhtisarIntro = `Bagian ini menyajikan ikhtisar menyeluruh atas hasil kegiatan audit yang dilaksanakan selama ${periodContextLabel}, mencakup ringkasan rating audit reguler, temuan signifikan, serta isu risiko yang teridentifikasi melalui analisis risk issue.`;
+  setFont('normal', 9, COLORS.textDark);
+  const ikhtisarIntroLines = pdf.splitTextToSize(ikhtisarIntro, CW);
+  pdf.text(ikhtisarIntroLines, M, y);
+  y += ikhtisarIntroLines.length * 4.5 + 5;
+
+  // --- 3.1 Ringkasan Rating Audit dan Temuan Signifikan ---
+  y = drawSubTitle('3.1 Ringkasan Rating Audit dan Temuan Signifikan', y);
+
+  const allRegions = new Set<string>();
+  data.auditDetails.forEach(a => { if (a.region) allRegions.add(a.region); });
+  const sortedAllRegions = [...allRegions].sort();
+
+  const regionSummaryRows = sortedAllRegions.map((reg, idx) => {
+    const regReguler = regulerAudits.filter(a => a.region === reg);
+    const regKhusus = khususAudits.filter(a => a.region === reg);
+    const regFraudStaff = data.fraudDetails.filter(f => f.region === reg);
+    const khususTotal = regKhusus.length;
+    return [
+      String(idx + 1),
+      reg,
+      String(regReguler.length),
+      String(khususTotal),
+    ];
+  });
+
+  if (regionSummaryRows.length > 0) {
+    autoTable(pdf, {
+      startY: y,
+      head: [['No', 'Regional', 'Reguler', 'Khusus']],
+      body: regionSummaryRows,
+      theme: 'grid',
+      headStyles: { fillColor: COLORS.tableHeaderBlue, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
+      alternateRowStyles: { fillColor: COLORS.rowAltBlue },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 55, halign: 'center' },
+      },
+      margin: { left: M, right: M },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+    setFont('italic', 7.5, COLORS.textLight);
+    pdf.text(`Tabel 1: Ringkasan Rating Audit dan Temuan per Regional ${periodLabel}`, PW / 2, y, { align: 'center' });
+    y += 8;
+  }
+
+  drawPageFooter(5);
+
+  // --- 3.1.1 Isu Risiko Signifikan ---
+  pdf.addPage();
+  drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
+  y = 22;
+
+  y = drawSubTitle('3.1.1 Isu Risiko Signifikan', y);
+
+  const riAggMap: Record<string, { kode: string; judul: string; contoh: string; count: number }> = {};
+  data.riskIssues.forEach(ri => {
+    const key = `${ri.kode_risk_issue}|||${ri.judul_risk_issue}`;
+    if (!riAggMap[key]) {
+      riAggMap[key] = { kode: ri.kode_risk_issue || '-', judul: ri.judul_risk_issue || '-', contoh: ri.contoh_temuan || '-', count: 0 };
+    }
+    riAggMap[key].count++;
+  });
+  const riAggSorted = Object.values(riAggMap).sort((a, b) => b.count - a.count);
+
+  if (riAggSorted.length > 0) {
+    const pieColors = ['#11356B', '#C0392B', '#E67E22', '#27AE60', '#8E44AD', '#2980B9', '#D35400', '#16A085', '#7F8C8D', '#F39C12'];
+    const topRi = riAggSorted.slice(0, 10);
+    const pieImg = drawPieChart(
+      topRi.map(r => r.kode || r.judul.substring(0, 20)),
+      topRi.map(r => r.count),
+      pieColors,
+      `Distribusi Isu Risiko Signifikan - ${periodLabel}`,
+      520, 280,
+    );
+    pdf.addImage(pieImg, 'PNG', M + 5, y, CW - 10, 86);
+    setFont('italic', 7.5, COLORS.textLight);
+    pdf.text(`Gambar 2: Distribusi Isu Risiko Signifikan ${periodLabel}`, PW / 2, y + 89, { align: 'center' });
+    y += 96;
+  } else {
+    setFont('italic', 9, COLORS.textMed);
+    pdf.text('Tidak ada data risk issue pada periode ini.', M, y);
+    y += 8;
+  }
+
+  if (riAggSorted.length > 0) {
+    autoTable(pdf, {
+      startY: y,
+      head: [['No', 'Kode Risk Issue', 'Judul Risk Issue', 'Contoh Temuan', 'Jumlah']],
+      body: riAggSorted.slice(0, 10).map((r, i) => {
+        let contohFmt = r.contoh || '-';
+        if (contohFmt !== '-') {
+          const lines = contohFmt.split('\n').map(l => l.trim()).filter(Boolean);
+          contohFmt = lines.map(l => /^[-•\d]/.test(l) ? l : `- ${l}`).join('\n');
+        }
+        return [String(i + 1), r.kode, r.judul, contohFmt, String(r.count)];
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: COLORS.tableHeaderBlue, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
+      alternateRowStyles: { fillColor: COLORS.rowAltBlue },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 60 },
+        3: { cellWidth: 55 },
+        4: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+      },
+      margin: { left: M, right: M },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+    setFont('italic', 7.5, COLORS.textLight);
+    pdf.text(`Tabel 2: Daftar Isu Risiko Signifikan ${periodLabel}`, PW / 2, y, { align: 'center' });
+    y += 6;
+  }
+
+  drawPageFooter(6);
+
+  // ======================================================
+  // 3.2 Audit Reguler
+  // ======================================================
+  pdf.addPage();
+  drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
+  y = 22;
+
+  y = drawSubTitle(`3.2 Audit Reguler ${periodLabel}`, y);
+
+  const regulerIntro = `Audit reguler merupakan kegiatan pemeriksaan periodik yang dilaksanakan terhadap cabang-cabang berdasarkan jadwal yang telah ditetapkan. Pada ${periodContextLabel}, terdapat ${regulerAudits.length} cabang yang menjadi objek audit reguler. Audit reguler difokuskan pada evaluasi kepatuhan operasional, kecukupan dokumentasi, dan penilaian profil risiko masing-masing cabang.`;
   setFont('normal', 9, COLORS.textDark);
   const regulerIntroLines = pdf.splitTextToSize(regulerIntro, CW);
   pdf.text(regulerIntroLines, M, y);
   y += regulerIntroLines.length * 4.5 + 5;
-
-  y = drawSubTitle('3.1 Daftar Cabang yang Diaudit (Reguler)', y);
 
   if (regulerAudits.length > 0) {
     autoTable(pdf, {
@@ -1177,13 +1447,7 @@ const generatePDF = async (
         (a.rating || 'BELUM DIISI').toUpperCase(),
       ]),
       theme: 'grid',
-      headStyles: {
-        fillColor: COLORS.tableHeaderBlue,
-        textColor: COLORS.white,
-        fontStyle: 'bold',
-        fontSize: 8,
-        halign: 'center',
-      },
+      headStyles: { fillColor: COLORS.tableHeaderBlue, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
       bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
       alternateRowStyles: { fillColor: COLORS.rowAltBlue },
       columnStyles: {
@@ -1204,10 +1468,9 @@ const generatePDF = async (
         }
       },
     });
-
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 1: Daftar Cabang Audit Reguler ${periodLabel}`, PW / 2, y, { align: 'center' });
+    pdf.text(`Tabel 3: Daftar Cabang Audit Reguler ${periodLabel}`, PW / 2, y, { align: 'center' });
     y += 6;
   } else {
     setFont('italic', 9, COLORS.textMed);
@@ -1215,76 +1478,92 @@ const generatePDF = async (
     y += 10;
   }
 
-  drawPageFooter(5);
-
-  // ======================================================
-  // PAGE 5 — 3.2 Rating Distribution
-  // ======================================================
-  pdf.addPage();
-  drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
-  y = 22;
-
-  y = drawSubTitle('3.2 Distribusi Rating Hasil Audit Reguler', y);
-
-  const ratingCounts = { high: 0, medium: 0, low: 0 };
-  regulerAudits.forEach(a => {
-    const r = (a.rating || '').toLowerCase();
-    if (r === 'high') ratingCounts.high++;
-    else if (r === 'medium') ratingCounts.medium++;
-    else if (r === 'low') ratingCounts.low++;
-  });
-
-  const ratingDistText = `Penilaian hasil audit reguler menggunakan tiga kategori rating: HIGH (risiko tinggi/temuan signifikan), MEDIUM (risiko sedang), dan LOW (risiko rendah/kondisi baik). Dari ${regulerAudits.length} cabang yang diaudit, sebanyak ${ratingCounts.high} cabang mendapatkan rating High, ${ratingCounts.medium} cabang rating Medium, dan ${ratingCounts.low} cabang rating Low.`;
-
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar teks distribusi rating rapi
-  setFont('normal', 9, COLORS.textDark);
-  const ratingDistLines = pdf.splitTextToSize(ratingDistText, CW);
-  pdf.text(ratingDistLines, M, y);
-  y += ratingDistLines.length * 4.5 + 5;
-
   if (ratingCounts.high + ratingCounts.medium + ratingCounts.low > 0) {
+    if (y > PH - 80) { pdf.addPage(); drawPageHeader(HEADER_LEFT, HEADER_RIGHT); y = 22; }
     const ratingImg = drawHBarChart(
-      ['high', 'medium', 'low'],
+      ['HIGH', 'MEDIUM', 'LOW'],
       [ratingCounts.high, ratingCounts.medium, ratingCounts.low],
       ['#DC3545', '#F39C12', '#28A745'],
-      `Distribusi Rating Audit Reguler — ${periodLabel}`,
+      `Distribusi Rating Audit Reguler - ${periodLabel}`,
       520, 200,
     );
     pdf.addImage(ratingImg, 'PNG', M + 5, y, CW - 10, 55);
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Gambar 2: Distribusi Rating Audit Reguler ${periodLabel}`, PW / 2, y + 58, { align: 'center' });
+    pdf.text(`Gambar 3: Distribusi Rating Audit Reguler ${periodLabel}`, PW / 2, y + 58, { align: 'center' });
     y += 64;
   }
 
-  const highPct = regulerAudits.length > 0 ? Math.round((ratingCounts.high / regulerAudits.length) * 100) : 0;
-  const ratingHighlightText = `Sebanyak ${ratingCounts.high} cabang (${highPct}%) mendapatkan rating HIGH, yang mengindikasikan adanya temuan audit yang signifikan dan memerlukan tindak lanjut segera. Manajemen direkomendasikan untuk memastikan rencana tindak lanjut (RTL) dari cabang-cabang tersebut diselesaikan dalam tenggat waktu yang telah disepakati.`;
-  drawHighlightBox(ratingHighlightText, y, [236, 245, 252], COLORS.accentBlue, [40, 80, 130]);
-
-  drawPageFooter(6);
+  drawPageFooter(7);
 
   // ======================================================
-  // PAGE 6 — AUDIT KHUSUS 4.1 Daftar Kasus
+  // 3.3 Audit Khusus / Fraud
   // ======================================================
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
   y = 22;
 
-  y = drawSectionTitle(`4. AUDIT KHUSUS / FRAUD`, y);
+  y = drawSubTitle(`3.3 Audit Khusus / Fraud ${periodLabel}`, y);
 
-  const khususAudits = data.auditDetails.filter(
-    a => a.audit_type?.toLowerCase().includes('khusus') || a.audit_type?.toLowerCase().includes('fraud') || a.audit_type?.toLowerCase().includes('special'),
-  );
-
-  const khususIntro = `Audit khusus/fraud dilaksanakan atas dasar indikasi atau laporan adanya penyimpangan keuangan pada cabang tertentu. Pada ${periodContextLabel}, terdapat ${khususAudits.length} cabang yang menjadi objek audit khusus, tersebar di ${Object.keys(data.regionFrauds).length} regional. Seluruh audit khusus dikonfirmasi sebagai real fraud, dengan total kerugian yang teridentifikasi sebesar ${formatRp(data.totalNominalFraud)}.`;
-
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 4
-  // tampil rapi dan mengisi lebar CW secara penuh (sebelumnya terpotong)
+  const khususIntro = `Audit khusus/fraud dilaksanakan atas dasar indikasi atau laporan adanya penyimpangan keuangan pada cabang tertentu. Pada ${periodContextLabel}, terdapat ${khususAudits.length} cabang yang menjadi objek audit khusus, tersebar di ${Object.keys(data.regionFrauds).length} regional.`;
   setFont('normal', 9, COLORS.textDark);
   const khususIntroLines = pdf.splitTextToSize(khususIntro, CW);
   pdf.text(khususIntroLines, M, y);
   y += khususIntroLines.length * 4.5 + 5;
 
-  y = drawSubTitle('4.1 Daftar Kasus Fraud per Cabang', y);
+  // Daftar Cabang Audit Khusus per Regional
+  setFont('bold', 9, COLORS.headerBlue);
+  pdf.text('Daftar Cabang Audit Khusus per Regional', M, y);
+  y += 6;
+
+  const khususByRegion: Record<string, string[]> = {};
+  sortedAllRegions.forEach(reg => { khususByRegion[reg] = []; });
+  khususAudits.forEach(a => {
+    const reg = a.region || 'Lainnya';
+    if (!khususByRegion[reg]) khususByRegion[reg] = [];
+    if (a.branch_name && !khususByRegion[reg].includes(a.branch_name)) {
+      khususByRegion[reg].push(a.branch_name);
+    }
+  });
+
+  const khususRegionalRows = sortedAllRegions.map((reg, idx) => {
+    const branches = khususByRegion[reg] || [];
+    return [
+      String(idx + 1),
+      reg,
+      String(branches.length),
+      branches.length > 0 ? branches.map(b => toTitleCase(b)).join(', ') : '-',
+    ];
+  });
+
+  if (khususRegionalRows.length > 0) {
+    autoTable(pdf, {
+      startY: y,
+      head: [['No', 'Regional', 'Total', 'Cabang']],
+      body: khususRegionalRows,
+      theme: 'grid',
+      headStyles: { fillColor: COLORS.tableHeader, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
+      alternateRowStyles: { fillColor: COLORS.rowAltRed },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 15, halign: 'center' },
+        3: { cellWidth: 'auto' },
+      },
+      margin: { left: M, right: M },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+    setFont('italic', 7.5, COLORS.textLight);
+    pdf.text(`Tabel 4: Daftar Cabang Audit Khusus per Regional ${periodLabel}`, PW / 2, y, { align: 'center' });
+    y += 8;
+  }
+
+  // Daftar Kasus Fraud per Cabang
+  if (y > PH - 60) { pdf.addPage(); drawPageHeader(HEADER_LEFT, HEADER_RIGHT); y = 22; }
+
+  setFont('bold', 9, COLORS.headerBlue);
+  pdf.text('Daftar Kasus Fraud per Cabang', M, y);
+  y += 6;
 
   const branchFraudMap: Record<string, { region: string; pelaku: string[]; total: number; start: string; end: string }> = {};
   khususAudits.forEach(a => {
@@ -1299,31 +1578,19 @@ const generatePDF = async (
     branchFraudMap[bn].pelaku.push(f.fraud_staff);
     branchFraudMap[bn].total += f.fraud_amount;
   });
-
-  const branchFraudRows = Object.entries(branchFraudMap)
-    .sort((a, b) => b[1].total - a[1].total);
+  const branchFraudRows = Object.entries(branchFraudMap).sort((a, b) => b[1].total - a[1].total);
 
   if (branchFraudRows.length > 0) {
     autoTable(pdf, {
       startY: y,
       head: [['No', 'Cabang', 'Regional', 'Tgl Mulai', 'Tgl Selesai', 'Jml Pelaku', 'Total Fraud (Rp)']],
       body: branchFraudRows.map(([bn, v], i) => [
-        String(i + 1),
-        bn.toUpperCase(),
-        v.region,
-        toDisplayDate(v.start),
-        toDisplayDate(v.end),
-        String(v.pelaku.length),
-        formatRp(v.total),
+        String(i + 1), bn.toUpperCase(), v.region,
+        toDisplayDate(v.start), toDisplayDate(v.end),
+        String(v.pelaku.length), formatRp(v.total),
       ]),
       theme: 'grid',
-      headStyles: {
-        fillColor: COLORS.tableHeader,
-        textColor: COLORS.white,
-        fontStyle: 'bold',
-        fontSize: 8,
-        halign: 'center',
-      },
+      headStyles: { fillColor: COLORS.tableHeader, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
       bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
       alternateRowStyles: { fillColor: COLORS.rowAltRed },
       columnStyles: {
@@ -1337,59 +1604,54 @@ const generatePDF = async (
       },
       margin: { left: M, right: M },
     });
-
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 2: Ringkasan Kasus Fraud per Cabang ${periodLabel}`, PW / 2, y, { align: 'center' });
-    y += 6;
-
-    // FIX: Hapus pdf.text judul chart yang duplikat di sini.
-    // Sebelumnya ada 2 judul: satu dari pdf.text dan satu dari dalam canvas drawVBarChart,
-    // sehingga judul tampil double di PDF. Sekarang cukup dari dalam canvas saja.
-    if (y < PH - 80) {
-      const topBranches = branchFraudRows.slice(0, 10);
-      const barImg = drawVBarChart(
-        topBranches.map(([bn]) => bn.length > 10 ? bn.substring(0, 10) + '.' : bn),
-        topBranches.map(([, v]) => v.total),
-        `Nominal Fraud per Cabang — ${periodLabel}`,
-        520, 200,
-      );
-      // FIX: Hapus baris pdf.text judul chart yang menyebabkan double title:
-      // sebelumnya ada: setFont('bold', 9, ...) + pdf.text(`Nominal Fraud per Cabang...`)
-      // Judul sudah ada di dalam canvas, jadi tidak perlu pdf.text lagi
-      const chartH = Math.min(55, PH - y - 30);
-      pdf.addImage(barImg, 'PNG', M + 5, y, CW - 10, chartH);
-      y += chartH + 15;
-    }
-  } else {
-    setFont('italic', 9, COLORS.textMed);
-    pdf.text('Tidak ada data audit khusus pada periode ini.', M, y);
-    y += 10;
+    pdf.text(`Tabel 5: Ringkasan Kasus Fraud per Cabang ${periodLabel}`, PW / 2, y, { align: 'center' });
+    y += 8;
   }
 
-  drawPageFooter(7);
+  drawPageFooter(8);
 
-  // ======================================================
-  // PAGE 7 — 4.2 Rincian Pelaku
-  // ======================================================
+  // Rincian Staf Fraud: summary per regional + detail
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
   y = 22;
 
-  // FIX: Hapus baris caption "Gambar 3" yang sebelumnya ada di sini tapi
-  // tidak sesuai posisi karena chart sudah di halaman sebelumnya
-  y = drawSubTitle('4.2 Rincian Pelaku dan Nominal Fraud', y);
+  setFont('bold', 9, COLORS.headerBlue);
+  pdf.text('Rincian Staf Fraud', M, y);
+  y += 6;
 
-  const topBranchByFraud = branchFraudRows[0];
-  const pelakuIntroText = `Berikut adalah daftar lengkap pelaku fraud beserta nominal kerugian yang teridentifikasi dalam pelaksanaan audit khusus selama ${periodContextLabel}. Total teridentifikasi ${data.fraudDetails.length} pelaku${topBranchByFraud ? ` dengan nominal fraud terbesar tercatat pada cabang ${topBranchByFraud[0]} (Regional ${topBranchByFraud[1].region}) sebesar ${formatRp(topBranchByFraud[1].total)} yang melibatkan ${topBranchByFraud[1].pelaku.length} pelaku.` : '.'}`;
+  const fraudRegionalSummary = sortedAllRegions.map((reg, idx) => {
+    const regFrauds = data.fraudDetails.filter(f => f.region === reg);
+    return [String(idx + 1), reg, String(regFrauds.length)];
+  });
 
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro 4.2 rapi
-  setFont('normal', 9, COLORS.textDark);
-  const pelakuIntroLines = pdf.splitTextToSize(pelakuIntroText, CW);
-  pdf.text(pelakuIntroLines, M, y);
-  y += pelakuIntroLines.length * 4.5 + 4;
+  if (fraudRegionalSummary.length > 0) {
+    setFont('bold', 8.5, COLORS.textDark);
+    pdf.text('Ringkasan Fraud per Regional', M, y);
+    y += 5;
+
+    autoTable(pdf, {
+      startY: y,
+      head: [['No', 'Regional', 'Total Fraud']],
+      body: fraudRegionalSummary,
+      theme: 'grid',
+      headStyles: { fillColor: COLORS.tableHeaderBlue, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
+      alternateRowStyles: { fillColor: COLORS.rowAltBlue },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 25, halign: 'center' },
+      },
+      margin: { left: M, right: M },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 6;
+  }
 
   if (data.fraudDetails.length > 0) {
+    if (y > PH - 50) { pdf.addPage(); drawPageHeader(HEADER_LEFT, HEADER_RIGHT); y = 22; }
+
     autoTable(pdf, {
       startY: y,
       head: [['No', 'Cabang', 'Regional', 'Nama Pelaku', 'Nominal Fraud (Rp)']],
@@ -1402,19 +1664,8 @@ const generatePDF = async (
       ]),
       foot: [['', '', '', 'TOTAL', formatRp(data.totalNominalFraud)]],
       theme: 'grid',
-      headStyles: {
-        fillColor: COLORS.tableHeader,
-        textColor: COLORS.white,
-        fontStyle: 'bold',
-        fontSize: 8,
-        halign: 'center',
-      },
-      footStyles: {
-        fillColor: COLORS.lightGray,
-        textColor: COLORS.textDark,
-        fontStyle: 'bold',
-        fontSize: 8,
-      },
+      headStyles: { fillColor: COLORS.tableHeader, textColor: COLORS.white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+      footStyles: { fillColor: COLORS.lightGray, textColor: COLORS.textDark, fontStyle: 'bold', fontSize: 8 },
       bodyStyles: { fontSize: 7.5, textColor: COLORS.textDark },
       alternateRowStyles: { fillColor: COLORS.rowAltRed },
       columnStyles: {
@@ -1426,30 +1677,18 @@ const generatePDF = async (
       },
       margin: { left: M, right: M },
     });
-
     y = (pdf as any).lastAutoTable.finalY + 4;
     setFont('italic', 7.5, COLORS.textLight);
-    pdf.text(`Tabel 3: Rincian Pelaku Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
+    pdf.text(`Tabel 6: Rincian Pelaku Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
+    y += 8;
   }
 
-  drawPageFooter(8);
+  // Status Pengembalian
+  if (y > PH - 70) { pdf.addPage(); drawPageHeader(HEADER_LEFT, HEADER_RIGHT); y = 22; }
 
-  // ======================================================
-  // PAGE 8 — 4.3 Status Pengembalian
-  // ======================================================
-  pdf.addPage();
-  drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
-  y = 22;
-
-  y = drawSubTitle('4.3 Status Pengembalian (Recovery) Fraud', y);
-
-  const recoveryIntroText = `Pengembalian fraud merupakan upaya pemulihan kerugian yang dilakukan oleh pelaku atau pihak terkait setelah temuan fraud dikonfirmasi. Berdasarkan data yang tercatat dalam sistem hingga tanggal pelaporan, status pengembalian fraud untuk ${periodContextLabel} adalah sebagai berikut:`;
-
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar teks intro recovery rapi
-  setFont('normal', 9, COLORS.textDark);
-  const recoveryIntroLines = pdf.splitTextToSize(recoveryIntroText, CW);
-  pdf.text(recoveryIntroLines, M, y);
-  y += recoveryIntroLines.length * 4.5 + 4;
+  setFont('bold', 9, COLORS.headerBlue);
+  pdf.text('Status Pengembalian (Recovery) Fraud', M, y);
+  y += 6;
 
   const recoveryPct = data.totalNominalFraud > 0
     ? ((data.totalPengembalianFraud / data.totalNominalFraud) * 100).toFixed(2)
@@ -1466,12 +1705,7 @@ const generatePDF = async (
       ['Persentase Recovery', `${recoveryPct}%`],
     ],
     theme: 'grid',
-    headStyles: {
-      fillColor: COLORS.tableHeaderGray,
-      textColor: COLORS.white,
-      fontStyle: 'bold',
-      fontSize: 9,
-    },
+    headStyles: { fillColor: COLORS.tableHeaderGray, textColor: COLORS.white, fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 8.5, textColor: COLORS.textDark },
     columnStyles: {
       0: { cellWidth: 110 },
@@ -1490,116 +1724,28 @@ const generatePDF = async (
 
   y = (pdf as any).lastAutoTable.finalY + 4;
   setFont('italic', 7.5, COLORS.textLight);
-  pdf.text(`Tabel 4: Status Pengembalian Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
+  pdf.text(`Tabel 7: Status Pengembalian Fraud ${periodLabel}`, PW / 2, y, { align: 'center' });
   y += 7;
 
   const recoveryNote = data.totalPengembalianFraud === 0
-    ? `Hingga tanggal laporan ini diterbitkan, belum ada pengembalian dana yang diterima dari seluruh pelaku fraud yang teridentifikasi selama ${periodContextLabel}. Proses penagihan dan pemulihan kerugian akan terus dipantau dan dilaporkan pada periode berikutnya. Divisi Audit Internal berkoordinasi dengan pihak terkait untuk memastikan proses recovery berjalan sesuai ketentuan yang berlaku.`
-    : `Hingga tanggal laporan ini diterbitkan, total pengembalian yang diterima adalah ${formatRp(data.totalPengembalianFraud)} atau ${recoveryPct}% dari total kerugian. Saldo yang belum terpulihkan sebesar ${formatRp(outstanding)} masih dalam proses penagihan dan pemulihan. Divisi Audit Internal berkoordinasi dengan pihak terkait untuk memastikan proses recovery berjalan sesuai ketentuan yang berlaku.`;
+    ? `Hingga tanggal laporan ini diterbitkan, belum ada pengembalian dana yang diterima dari seluruh pelaku fraud yang teridentifikasi selama ${periodContextLabel}. Proses penagihan dan pemulihan kerugian akan terus dipantau dan dilaporkan pada periode berikutnya.`
+    : `Hingga tanggal laporan ini diterbitkan, total pengembalian yang diterima adalah ${formatRp(data.totalPengembalianFraud)} atau ${recoveryPct}% dari total kerugian. Saldo yang belum terpulihkan sebesar ${formatRp(outstanding)} masih dalam proses penagihan.`;
 
   drawHighlightBox(recoveryNote, y, [236, 245, 252], COLORS.accentBlue, [40, 80, 130]);
 
   drawPageFooter(9);
 
   // ======================================================
-  // PAGE 9 — ANALISIS REGIONAL
+  // 4. KESIMPULAN DAN REKOMENDASI
   // ======================================================
   pdf.addPage();
   drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
   y = 22;
 
-  y = drawSectionTitle('5. ANALISIS REGIONAL', y);
-
-  const regionalIntro = `Analisis regional bertujuan untuk mengidentifikasi pola distribusi kasus fraud berdasarkan wilayah/regional selama ${periodContextLabel}. Data ini penting untuk menentukan prioritas pengawasan dan alokasi sumber daya audit pada periode selanjutnya.`;
-
-  // FIX: setFont dipanggil SEBELUM splitTextToSize agar paragraf intro section 5 rapi
-  setFont('normal', 9, COLORS.textDark);
-  const regionalIntroLines = pdf.splitTextToSize(regionalIntro, CW);
-  pdf.text(regionalIntroLines, M, y);
-  y += regionalIntroLines.length * 4.5 + 5;
-
-  const sortedRegions = Object.entries(data.regionFrauds).sort((a, b) => b[1].count - a[1].count);
-
-  if (sortedRegions.length > 0) {
-    const regionColors = sortedRegions.map((_, i) => {
-      const blues = ['#11356B', '#1E4D8C', '#2E6DB0', '#3A8AC8', '#4BA3DB'];
-      return blues[Math.min(i, blues.length - 1)];
-    });
-
-    const regBarImg = drawHBarChart(
-      sortedRegions.map(([r]) => r),
-      sortedRegions.map(([, v]) => v.count),
-      regionColors,
-      'Top Regional dengan Kasus Fraud Terbanyak (Kumulatif)',
-      520, Math.max(160, sortedRegions.length * 22 + 50),
-    );
-
-    const chartH = Math.min(65, PH - y - 100);
-    pdf.addImage(regBarImg, 'PNG', M + 5, y, CW - 10, chartH);
-    setFont('italic', 7.5, COLORS.textLight);
-    pdf.text('Gambar 4: Top Regional dengan Kasus Fraud Terbanyak (Kumulatif)', PW / 2, y + chartH + 3, { align: 'center' });
-    y += chartH + 8;
-
-    autoTable(pdf, {
-      startY: y,
-      head: [['No', 'Regional', 'Jumlah Pelaku', 'Total Nominal Fraud (Rp)']],
-      body: sortedRegions.map(([region, v], i) => [
-        String(i + 1),
-        region,
-        String(v.count),
-        formatRp(v.nominal),
-      ]),
-      theme: 'grid',
-      headStyles: {
-        fillColor: COLORS.tableHeaderBlue,
-        textColor: COLORS.white,
-        fontStyle: 'bold',
-        fontSize: 8,
-        halign: 'center',
-      },
-      bodyStyles: { fontSize: 8, textColor: COLORS.textDark },
-      alternateRowStyles: { fillColor: COLORS.rowAltBlue },
-      columnStyles: {
-        0: { cellWidth: 12, halign: 'center' },
-        1: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
-        2: { cellWidth: 30, halign: 'center' },
-        3: { cellWidth: 70, halign: 'right', fontStyle: 'bold', textColor: COLORS.red },
-      },
-      margin: { left: M, right: M },
-      didParseCell: (hookData) => {
-        if (hookData.section === 'body' && hookData.row.index === 0) {
-          hookData.cell.styles.fillColor = [255, 230, 230];
-        }
-      },
-    });
-
-    y = (pdf as any).lastAutoTable.finalY + 4;
-    setFont('italic', 7.5, COLORS.textLight);
-    pdf.text('Tabel 5: Ranking Regional Berdasarkan Kumulatif Kasus Fraud', PW / 2, y, { align: 'center' });
-    y += 6;
-
-    if (sortedRegions.length >= 2) {
-      const r1 = sortedRegions[0];
-      const r2 = sortedRegions[1];
-      const regionalHighlight = `Regional ${r1[0]} menempati posisi pertama dengan kasus fraud terbanyak (${r1[1].count} pelaku, total ${formatRp(r1[1].nominal)}), diikuti oleh Regional ${r2[0]} (${r2[1].count} pelaku, total ${formatRp(r2[1].nominal)}). Kedua regional ini perlu mendapatkan perhatian dan pengawasan yang lebih intensif dalam periode audit selanjutnya.`;
-      drawHighlightBox(regionalHighlight, y, [236, 245, 252], COLORS.accentBlue, [40, 80, 130]);
-    }
-  } else {
-    setFont('italic', 9, COLORS.textMed);
-    pdf.text('Tidak ada kasus fraud regional untuk dianalisis pada periode ini.', M, y);
-  }
-
-  drawPageFooter(10);
-
-  // ======================================================
-  // PAGE 10+ — KESIMPULAN DAN REKOMENDASI
-  // ======================================================
-  pdf.addPage();
-  drawPageHeader(HEADER_LEFT, HEADER_RIGHT);
-  y = 22;
-
-  y = drawSectionTitle('6. KESIMPULAN DAN REKOMENDASI', y);
+  y = drawSectionTitle('4. KESIMPULAN DAN REKOMENDASI', y);
   y += 2;
+
+
 
   const renderNarrative = (text: string, startY: number): number => {
     let cy = startY;
@@ -1609,7 +1755,7 @@ const generatePDF = async (
       const line = rawLine.trimEnd();
       if (!line) return;
 
-      const isH2 = /^6\.[0-9]/.test(line.trim());
+      const isH2 = /^4\.[0-9]/.test(line.trim());
       const isAlpha = /^[a-z]\.\s/.test(line.trim());
       const isNumPt = /^[0-9]+\.\s/.test(line.trim());
       const isBullet = line.trim().startsWith('- ') || line.trim().startsWith('* ');
@@ -1680,7 +1826,7 @@ const generatePDF = async (
         pdf.setFontSize(9);
         const wrappedContent = pdf.splitTextToSize(content, CW - 10);
         pdf.setTextColor(...COLORS.textDark);
-        pdf.text('•', M + 3, cy);
+        pdf.text('â€¢', M + 3, cy);
         wrappedContent.forEach((wl: string, wi: number) => {
           if (cy > PH - 25) { pdf.addPage(); drawPageHeader(HEADER_LEFT, HEADER_RIGHT); cy = 22; }
           pdf.text(wl, M + 9, cy + wi * 4.8);
@@ -1988,7 +2134,7 @@ export default function MonthlyReportGenerator() {
               )}
               {selectedModel.startsWith('groq:') && (
                 <p className="text-xs text-orange-600 flex items-center gap-1">
-                  <span>⚡</span> Groq — Super cepat, gratis
+                  <span>⚡</span> Groq - Super cepat, gratis
                 </p>
               )}
               {selectedModel.startsWith('openrouter:') && (
@@ -2036,7 +2182,7 @@ export default function MonthlyReportGenerator() {
 
             {step === 'error' && (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200 animate-in fade-in duration-300">
-                <div className="mt-0.5 text-red-500 text-lg">⚠</div>
+                <div className="mt-0.5 text-red-500 text-lg">âš </div>
                 <div>
                   <p className="text-sm font-medium text-red-800">Gagal generate laporan</p>
                   <p className="text-xs text-red-600">{errorMessage}</p>

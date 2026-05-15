@@ -62,10 +62,29 @@ const createBlankRiskIssueRow = (createdBy: string, auditType: EditorTab) => ({
   rekomendasi: '',
   poin: null as number | null,
   perbaikan_temuan: '',
-  jatuh_tempo: '',
-  tanggal_audit: '',
+  jatuh_tempo: null as string | null,
+  tanggal_audit: null as string | null,
   last_updated: new Date().toISOString(),
 });
+
+const getLevenshteinDistance = (a: string, b: string): number => {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j] + 1,
+        matrix[i - 1][j - 1] + indicator
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+};
 
 export default function RiskIssueEditorPage() {
   const { user } = useAuth();
@@ -79,6 +98,7 @@ export default function RiskIssueEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMessage, setSaveMessage] = useState('Data siap diedit');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const rcmCodesRef = useRef<string[]>([]);
 
   const rowCountLabel = useMemo(() => `${rows.length} baris`, [rows.length]);
 
@@ -128,15 +148,25 @@ export default function RiskIssueEditorPage() {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('risk_issue')
-        .select('*')
-        .eq('created_by', user.id)
-        .eq('audit_type', editorTab)
-        .order('id');
+      const [riRes, rcmRes] = await Promise.all([
+        supabase
+          .from('risk_issue')
+          .select('*')
+          .eq('created_by', user.id)
+          .eq('audit_type', editorTab)
+          .order('id'),
+        supabase
+          .from('rcm')
+          .select('code')
+      ]);
 
-      if (error) throw error;
-      setRows(data || []);
+      if (riRes.error) throw riRes.error;
+      
+      if (rcmRes.data) {
+        rcmCodesRef.current = rcmRes.data.map(r => r.code).filter(Boolean);
+      }
+
+      setRows(riRes.data || []);
     } catch (error) {
       console.error('Error fetching risk issue rows:', error);
       toast.error(getRiskIssueTableSetupMessage(error) || 'Gagal memuat data risk issue');
@@ -227,7 +257,66 @@ export default function RiskIssueEditorPage() {
           headerFilterFunc: 'in'
         },
         { title: 'Judul Temuan', field: 'judul_temuan', editor: 'textarea', width: 240 },
-        { title: 'Kode Risk Issue', field: 'kode_risk_issue', editor: 'input', width: 160 },
+        { 
+          title: 'Kode Risk Issue', 
+          field: 'kode_risk_issue', 
+          editor: 'input', 
+          width: 160,
+          cellEdited: (cell: any) => {
+            const val = cell.getValue();
+            if (!val) return;
+            const validCodes = rcmCodesRef.current;
+            if (validCodes.length > 0) {
+              const valUpper = String(val).toUpperCase();
+              
+              if (validCodes.includes(valUpper)) {
+                if (val !== valUpper) cell.setValue(valUpper);
+                return;
+              }
+
+              const suggestions = validCodes
+                .map(code => ({ code, dist: getLevenshteinDistance(valUpper, code.toUpperCase()) }))
+                .filter(item => item.dist <= 2)
+                .sort((a, b) => a.dist - b.dist);
+
+              if (suggestions.length > 0) {
+                const bestMatch = suggestions[0].code;
+                toast((t) => (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium text-slate-800">
+                      Kode <b>'{val}'</b> tidak ditemukan.
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Apakah maksud Anda <b className="text-blue-600">{bestMatch}</b>?
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          cell.setValue(bestMatch);
+                          toast.dismiss(t.id);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white flex-1 h-8"
+                      >
+                        Ya, Ganti
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 h-8"
+                      >
+                        Batal
+                      </Button>
+                    </div>
+                  </div>
+                ), { duration: 10000, position: 'top-center' });
+              } else {
+                toast.error(`Kode '${val}' tidak ditemukan di tabel RCM.`, { duration: 5000 });
+              }
+            }
+          }
+        },
         { title: 'Judul Risk Issue', field: 'judul_risk_issue', editor: 'textarea', width: 240 },
         { 
           title: 'Kategori', 
