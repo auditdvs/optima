@@ -24,7 +24,8 @@ import {
   UserRoundPen,
   Users,
   Wrench,
-  X
+  X,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -264,6 +265,7 @@ function Sidebar({ isCollapsed, onToggleCollapse, unreadChatCount = 0 }: { isCol
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/assignment-letter', icon: FileText, label: 'Assignment' });
     if (['user', 'dvs', 'qa', 'manager', 'superadmin'].includes(userRole.toLowerCase())) auditItems.push({ path: '/survey-manager', icon: ClipboardCheck, label: 'Survei Kepuasan' });
     auditItems.push({ path: '/tools', icon: Wrench, label: 'Tools' });
+    auditItems.push({ path: '/excel-converter', icon: FileSpreadsheet, label: 'Excel Converter' });
     auditItems.push({ path: '/audit-assistant', icon: Sparkles, label: 'AI Assistant' });
     auditItems.push({ path: '/shortlink', icon: Link2, label: 'Shortlink' });
 

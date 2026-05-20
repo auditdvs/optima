@@ -176,7 +176,7 @@ export default function UserControlPanel() {
       {/* Main header */}
       <div className="mb-4">
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">System Administration</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage users, system parameters, and track application releases.</p>
+        <p className="text-sm text-gray-500 mt-1">Manage users, system parameters, and track application releases. Default password: auditoptima</p>
       </div>
 
       {/* GitHub Style Tab Navigation */}

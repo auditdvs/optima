@@ -21,6 +21,7 @@ import GrammarCorrection from './pages/GrammarCorrection';
 import CompanyRegulations from './pages/CompanyRegulations';
 import Dashboard from './pages/Dashboard';
 import EmailAddress from './pages/EmailAddress';
+import ExcelConverter from './pages/ExcelConverter';
 import FinanceLPJ from './pages/FinanceLPJ';
 import FraudStaffPage from './pages/FraudStaffPage';
 import Login from './pages/Login';
@@ -212,6 +213,11 @@ function App() {
                 <Route path="audit-assistant" element={
                 <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
                   <AuditAssistant />
+                </PrivateRoute>
+                } />
+                <Route path="excel-converter" element={
+                <PrivateRoute requiredRoles={['superadmin', 'manager', 'qa', 'dvs', 'user', 'risk']}>
+                  <ExcelConverter />
                 </PrivateRoute>
                 } />
             </Route>

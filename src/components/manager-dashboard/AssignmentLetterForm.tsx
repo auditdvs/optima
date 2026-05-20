@@ -385,9 +385,6 @@ export default function AssignmentLetterForm({ onSuccess, onCancel }: Assignment
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Isi form surat tugas</h2>
-      </div>
 
       {/* Preview Nomor Surat */}
       <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg">
